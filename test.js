@@ -1,4 +1,4 @@
-'use strict';
+/*'use strict';
 
 let startTime = 0;
 let totalTime = 0;
@@ -222,3 +222,4 @@ function getShortestPathDistance() {
 function closeModal() {
     modal.style.display = 'none';
 }
+*/
