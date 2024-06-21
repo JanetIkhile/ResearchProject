@@ -1,3 +1,4 @@
+
 'use strict';
 
 let startTime = 0;
@@ -184,7 +185,7 @@ document.addEventListener("touchend", e => {
     reachedTarget = false;
 });
 
-// Function to calculate drag distance covered
+/*// Function to calculate drag distance covered
 function calculateDistance(x1, x2, y1, y2) {
     const disX = x2 - x1;
     const disY = y2 - y1;
@@ -192,6 +193,7 @@ function calculateDistance(x1, x2, y1, y2) {
         Math.pow(disX, 2) + Math.pow(disY, 2)
     );
 }
+*/
 
 // Function to calculate tap duration
 function calculateTotalTime(startTime) {
@@ -199,7 +201,7 @@ function calculateTotalTime(startTime) {
     return (endTime - startTime);
 
 }
-
+/*
 // Function to calculate drag speed
 function calculateDragSpeed(distance, duration) {
     return (distance / duration);
@@ -218,7 +220,7 @@ function getShortestPathDistance() {
     let dy = targetY - startY;
 
     return Math.sqrt(dx * dx + dy * dy);
-}
+}*/
 function closeModal() {
     modal.style.display = 'none';
 }
