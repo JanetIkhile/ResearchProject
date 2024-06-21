@@ -1,4 +1,4 @@
-let startTime = 0;
+/*let startTime = 0;
 let touchStartX, touchStartY;
 let touchEndX, touchEndY;
 let firstTapTime = 0;
@@ -95,3 +95,4 @@ document.addEventListener("touchcancel", e => {
         pointer.remove()
     })
 })
+    */
