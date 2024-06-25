@@ -105,7 +105,7 @@ document.addEventListener("touchmove", e => {
         timeToPeakSpeed = currentTime - startTime;
     }
 
-    /*Check This Block to know if it can also work for average acceleration and what it means */
+    //Check This Block to know if it can also work for average acceleration and what it means
     //Average acceleration (final velocity - initial velocity)/ (final time -initial time)
     //let acceleration = (finalSpeed - previousSpeed) / (totalTimeTakenForTouchMove);
     //averageAcceleration = acceleration;
