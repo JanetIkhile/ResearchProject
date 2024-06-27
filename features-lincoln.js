@@ -8,6 +8,8 @@ let pauseCounter = 0;
 let pauseDuration = 0;
 let specificPauseDuration = 0;
 let currentTime = 0;
+let reachedTarget = false;
+let hitTarget = false;
 
 
 document.addEventListener("touchstart", e => {
@@ -17,7 +19,6 @@ document.addEventListener("touchstart", e => {
 
     startTime = Date.now();
     pauseIdentifier = Date.now();
-
 
     const pointer = document.createElement("div")
     pointer.classList.add("dot")
@@ -29,8 +30,6 @@ document.addEventListener("touchstart", e => {
     pauseDuration = 0;
 
     document.body.append(pointer);
-    // console.log(touch);
-
 });
 
 document.addEventListener("touchmove", e => {
@@ -58,8 +57,6 @@ document.addEventListener("touchmove", e => {
     const pointer = document.getElementById(touch.identifier)
     pointer.style.top = `${touch.pageY}px`
     pointer.style.left = `${touch.pageX}px`
-
-    //console.log(touch);
 });
 
 document.addEventListener("touchend", e => {
@@ -70,24 +67,30 @@ document.addEventListener("touchend", e => {
     pointer.remove();
 
     endTime = Date.now();
-    totalTime = (endTime - startTime)
+    totalTime = (endTime - startTime);
     console.log(totalTime);
 
     if (pauseCounter < 0) {
         pauseCounter = 0;
     }
-
     if (pauseCounter <= 0) {
         pauseDuration = 0;
     }
-
-    results = `Total Time: ${totalTime} ms
+    if (document.elementFromPoint(touch.clientX, touch.clientY) === targetInnerDot) {
+        reachedTarget = true;
+    }
+    results = `Target reached: ${reachedTarget}
+    Total Time: ${totalTime} ms
     Total Pauses: ${pauseCounter} pauses
     Longest Pause Duration: ${pauseDuration} ms`;
 
     modalContent.innerText = results;
     modal.style.display = 'block'
+    reachedTarget = false;
+    modalContent = null;
 });
+
 function closeModal() {
     modal.style.display = 'none';
+    modalContent = document.getElementById('modalBodyContent');
 }
