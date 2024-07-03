@@ -10,6 +10,8 @@ let specificPauseDuration = 0;
 let currentTime = 0;
 let reachedTarget = false;
 let hitTarget = false;
+let exitedTarget = false;
+let targetReentry = 0;
 let targetPositionX = getOffset(document.getElementById('targetInnerDot')).left;
 let targetPositionY = getOffset(document.getElementById('targetInnerDot')).top;
 let touchSlipBase = 50;
@@ -58,6 +60,7 @@ document.addEventListener("touchmove", e => {
         }
     }
 
+    //If the target has been entered, records a "touchslip" depending on the farthest distance the tap has reached from the closest the tap ever got to hte center of the target
     if ((currentX < targetPositionX + 12.5 && currentX > targetPositionX - 12.5) && (currentY < targetPositionY + 12.5 && currentY > targetPositionY - 12.5)) {
         hitTarget = true;
         reachedTarget = true;
@@ -67,25 +70,27 @@ document.addEventListener("touchmove", e => {
             touchSlipBaseX = currentX;
             touchSlipBaseY = currentY;
         }
+        //If the current distance from the tap is farther than the farthest recorded distance of touch slip, the farthest touch slip distance is updated
         if (touchSlipDistance < (((touchSlipBaseX - currentX) ** 2 + (touchSlipBaseY - currentY) ** 2) ** (1 / 2))) {
             touchSlipDistance = (((touchSlipBaseX - currentX) ** 2 + (touchSlipBaseY - currentY) ** 2) ** (1 / 2));
-            console.log(touchSlipDistance);
         }
-        console.log(touch.clientX, touch.clientY);
-        console.log(tempTouchSlip);
-        console.log(1);
-    } else {
-        reachedTarget = false;
-        console.log(2);
+        //Adds one count to the number of target reentries if the tap has exited and then entered the target
+        if (exitedTarget == true) {
+            exitedTarget = false;
+            targetReentry = targetReentry + 1;
+        }
     }
+    //If the tap is not inside the target, reachedTarget is set to false
+    else {
+        reachedTarget = false;
+    }
+    //If the tap has entered the target and then exited the target, records the distance the touch has slipped from the closest the tap got to the center of the target; records that the target has been exited
     if (hitTarget == true && reachedTarget == false) {
+        //Updates the touch slip distance if the current tap is farther from the initial touch slip point than what has been previously recorded
         if (touchSlipDistance < (((touchSlipBaseX - currentX) ** 2 + (touchSlipBaseY - currentY) ** 2) ** (1 / 2))) {
             touchSlipDistance = (((touchSlipBaseX - currentX) ** 2 + (touchSlipBaseY - currentY) ** 2) ** (1 / 2));
-            console.log(touchSlipDistance);
         }
-        console.log(3);
-        console.log(touch.clientX, touch.clientY);
-        console.log(touchSlipBaseX, touchSlipBaseY);
+        exitedTarget = true;
     }
     pauseIdentifier = Date.now();
 });
@@ -98,14 +103,12 @@ document.addEventListener("touchend", e => {
     pointer.remove();
 
     endTime = Date.now();
-    totalTime = (endTime - startTime);
+    totalTime = (endTime - startTime);//Total time the touch has lasted
     console.log(totalTime);
 
+    //When tapping, sets the number of pauses to 0
     if (pauseCounter < 0) {
         pauseCounter = 0;
-    }
-    if (pauseCounter <= 0) {
-        pauseDuration = 0;
     }
     if (document.elementFromPoint(touch.clientX, touch.clientY) === targetInnerDot) {
         reachedTarget = true;
@@ -114,7 +117,8 @@ document.addEventListener("touchend", e => {
     Total Time: ${totalTime} ms
     Total Pauses: ${pauseCounter} pauses
     Longest Pause Duration: ${pauseDuration} ms
-    Touchslip: ${Math.round(touchSlipDistance * 100) / 100} pixels`;
+    Touchslip: ${Math.round(touchSlipDistance * 100) / 100} pixels
+    Target Re-entries: ${targetReentry}`;
 
     modalContent.innerText = results;
     modal.style.display = 'block'
@@ -123,12 +127,15 @@ document.addEventListener("touchend", e => {
     modalContent = 0;
     touchSlipBase = 50;
     touchSlipDistance = 0;
+    targetReentry = 0;
 });
 
+//function to close the results modal
 function closeModal() {
     modal.style.display = 'none';
     modalContent = document.getElementById('modalBodyContent');
 }
+//function to find how far a certain element is from the top or the left of the screen 
 function getOffset(el) {
     var _x = 0;
     var _y = 0;
