@@ -18,6 +18,8 @@ let touchSlipBase = 50;
 let touchSlipDistance = 0;
 let touchSlipBaseX = 0;
 let touchSlipBaseY = 0;
+let enterTargetTime = 0;
+let verificationTime = 0;
 
 document.addEventListener("touchstart", e => {
     const touch = e.changedTouches[0];
@@ -64,6 +66,12 @@ document.addEventListener("touchmove", e => {
     if ((currentX < targetPositionX + 12.5 && currentX > targetPositionX - 12.5) && (currentY < targetPositionY + 12.5 && currentY > targetPositionY - 12.5)) {
         hitTarget = true;
         reachedTarget = true;
+
+        //Records the time the target was initially entered
+        const enterTargetTemp = Date.now();
+        if (enterTargetTime == 0) {
+            enterTargetTime = enterTargetTemp;
+        }
         let tempTouchSlip = (((targetPositionX - currentX) ** 2 + (targetPositionY - currentY) ** 2) ** (1 / 2));
         if (tempTouchSlip < touchSlipBase) {
             touchSlipBase = tempTouchSlip;
@@ -106,19 +114,28 @@ document.addEventListener("touchend", e => {
     totalTime = (endTime - startTime);//Total time the touch has lasted
     console.log(totalTime);
 
+    //Records the time since the target was first reached to the time the tap ends
+    if (enterTargetTime != 0) {
+        verificationTime = (Date.now() - enterTargetTime);
+    } else {
+        verificationTime = 0;
+    } /*if (reachedTarget == false) {
+        verificationTime = 0;
+    }*/
+
     //When tapping, sets the number of pauses to 0
     if (pauseCounter < 0) {
         pauseCounter = 0;
     }
-    if (document.elementFromPoint(touch.clientX, touch.clientY) === targetInnerDot) {
-        reachedTarget = true;
-    }
-    results = `Target reached: ${reachedTarget}
+
+    results = `Target reached at end of tap: ${reachedTarget}
+    Target reached at some point: ${hitTarget}
     Total Time: ${totalTime} ms
     Total Pauses: ${pauseCounter} pauses
     Longest Pause Duration: ${pauseDuration} ms
     Touchslip: ${Math.round(touchSlipDistance * 100) / 100} pixels
-    Target Re-entries: ${targetReentry}`;
+    Target Re-entries: ${targetReentry}
+    Time to liftoff from contact with target: ${verificationTime} ms`;
 
     modalContent.innerText = results;
     modal.style.display = 'block'
@@ -128,6 +145,7 @@ document.addEventListener("touchend", e => {
     touchSlipBase = 50;
     touchSlipDistance = 0;
     targetReentry = 0;
+    enterTargetTime = 0;
 });
 
 //function to close the results modal
