@@ -52,13 +52,15 @@ document.addEventListener("touchmove", e => {
 
     //Number of pauses while the person is still touching the screen
     //100 ms or longer
-    if (pauseIdentifier <= currentTime - 100) {
-        pauseCounter = pauseCounter + 1;
-        specificPauseDuration = currentTime - pauseIdentifier;
-        console.log(specificPauseDuration);
-        //If this specific pause is longer than the previous longest pause, the longest pause is updated
-        if (specificPauseDuration > pauseDuration) {
-            pauseDuration = specificPauseDuration;
+    if (pauseIdentifier != startTime) {
+        if (pauseIdentifier <= currentTime - 100) {
+            pauseCounter = pauseCounter + 1;
+            specificPauseDuration = currentTime - pauseIdentifier;
+            console.log(specificPauseDuration);
+            //If this specific pause is longer than the previous longest pause, the longest pause is updated
+            if (specificPauseDuration > pauseDuration) {
+                pauseDuration = specificPauseDuration;
+            }
         }
     }
 
