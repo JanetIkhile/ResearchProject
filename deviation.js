@@ -2,6 +2,7 @@
 
 let deviations = []; // Array to store deviations from the intended path
 let touchTimes = []; // Array to store touch times for calculating time variability
+const blockSize = 5; // Number of trials to consider in the block, can be changed as needed
 
 // At the touch start
 document.addEventListener("touchstart", e => {
@@ -37,18 +38,16 @@ document.addEventListener("touchend", e => {
     const maxDeviation = Math.max(...deviations); // Maximum deviation from task axis
     const medianDeviation = calculateMedianDeviation(deviations); // Median deviation from task axis
 
-    // Calculate maximum time variability (coefficient of variation) for the last 5 trials
-    const lastFiveTimes = getLastFiveTouchTimes();
-    const meanTime = calculateMean(lastFiveTimes);
-    const stdDevTime = calculateStandardDeviation(lastFiveTimes, meanTime);
-    const maxTimeVariability = (stdDevTime / meanTime) * 100; // Coefficient of variation as a percentage
+    // Calculate maximum time variability (max time) for the last block of trials
+    const lastBlockTimes = getLastBlockTouchTimes(blockSize);
+    const maxTimeVariability = Math.max(...lastBlockTimes);
 
     // Add deviation and time variability results to the existing results string
     results += `
     Average Deviation from Path: ${averageDeviation.toFixed(2)} px
     Maximum Deviation from Path: ${maxDeviation.toFixed(2)} px
     Median Deviation from Path: ${medianDeviation.toFixed(2)} px
-    Maximum Time Variability: ${maxTimeVariability.toFixed(2)} %`;
+    Maximum Time Variability: ${maxTimeVariability.toFixed(2)} ms`;
 
     modalContent.innerText = results;
     modal.style.display = 'block';
@@ -72,6 +71,22 @@ function calculateMedianDeviation(deviations) {
     return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+// Function to store touch times in local storage
+function storeTouchTime(touchTime) {
+    let touchTimes = JSON.parse(localStorage.getItem('touchTimes')) || [];
+    touchTimes.push(touchTime);
+    if (touchTimes.length > blockSize) {
+        touchTimes.shift(); // Keep only the last 'blockSize' times
+    }
+    localStorage.setItem('touchTimes', JSON.stringify(touchTimes));
+}
+
+// Function to retrieve the last block of touch times from local storage
+function getLastBlockTouchTimes(blockSize) {
+    let touchTimes = JSON.parse(localStorage.getItem('touchTimes')) || [];
+    return touchTimes.slice(-blockSize);
+}
+
 // Function to calculate the mean of an array
 function calculateMean(array) {
     const sum = array.reduce((acc, val) => acc + val, 0);
@@ -82,19 +97,4 @@ function calculateMean(array) {
 function calculateStandardDeviation(array, mean) {
     const variance = array.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / array.length;
     return Math.sqrt(variance);
-}
-
-// Function to store touch times in local storage
-function storeTouchTime(touchTime) {
-    let touchTimes = JSON.parse(localStorage.getItem('touchTimes')) || [];
-    touchTimes.push(touchTime);
-    if (touchTimes.length > 5) {
-        touchTimes.shift(); // Keep only the last 5 times
-    }
-    localStorage.setItem('touchTimes', JSON.stringify(touchTimes));
-}
-
-// Function to retrieve the last 5 touch times from local storage
-function getLastFiveTouchTimes() {
-    return JSON.parse(localStorage.getItem('touchTimes')) || [];
 }
