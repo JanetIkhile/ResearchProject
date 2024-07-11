@@ -6,7 +6,7 @@ let touchStartX, touchStartY;
 let touchEndX, touchEndY;
 let finalSpeed = 0;
 let lastSpeed = 0;
-let peakSpeed = 0;
+let peakSpeed = 0
 let timeToPeakSpeed = 0;
 let previousSpeed = 0;
 let previousTime = 0;
@@ -21,11 +21,10 @@ let modalContent = document.getElementById('modalBodyContent');
 let results = null;
 let reachedTarget = false;
 let totalDistanceTraveled = 0;
-let deviations = []; // Array to store deviations from the intended path
 
 const startPoint = document.getElementById('startInnerDot');
 const targetPoint = document.getElementById('targetInnerDot');
-// const targetInnerDot = document.getElementById('targetInnerDot');
+//const targetInnerDot = document.getElementById('targetInnerDot');
 
 const screenWidth = window.innerWidth;
 const screenHeight = window.innerHeight;
@@ -33,18 +32,18 @@ const screenHeight = window.innerHeight;
 console.log(`Viewport width: ${screenWidth}px`);
 console.log(`Viewport height: ${screenHeight}px`);
 
+
 // At the touch start
 document.addEventListener("touchstart", e => {
-    // Getting the current date at the start of the touch event
-    // if (e.target === startPoint) {
+    //Getting the current date at the start of the touch event
+    //if (e.target === startPoint) {
 
-    // Get the first touch event
+    //Get the first touch event
     const touch = e.changedTouches[0];
     touchStartX = touch.pageX;
     touchStartY = touch.pageY;
 
     startTime = Date.now();
-    deviations = []; // Reset deviations array at the start of each touch
 
     // Create pointer to display a visual representation of where the finger is at any point
     const pointer = document.createElement("div")
@@ -54,22 +53,23 @@ document.addEventListener("touchstart", e => {
     pointer.id = touch.identifier
 
     document.body.append(pointer);
-    previousTime = startTime; // Set previous time to start time
-    initialX = touchStartX; // Store touch start x in another variable
-    initialY = touchStartY; // Store touch start y in another variable
-    totalDistanceTraveled = 0; // Distance is currently zero
-    // }
+    previousTime = startTime; //Set previous time to start time
+    initialX = touchStartX; //Store touch start x in another variable
+    initialY = touchStartY; //Store touch start y in another variable
+    totalDistanceTraveled = 0; //Distance is currently zero
+    //}
 });
 
-// Finger is moving on the screen
+
+//Finger is moving on the screen
 document.addEventListener("touchmove", e => {
     e.preventDefault();
 
-    isDragging = true; // Turn on flag when finger moves on the screen
+    isDragging = true; //Turn on flag when finger moves on the screen
 
     const touch = e.changedTouches[0];
-    let currentX = touch.pageX; // Store current x location as finger is moving
-    let currentY = touch.pageY; // Store current y location as finger is moving
+    let currentX = touch.pageX; //Store current x location as finger is moving
+    let currentY = touch.pageY; //Store current y location as finger is moving
     let currentTime = Date.now();
 
     // Visual representation of where the finger is at any point
@@ -77,22 +77,23 @@ document.addEventListener("touchmove", e => {
     pointer.style.top = `${touch.pageY}px`
     pointer.style.left = `${touch.pageX}px`
 
-    // Calculate distance from the last point
+
+    //Calculate distance from the last point
     let changeInDistance = calculateDistance(initialX, currentX, initialY, currentY);
 
-    // This reflects the actual path taken by the user's finger across the touch surface. It is different from the straight line distance
+    //This reflects the actual path taken by the user's finger across the touch surface. It is different from the straight line distance
     totalDistanceTraveled += changeInDistance;
 
-    let changeInTime = currentTime - previousTime; // Change in time
+    let changeInTime = currentTime - previousTime; //Change in time
 
-    let changeInSpeed = changeInDistance / changeInTime; // Change in speed with respect to time
+    let changeInSpeed = changeInDistance / changeInTime; //Change in speed with respect to time
 
     // This is a measure of how quickly or slowly the touch speeds up or slows down at a specific moment in time.
     let instantaneousAcceleration = (changeInSpeed - previousChangeInSpeed) / changeInTime;
 
     lastAcceleration = instantaneousAcceleration; // Last recorded acceleration of a touch movement on the screen.
 
-    let totalTimeTakenForTouchMove = currentTime - startTime; // This reflects the time from start of the touch event to the current time
+    let totalTimeTakenForTouchMove = currentTime - startTime; // This reflects the time from start of the touch event to the currrent time
 
     finalSpeed = totalDistanceTraveled / totalTimeTakenForTouchMove; // This represents the final speed during the touch movement
 
@@ -105,23 +106,21 @@ document.addEventListener("touchmove", e => {
     }
 
     /*Check This Block to know if it can also work for average acceleration and what it means */
-    // Average acceleration (final velocity - initial velocity)/ (final time -initial time)
-    // let acceleration = (finalSpeed - previousSpeed) / (totalTimeTakenForTouchMove);
-    // averageAcceleration = acceleration;
-    // console.log(` acceleration: ${acceleration.toFixed(9)}`);
+    //Average acceleration (final velocity - initial velocity)/ (final time -initial time)
+    //let acceleration = (finalSpeed - previousSpeed) / (totalTimeTakenForTouchMove);
+    //averageAcceleration = acceleration;
+    //console.log(` acceleration: ${acceleration.toFixed(9)}`);
 
-    previousSpeed = finalSpeed; // Update speed for the next move
-    previousTime = currentTime; // Update time for the next move
-    initialX = currentX; // Update start position for the next move
-    initialY = currentY; // Update start position for the next move
-    previousChangeInSpeed = changeInSpeed; // Update speed for the next move
+    previousSpeed = finalSpeed; //Update speed for the next move
+    previousTime = currentTime; //update time for the next move
+    initialX = currentX; //update start position for the next move
+    initialY = currentY; //update start position for the next move
+    previousChangeInSpeed = changeInSpeed; //update  speed for the next move
 
-    // Calculate deviation from intended path
-    const deviation = calculateDeviation(touchStartX, touchStartY, targetPoint.offsetLeft, targetPoint.offsetTop, currentX, currentY);
-    deviations.push(deviation); // Store each deviation in the array
 });
 
-// Finger leaves the screen
+
+//Finger leaves the screen
 document.addEventListener("touchend", e => {
 
     const touch = e.changedTouches[0];
@@ -130,7 +129,7 @@ document.addEventListener("touchend", e => {
     const pointer = document.getElementById(touch.identifier);
     pointer.remove();
 
-    // Calculating the straight line distance covered from start to target point
+    //Calculating the straight line distance covered from start to target point
     const straightLineDistance = calculateDistance(touchStartX, touchEndX, touchStartY, touchEndY);
 
     // Calculating total duration
@@ -138,16 +137,16 @@ document.addEventListener("touchend", e => {
         totalTime = calculateTotalTime(startTime);
     }
 
-    // Calculating the average drag speed (TotalDistance/ Total Time)
+    //Calculating the average drag speed (TotalDistance/ Total Time)
     const averageDragSpeed = calculateDragSpeed(totalDistanceTraveled, totalTime);
 
-    // Average acceleration (final velocity - initial velocity)/ (final time -initial time) 
-    // This is a measure of how quickly or slowly the touch speeds up or slows down across the entire period of the task
+    //Average acceleration (final velocity - initial velocity)/ (final time -initial time) 
+    //This is a measure of how quickly or slowly the touch speeds up or slows down across the entire period of the task
     let averageAcceleration = (finalSpeed - 0) / (totalTime);
 
-    let tapDuration = isDragging ? null : totalTime; // Show tapDuration if a tap occurred
+    let tapDuration = isDragging ? null : totalTime; //Show tapDuration if a tap occurred
 
-    // This captures the rectangular area defined by the start and end points of a touch gesture on the screen. 
+    //This captures the rectangular area defined by the start and end points of a touch gesture on the screen. 
     let tapAreaSize = Math.abs(touchStartX - touchEndX) * Math.abs(touchStartY - touchEndY);
 
     let startRect = startPoint.getBoundingClientRect();
@@ -165,12 +164,6 @@ document.addEventListener("touchend", e => {
     if (document.elementFromPoint(touch.clientX, touch.clientY) === targetInnerDot) {
         reachedTarget = true;
     }
-
-    // Calculate average, maximum, and median deviations from the path
-    const averageDeviation = calculateAverageDeviation(deviations); // Average deviation from path/task axis
-    const maxDeviation = Math.max(...deviations); // Maximum deviation from task axis
-    const medianDeviation = calculateMedianDeviation(deviations); // Median deviation from task axis
-
     results = `Target reached: ${reachedTarget}
     Tap duration: ${tapDuration !== null ? tapDuration : 'Not a tap'} ms
     Straight line drag distance: ${straightLineDistance.toFixed(2)} px
@@ -183,13 +176,10 @@ document.addEventListener("touchend", e => {
     Last acceleration: ${lastAcceleration.toFixed(8)} ms^2
     Average acceleration: ${averageAcceleration.toFixed(8)} ms^2
     Tap area: ${tapAreaSize.toFixed(2)} px^2
-    Shortest Path Distance: ${shortestPathDistance.toFixed(2)} px
-    Average Deviation from Path: ${averageDeviation.toFixed(2)} px
-    Maximum Deviation from Path: ${maxDeviation.toFixed(2)} px
-    Median Deviation from Path: ${medianDeviation.toFixed(2)} px`; // Include the average, maximum, and median deviations in the results
+    Shortest Path Distance: ${shortestPathDistance.toFixed(2)} px `;
 
     modalContent.innerText = results;
-    modal.style.display = 'block';
+    modal.style.display = 'block'
     isDragging = false;
     reachedTarget = false;
 });
@@ -207,32 +197,28 @@ function calculateDistance(x1, x2, y1, y2) {
 function calculateTotalTime(startTime) {
     const endTime = Date.now();
     return (endTime - startTime);
+
 }
 
 // Function to calculate drag speed
 function calculateDragSpeed(distance, duration) {
     return (distance / duration);
 }
+function getShortestPathDistance() {
+    let startRect = startPoint.getBoundingClientRect();
+    let targetRect = targetPoint.getBoundingClientRect();
 
-// Function to calculate the deviation from the intended path
-function calculateDeviation(x1, y1, x2, y2, x, y) {
-    return Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2));
+    let startX = startRect.left + startRect.width / 2;
+    let startY = startRect.top + startRect.height / 2;
+
+    let targetX = targetRect.left + targetRect.width / 2;
+    let targetY = targetRect.top + targetRect.height / 2;
+
+    let dx = targetX - startX;
+    let dy = targetY - startY;
+
+    return Math.sqrt(dx * dx + dy * dy);
 }
-
-// Function to calculate the average deviation from the path
-function calculateAverageDeviation(deviations) {
-    const sum = deviations.reduce((acc, val) => acc + val, 0);
-    return sum / deviations.length;
-}
-
-// Function to calculate the median deviation from the path
-function calculateMedianDeviation(deviations) {
-    const sorted = deviations.slice().sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-// Function to close the modal
 function closeModal() {
     modal.style.display = 'none';
 }
