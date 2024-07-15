@@ -20,11 +20,30 @@ let touchSlipBaseX = 0;
 let touchSlipBaseY = 0;
 let enterTargetTime = 0;
 let verificationTime = 0;
+let windowWidth = window.innerWidth;
+let windowHeight = window.innerHeight;
+let startPosition = document.getElementById(startPoint);
+let targetPosition = document.getElementById(targetPoint);
+let parallelDirectionChange = 0
+let initialSlope = 0;
+let initialSlopeReciprocal = 0;
+let previousX = 0;
+let previousY = 0;
+let movementCounter = 0;
+console.log(windowWidth, windowHeight);
 
 document.addEventListener("touchstart", e => {
     const touch = e.changedTouches[0];
     touchStartX = touch.pageX;
     touchStartY = touch.pageY;
+    previousX = touch.pageX;
+    previousY = touch.pageY;
+
+    //For movement and orthogonal direction changes
+    initialSlope = ((targetPositionY - touch.pageY) / (targetPositionX - touch.pageX));
+    initialSlopeReciprocal = 1 / ((targetPositionY - touch.pageY) / (targetPositionX - touch.pageX));
+    movementCounter = 0;
+    console.log(initialSlope, initialSlopeReciprocal);
 
     startTime = Date.now();
     pauseIdentifier = Date.now();
@@ -35,7 +54,7 @@ document.addEventListener("touchstart", e => {
     pointer.style.left = `${touchStartX}px`
     pointer.id = touch.identifier
 
-    pauseCounter = -1;
+    pauseCounter = 0;
     pauseDuration = 0;
 
     document.body.append(pointer);
@@ -54,7 +73,7 @@ document.addEventListener("touchmove", e => {
     //100 ms or longer
     if (pauseIdentifier != startTime) {
         if (pauseIdentifier <= currentTime - 100) {
-            pauseCounter = pauseCounter + 1;
+            pauseCounter++;
             specificPauseDuration = currentTime - pauseIdentifier;
             console.log(specificPauseDuration);
             //If this specific pause is longer than the previous longest pause, the longest pause is updated
@@ -64,8 +83,9 @@ document.addEventListener("touchmove", e => {
         }
     }
 
+    //console.log(calculateDistance(currentX, targetPositionX, currentY, targetPositionY));
     //If the target has been entered, records a "touchslip" depending on the farthest distance the tap has reached from the closest the tap ever got to hte center of the target
-    if ((currentX < targetPositionX + 12.5 && currentX > targetPositionX - 12.5) && (currentY < targetPositionY + 12.5 && currentY > targetPositionY - 12.5)) {
+    if (calculateDistance(currentX, targetPositionX, currentY, targetPositionY) < 18) {
         hitTarget = true;
         reachedTarget = true;
 
@@ -87,7 +107,7 @@ document.addEventListener("touchmove", e => {
         //Adds one count to the number of target reentries if the tap has exited and then entered the target
         if (exitedTarget == true) {
             exitedTarget = false;
-            targetReentry = targetReentry + 1;
+            targetReentry++;
         }
     }
     //If the tap is not inside the target, reachedTarget is set to false
@@ -102,7 +122,23 @@ document.addEventListener("touchmove", e => {
         }
         exitedTarget = true;
     }
+
+    //Identifies if there has been a parallel direction change(only once every three touchmoves; need to add in two counters to be fully covered)
+    //OR look at page 7 of the PDF from Vineet saved in bookmarks - need to figure out how to do submovements
+    if (movementCounter >= 50) {
+        if (((currentY - previousY) / (currentX - previousX)) < initialSlope) {
+            console.log(((currentY - previousY) / (currentX - previousX)), initialSlope);
+            parallelDirectionChange++;
+        } else {
+            console.log("Positive");
+        }
+        previousX = currentX;
+        previousY = currentY;
+        movementCounter = 0;
+    } //console.log(previousX, previousY);
+    //console.log(currentX, currentY);
     pauseIdentifier = Date.now();
+    movementCounter++;
 });
 
 document.addEventListener("touchend", e => {
@@ -135,7 +171,7 @@ document.addEventListener("touchend", e => {
     Total Time: ${totalTime} ms
     Total Pauses: ${pauseCounter} pauses
     Longest Pause Duration: ${pauseDuration} ms
-    Touchslip: ${Math.round(touchSlipDistance * 100) / 100} pixels
+    Max Touchslip: ${Math.round(touchSlipDistance * 100) / 100} pixels
     Target Re-entries: ${targetReentry}
     Time to liftoff from contact with target: ${verificationTime} ms`;
 
@@ -165,4 +201,12 @@ function getOffset(el) {
         el = el.offsetParent;
     }
     return { top: _y, left: _x };
+}
+//function to calculate the distance between two points
+function calculateDistance(x1, x2, y1, y2) {
+    const disX = x2 - x1;
+    const disY = y2 - y1;
+    return Math.sqrt(
+        Math.pow(disX, 2) + Math.pow(disY, 2)
+    );
 }

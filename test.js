@@ -21,6 +21,10 @@ let modalContent = document.getElementById('modalBodyContent');
 let results = null;
 let reachedTarget = false;
 let totalDistanceTraveled = 0;
+let i = -1;//For speed calculations
+let currentLoopX = new Array(5);
+let currentLoopY = new Array(5);
+let currentLoopTime = new Array(5);
 
 const startPoint = document.getElementById('startInnerDot');
 const targetPoint = document.getElementById('targetInnerDot');
@@ -93,15 +97,31 @@ document.addEventListener("touchmove", e => {
 
     lastAcceleration = instantaneousAcceleration; // Last recorded acceleration of a touch movement on the screen.
 
-    let totalTimeTakenForTouchMove = currentTime - startTime; // This reflects the time from start of the touch event to the currrent time
+    let totalTimeTakenForTouchMove = currentTime - startTime; // This reflects the time from start of the touch event to the current time
 
-    finalSpeed = totalDistanceTraveled / totalTimeTakenForTouchMove; // This represents the final speed during the touch movement
+    // Finds the most recent speed of the tap/drag
+    if (i < 4) {
+        i++;
+    } else {
+        i = 0;
+    }
+    currentLoopX[i] = touch.clientX;
+    currentLoopY[i] = touch.clientY;
+    currentLoopTime[i] = Date.now();
+    if (i + 1 < currentLoopX.length) {
+        finalSpeed = calculateDistance(currentLoopX[i], currentLoopX[i + 1], currentLoopY[i], currentLoopY[i + 1]) / (currentLoopTime[i] - currentLoopTime[i + 1]);
+        console.log(finalSpeed);
+    } else {
+        finalSpeed = calculateDistance(currentLoopX[i], currentLoopX[0], currentLoopY[i], currentLoopY[0]) / (currentLoopTime[i] - currentLoopTime[0]);
+        console.log(finalSpeed);
+    }
 
     lastSpeed = finalSpeed; // This represents the last recorded final speed in the touch movement
 
     // Getting the peak speed here
     if (finalSpeed > peakSpeed) {
         peakSpeed = finalSpeed;
+        console.log(peakSpeed);
         timeToPeakSpeed = currentTime - startTime;
     }
 
@@ -182,6 +202,11 @@ document.addEventListener("touchend", e => {
     modal.style.display = 'block'
     isDragging = false;
     reachedTarget = false;
+    peakSpeed = 0;
+    finalSpeed = 0;
+    currentLoopX = new Array(5);
+    currentLoopY = new Array(5);
+    currentLoopTime = new Array(5);
 });
 
 // Function to calculate drag distance covered
