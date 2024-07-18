@@ -28,7 +28,7 @@ app.get('*', (req, res) => {
 );
 
 app.get('/', (req, res) => {
-    res.json({ message: 'Hello World!' })
+    res.sendFile(path.join(__dirname, 'index.html'));
 }
 );
 const PORT = process.env.PORT || 3001;
