@@ -2,6 +2,8 @@ const express = require('express')
 const mongoose = require('mongoose')
 const Measures = require('./models/measures.model.js')
 const measuresRoutes = require('./routes/measures.route.js')
+require('dotenv').config();
+
 const cors = require('cors')
 const app = express()
 const bodyParser = require('body-parser');
@@ -15,18 +17,19 @@ app.use(bodyParser.json());
 //routes
 app.use("/api/measures", measuresRoutes);
 
+const PORT = process.env.PORT || 3001;
 
-mongoose.connect('mongodb+srv://adazejohnson:Hy3da6qkZi0X6POf@cluster0.teaetw3.mongodb.net/motor_performance?retryWrites=true&w=majority&appName=Cluster0')
+mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
         console.log('Connected to the database!');
-        app.listen(3001, () => {
-            console.log('Server is running on http://localhost:3001')
+        app.listen(PORT, () => {
+            console.log(`Server is running on ${PORT}`);
         });
     })
     .catch((error) => console.log('Connection failed!', error));
 
 const corsOptions = {
-    origin: 'http://localhost:3001',  // Replace with your frontend's URL
+    origin: 'http://localhost:3001',
     optionsSuccessStatus: 200
 };
 
