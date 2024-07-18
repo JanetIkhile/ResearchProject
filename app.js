@@ -14,7 +14,7 @@ const bodyParser = require('body-parser');
 app.use(express.json())
 app.use(cors())
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, '../client')));
+//app.use(express.static(path.join(__dirname, '../client')));
 
 const PROD_URL = process.env.PROD_URL;
 const LOCAl_URL = process.env.LOCAL_URL;
@@ -22,10 +22,10 @@ console.log('PROD URL:', PROD_URL);
 //routes
 app.use(`/api/measures`, measuresRoutes);
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/index.html'));
-}
-);
+// app.get('*', (req, res) => {
+//     res.sendFile(path.join(__dirname, '../client/index.html'));
+// }
+// );
 const PORT = process.env.PORT || 3001;
 
 mongoose.connect(process.env.MONGODB_URI)

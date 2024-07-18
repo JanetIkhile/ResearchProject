@@ -232,7 +232,7 @@ function getShortestPathDistance() {
 // Example function to send data to the server
 async function sendDataToServer(measures) {
     try {
-        const response = await fetch(`${apiUrl}/api/measures/save`, {
+        const response = await fetch(`http://127.0.0.1:3001/api/measures/save`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -253,7 +253,7 @@ async function sendDataToServer(measures) {
 
 async function fetchDataFromServer() {
     try {
-        const response = await fetch(`${apiUrl}/api/measures`);
+        const response = await fetch(`http://localhost:3001/api/measures`);
         const data = await response.json();
         console.log('Data retrieved:', data);
     } catch (error) {
