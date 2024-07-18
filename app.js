@@ -13,7 +13,8 @@ const bodyParser = require('body-parser');
 app.use(express.json())
 app.use(cors())
 app.use(bodyParser.json());
-\
+//app.use(express.static(path.join(__js_basics, '../client/build')));
+
 
 //routes
 app.use("/api/measures", measuresRoutes);
@@ -31,7 +32,7 @@ mongoose.connect(process.env.MONGODB_URI)
     .catch((error) => console.log('Connection failed!', error));
 
 const corsOptions = {
-    origin: PROD_URI,
+    origin: 'http://localhost:3001',
     optionsSuccessStatus: 200
 };
 
