@@ -33,7 +33,6 @@ console.log(`Viewport height: ${screenHeight}px`);
 
 // get api url from envrionment variable
 const apiUrl = 'https://motor-performance.vercel.app' || 'http://localhost:3001';
-console.log(`API URL is ${apiUrl}`);
 
 // At the touch start
 document.addEventListener("touchstart", e => {
