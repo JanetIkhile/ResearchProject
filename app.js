@@ -16,6 +16,14 @@ app.use(cors())
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname)));
 
+//handle js files
+app.use((req, res, next) => {
+    if (req.path.endsWith('.js') && !req.path.includes('app.js')) {
+        res.type('application/javascript');
+    }
+    next();
+});
+
 const PROD_URL = process.env.PROD_URL;
 const LOCAl_URL = process.env.LOCAL_URL;
 console.log('PROD URL:', PROD_URL);
