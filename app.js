@@ -1,26 +1,30 @@
 const express = require('express')
 const mongoose = require('mongoose')
-const Measures = require('./models/measures.model.js')
 const measuresRoutes = require('./routes/measures.route.js')
+const path = require('path');
+
 require('dotenv').config();
+
 
 const cors = require('cors')
 const app = express()
 const bodyParser = require('body-parser');
 
-
 //middleware
 app.use(express.json())
 app.use(cors())
 app.use(bodyParser.json());
-//app.use(express.static(path.join(__js_basics, '../client/build')));
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 
 //routes
 app.use("/api/measures", measuresRoutes);
 
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build/index.html'));
+}
+);
 const PORT = process.env.PORT;
-const PROD_URI = process.env.PROD_URI;
 
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
@@ -31,8 +35,9 @@ mongoose.connect(process.env.MONGODB_URI)
     })
     .catch((error) => console.log('Connection failed!', error));
 
+
 const corsOptions = {
-    origin: 'http://localhost:3001',
+    origin: 'https://motor-performance.vercel.app' || 'http://localhost:3001',
     optionsSuccessStatus: 200
 };
 

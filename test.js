@@ -31,6 +31,9 @@ const screenHeight = window.innerHeight;
 console.log(`Viewport width: ${screenWidth}px`);
 console.log(`Viewport height: ${screenHeight}px`);
 
+// get api url from envrionment variable
+const apiUrl = 'https://motor-performance.vercel.app' || 'http://localhost:3001';
+console.log(`API URL is ${apiUrl}`);
 
 // At the touch start
 document.addEventListener("touchstart", e => {
@@ -225,11 +228,12 @@ function getShortestPathDistance() {
     return Math.sqrt(dx * dx + dy * dy);
 }
 
+
 //send data to server
 // Example function to send data to the server
 async function sendDataToServer(measures) {
     try {
-        const response = await fetch('http://127.0.0.1:3001/api/measures/save', {
+        const response = await fetch(`${apiUrl}/api/measures/save`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -250,7 +254,7 @@ async function sendDataToServer(measures) {
 
 async function fetchDataFromServer() {
     try {
-        const response = await fetch('http://localhost:3001/api/measures');
+        const response = await fetch(`${apiUrl}/api/measures`);
         const data = await response.json();
         console.log('Data retrieved:', data);
     } catch (error) {
