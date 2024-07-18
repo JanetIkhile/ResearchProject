@@ -14,7 +14,8 @@ const bodyParser = require('body-parser');
 app.use(express.json())
 app.use(cors())
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
+
 
 //handle js files
 app.use((req, res, next) => {
@@ -30,13 +31,15 @@ console.log('PROD URL:', PROD_URL);
 //routes
 app.use(`/api/measures`, measuresRoutes);
 
+console.log(path.join(__dirname, 'public', 'index.html'));
+
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 }
 );
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 }
 );
 const PORT = process.env.PORT || 3001;
