@@ -16,7 +16,6 @@ let averageAcceleration = 0;
 let initialX = 0;
 let initialY = 0;
 let previousChangeInSpeed = 0;
-let modal = document.getElementById('resultsModal');
 let modalContent = document.getElementById('modalBodyContent');
 let results = null;
 let reachedTarget = false;
@@ -225,9 +224,7 @@ function getShortestPathDistance() {
 
     return Math.sqrt(dx * dx + dy * dy);
 }
-function closeModal() {
-    modal.style.display = 'none';
-}
+
 //send data to server
 // Example function to send data to the server
 async function sendDataToServer(measures) {
