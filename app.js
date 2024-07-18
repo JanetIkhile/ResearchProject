@@ -23,7 +23,7 @@ console.log('PROD URL:', PROD_URL);
 app.use(`/api/measures`, measuresRoutes);
 
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '/index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 }
 );
 
