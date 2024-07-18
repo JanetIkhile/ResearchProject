@@ -13,11 +13,13 @@ const bodyParser = require('body-parser');
 app.use(express.json())
 app.use(cors())
 app.use(bodyParser.json());
+\
 
 //routes
 app.use("/api/measures", measuresRoutes);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
+const PROD_URI = process.env.PROD_URI;
 
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
@@ -29,7 +31,7 @@ mongoose.connect(process.env.MONGODB_URI)
     .catch((error) => console.log('Connection failed!', error));
 
 const corsOptions = {
-    origin: 'http://localhost:3001',
+    origin: PROD_URI,
     optionsSuccessStatus: 200
 };
 
