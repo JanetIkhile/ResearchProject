@@ -168,7 +168,7 @@ document.addEventListener("touchend", e => {
     Tap duration: ${tapDuration !== null ? tapDuration : 'Not a tap'} ms
     Straight line drag distance: ${straightLineDistance.toFixed(2)} px
     Total Drag distance: ${totalDistanceTraveled.toFixed(2)} pixels
-    Total duration: ${totalTime} ms
+    Total Execution Time: ${totalTime} ms
     Average drag speed: ${averageDragSpeed.toFixed(2)} px/ms
     Last speed: ${lastSpeed.toFixed(2)} px/ms
     Peak speed: ${peakSpeed.toFixed(2)} px/ms
