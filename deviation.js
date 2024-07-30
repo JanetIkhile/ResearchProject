@@ -1,9 +1,14 @@
 'use strict';
 
-let deviations = []; // Array to store deviations from the intended path
-let touchTimes = []; // Array to store touch times for calculating time variability
-let accelerations = []; // Array to store accelerations for calculating peak acceleration variability
+var deviations = []; // Array to store deviations from the intended path
+var touchTimes = []; // Array to store touch times for calculating time variability
+var accelerations = []; // Array to store accelerations for calculating peak acceleration variability
 const blockSize = 5; // Number of trials to consider in the block, can be changed as needed
+
+var pauseIdentifier = 0;
+var pauseCounter = 0;
+var totalPauseTime = 0;
+var specificPauseDuration = 0;
 
 // At the touch start
 document.addEventListener("touchstart", e => {
@@ -15,6 +20,10 @@ document.addEventListener("touchstart", e => {
     startTime = Date.now(); // Record the start time of the touch
     previousTime = startTime; // Initialize previous time for acceleration calculation
     previousChangeInSpeed = 0; // Initialize previous speed for acceleration calculation
+    pauseIdentifier = startTime;
+    pauseCounter = 0;
+    totalPauseTime = 0;
+    specificPauseDuration = 0;
 });
 
 // Finger is moving on the screen
@@ -51,6 +60,18 @@ document.addEventListener("touchmove", e => {
         touchStartX = currentX; // Update the start coordinates for the next move
         touchStartY = currentY;
     }
+
+    // Handle pauses
+    if (pauseIdentifier != startTime) {
+        if (pauseIdentifier <= currentTime - 100) {
+            pauseCounter++;
+            specificPauseDuration = currentTime - pauseIdentifier;
+            if (specificPauseDuration > totalPauseTime) {
+                totalPauseTime += specificPauseDuration;
+            }
+        }
+    }
+    pauseIdentifier = currentTime;
 });
 
 // Finger leaves the screen
@@ -91,21 +112,57 @@ document.addEventListener("touchend", e => {
     // Calculate peak acceleration variability
     const peakAccelerationVariability = calculateCoefficientOfVariation(lastBlockAccelerations);
 
+    // Calculate movement time (complete movement time from target onset to successful click)
+    const movementTime = touchTime;
+
+    // Calculate movement time variability (coefficient of variation of movement times in a block of trials)
+    const movementTimeVariability = calculateCoefficientOfVariation(touchTimes.slice(-blockSize));
+
+    // Calculate execution time without pauses
+    const executionTimeWithoutPauses = Math.max(0, touchTime - totalPauseTime); // Ensure it doesn't go below 0
+
+    // Calculate last block times without pauses
+    const lastBlockTimesWithoutPauses = getLastBlockTimesWithoutPauses(lastBlockTimes, totalPauseTime);
+
     // Add deviation and time variability results to the existing results string
     results += `
     ---------------------------------------------------------------------------
     Average Deviation from Path: ${averageDeviation.toFixed(2)} px
     Maximum Deviation from Path: ${maxDeviation.toFixed(2)} px
     Median Deviation from Path: ${medianDeviation.toFixed(2)} px
+    Movement Time: ${movementTime.toFixed(2)} ms
+    Movement Time Variability: ${movementTimeVariability.toFixed(2)}%
+    Execution Time without Pauses: ${executionTimeWithoutPauses.toFixed(2)} ms
+    Last Block Times without Pauses: ${lastBlockTimesWithoutPauses}
     Maximum Time Variability: ${maxTimeVariability.toFixed(2)} ms
     Last ${blockSize} Touch Times (Execution Time): ${formattedLastBlockTimes}
     Last ${blockSize} Peak Accelerations: ${formattedLastBlockAccelerations}
-    Peak Acceleration: ${peakAcceleration.toFixed(8)} ms^2`;
+    Peak Acceleration: ${peakAcceleration.toFixed(8)} ms^2
+    Peak Acceleration Variability: ${peakAccelerationVariability.toFixed(2)}%`;
 
     // Display the results in a modal
     modalContent.innerText = results;
     modal.style.display = 'block';
 });
+
+// Function to calculate execution time without pauses
+function calculateExecutionTimeWithoutPauses(touchTimes) {
+    const totalExecutionTime = touchTimes.reduce((acc, time) => acc + time, 0); // Sum of all touch times
+    return totalExecutionTime - totalPauseTime; // Subtract total pause time
+}
+
+// Function to calculate last block times without pauses
+function getLastBlockTimesWithoutPauses(lastBlockTimes, totalPauseTime) {
+    const lastBlockTimesWithoutPauses = lastBlockTimes.map(time => Math.max(0, time - totalPauseTime));
+    return formatTouchTimes(lastBlockTimesWithoutPauses);
+}
+
+// Function to calculate execution time variability (without pauses)
+function calculateExecutionTimeVariabilityWithoutPauses(touchTimes) {
+    const totalPauseTime = pauseCounter * 100; // Total pause time (assuming each pause is at least 100 ms)
+    const timeWithoutPauses = touchTimes.map(time => time - totalPauseTime); // Subtract pauses from each touch time
+    return calculateCoefficientOfVariation(timeWithoutPauses); // Calculate coefficient of variation for times without pauses
+}
 
 // Function to calculate the deviation from the intended path
 // Uses the formula for the perpendicular distance from a point to a line
