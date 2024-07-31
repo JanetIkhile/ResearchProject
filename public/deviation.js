@@ -1,3 +1,4 @@
+// deviation.js
 'use strict';
 
 var deviations = []; // Array to store deviations from the intended path
@@ -10,20 +11,45 @@ var pauseCounter = 0;
 var totalPauseTime = 0;
 var specificPauseDuration = 0;
 
+let deviationStartTime = 0;
+let deviationTotalTime = 0;
+let deviationTouchStartX, deviationTouchStartY;
+let deviationTouchEndX, deviationTouchEndY;
+let finalSpeed = 0;
+let lastSpeed = 0;
+let peakSpeed = 0;
+let timeToPeakSpeed = 0;
+let previousSpeed = 0;
+let previousTime = 0;
+let isDragging = false;
+let lastAcceleration = 0;
+let averageAcceleration = 0;
+let initialX = 0;
+let initialY = 0;
+let previousChangeInSpeed = 0;
+let reachedTarget = false;
+let totalDistanceTraveled = 0;
+
+const startPoint = document.getElementById('startInnerDot');
+const targetPoint = document.getElementById('targetInnerDot');
+const modalContent = document.getElementById('modalBodyContent');
+let deviationResults = "";
+
 // At the touch start
 document.addEventListener("touchstart", e => {
     const touch = e.changedTouches[0];
     deviations = []; // Reset deviations array at the start of each touch
     accelerations = []; // Reset accelerations array at the start of each touch
-    touchStartX = touch.pageX; // Initialize touch start coordinates (x-axis)
-    touchStartY = touch.pageY; // Initialize touch start coordinates (y-axis)
-    startTime = Date.now(); // Record the start time of the touch
-    previousTime = startTime; // Initialize previous time for acceleration calculation
+    deviationTouchStartX = touch.pageX; // Initialize touch start coordinates (x-axis)
+    deviationTouchStartY = touch.pageY; // Initialize touch start coordinates (y-axis)
+    deviationStartTime = Date.now(); // Record the start time of the touch
+    previousTime = deviationStartTime; // Initialize previous time for acceleration calculation
     previousChangeInSpeed = 0; // Initialize previous speed for acceleration calculation
-    pauseIdentifier = startTime;
+    pauseIdentifier = deviationStartTime;
     pauseCounter = 0;
     totalPauseTime = 0;
     specificPauseDuration = 0;
+    deviationResults = ""; // Reset results at the start of each touch
 });
 
 // Finger is moving on the screen
@@ -35,7 +61,7 @@ document.addEventListener("touchmove", e => {
     let currentY = touch.pageY; // Store current y location as finger is moving
 
     // Calculate deviation from intended path using the calculateDeviation function
-    const deviation = calculateDeviation(touchStartX, touchStartY, targetPoint.offsetLeft, targetPoint.offsetTop, currentX, currentY);
+    const deviation = calculateDeviation(deviationTouchStartX, deviationTouchStartY, targetPoint.offsetLeft, targetPoint.offsetTop, currentX, currentY);
     deviations.push(deviation); // Store each deviation in the array
 
     // Calculate instantaneous acceleration
@@ -43,7 +69,7 @@ document.addEventListener("touchmove", e => {
     const changeInTime = currentTime - previousTime; // Time difference between the current and previous touch points
     if (changeInTime > 0) {
         // Calculate distance change between current and previous touch points
-        const changeInDistance = calculateDistance(touchStartX, currentX, touchStartY, currentY);
+        const changeInDistance = calculateDistance(deviationTouchStartX, currentX, deviationTouchStartY, currentY);
         // Calculate speed change (change in distance divided by change in time)
         const changeInSpeed = changeInDistance / changeInTime;
         // Calculate instantaneous acceleration (change in speed divided by change in time)
@@ -57,12 +83,12 @@ document.addEventListener("touchmove", e => {
         // Update previous values for the next move
         previousTime = currentTime;
         previousChangeInSpeed = changeInSpeed;
-        touchStartX = currentX; // Update the start coordinates for the next move
-        touchStartY = currentY;
+        deviationTouchStartX = currentX; // Update the start coordinates for the next move
+        deviationTouchStartY = currentY;
     }
 
     // Handle pauses
-    if (pauseIdentifier != startTime) {
+    if (pauseIdentifier != deviationStartTime) {
         if (pauseIdentifier <= currentTime - 100) {
             pauseCounter++;
             specificPauseDuration = currentTime - pauseIdentifier;
@@ -78,7 +104,7 @@ document.addEventListener("touchmove", e => {
 document.addEventListener("touchend", e => {
     const touch = e.changedTouches[0];
     const touchEndTime = Date.now(); // Get the current time at touch end
-    const touchTime = touchEndTime - startTime; // Calculate the duration of the touch event (end time - start time)
+    const touchTime = touchEndTime - deviationStartTime; // Calculate the duration of the touch event (end time - start time)
     touchTimes.push(touchTime); // Store touch time
 
     // Store the touch time and peak accelerations in local storage
@@ -125,23 +151,23 @@ document.addEventListener("touchend", e => {
     const lastBlockTimesWithoutPauses = getLastBlockTimesWithoutPauses(lastBlockTimes, totalPauseTime);
 
     // Add deviation and time variability results to the existing results string
-    results += `
-    ---------------------------------------------------------------------------
-    Average Deviation from Path: ${averageDeviation.toFixed(2)} px
-    Maximum Deviation from Path: ${maxDeviation.toFixed(2)} px
-    Median Deviation from Path: ${medianDeviation.toFixed(2)} px
-    Movement Time: ${movementTime.toFixed(2)} ms
-    Movement Time Variability: ${movementTimeVariability.toFixed(2)}%
-    Execution Time without Pauses: ${executionTimeWithoutPauses.toFixed(2)} ms
-    Last Block Times without Pauses: ${lastBlockTimesWithoutPauses}
-    Maximum Time Variability: ${maxTimeVariability.toFixed(2)} ms
-    Last ${blockSize} Touch Times (Execution Time): ${formattedLastBlockTimes}
-    Last ${blockSize} Peak Accelerations: ${formattedLastBlockAccelerations}
-    Peak Acceleration: ${peakAcceleration.toFixed(8)} ms^2
-    Peak Acceleration Variability: ${peakAccelerationVariability.toFixed(2)}%`;
+    deviationResults += `
+    <hr>
+    <strong>Average Deviation from Path:</strong> ${averageDeviation.toFixed(2)} px<br>
+    <strong>Maximum Deviation from Path:</strong> ${maxDeviation.toFixed(2)} px<br>
+    <strong>Median Deviation from Path:</strong> ${medianDeviation.toFixed(2)} px<br>
+    <strong>Movement Time:</strong> ${movementTime.toFixed(2)} ms<br>
+    <strong>Movement Time Variability:</strong> ${movementTimeVariability.toFixed(2)}%<br>
+    <strong>Execution Time without Pauses:</strong> ${executionTimeWithoutPauses.toFixed(2)} ms<br>
+    <strong>Last Block Times without Pauses:</strong> ${lastBlockTimesWithoutPauses}<br>
+    <strong>Maximum Time Variability:</strong> ${maxTimeVariability.toFixed(2)} ms<br>
+    <strong>Last ${blockSize} Touch Times (Execution Time):</strong> ${formattedLastBlockTimes}<br>
+    <strong>Last ${blockSize} Peak Accelerations:</strong> ${formattedLastBlockAccelerations}<br>
+    <strong>Peak Acceleration:</strong> ${peakAcceleration.toFixed(8)} ms^2<br>
+    <strong>Peak Acceleration Variability:</strong> ${peakAccelerationVariability.toFixed(2)}%<br>`;
 
     // Display the results in a modal
-    modalContent.innerText = results;
+    modalContent.innerHTML += deviationResults;
     modal.style.display = 'block';
 });
 
