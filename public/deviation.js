@@ -154,6 +154,8 @@ document.addEventListener("touchend", e => {
     // Add deviation and time variability results to the existing results string
     deviationResults += `
     <hr>
+    -----------------------------
+    <br>
     <strong>Average Deviation from Path:</strong> ${calculateAverageDeviation(deviations).toFixed(2)} px<br>
     <strong>Maximum Deviation from Path:</strong> ${Math.max(...deviations).toFixed(2)} px<br>
     <strong>Movement Time:</strong> ${movementTime.toFixed(2)} ms<br>
