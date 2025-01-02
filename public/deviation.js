@@ -33,6 +33,15 @@ let totalDistanceTraveled = 0;
 let movementTime = 0; // Time to reach the target
 let executionTime = 0; // Total time from touchstart to touchend
 
+// variables for features 19-21
+let movementDirectionChangeCounter = 0; // Counts orthogonal movement direction changes
+let orthogonalDirectionChangeCounter = 0; // Counts parallel movement direction changes
+let submovements = []; // Array to store peak speeds of submovements
+let currentSubmovementPeakSpeed = 0; // Tracks the peak speed of the current submovement
+let previousDirectionOrthogonal = null; // Tracks the last orthogonal direction
+let previousDirectionParallel = null; // Tracks the last parallel direction
+
+
 const startPoint = document.getElementById('startInnerDot');
 const targetPoint = document.getElementById('targetInnerDot');
 const modalContent = document.getElementById('modalBodyContent');
@@ -56,45 +65,88 @@ document.addEventListener("touchstart", e => {
     reachedTarget = false; // Reset the target status for each new touch
     movementTime = 0; // Reset movement time
     totalDistanceTraveled = 0; // Reset distance
+    movementDirectionChangeCounter = 0;
+    orthogonalDirectionChangeCounter = 0;
+    submovements = [];
+    currentSubmovementPeakSpeed = 0;
+    previousDirectionOrthogonal = null;
+    previousDirectionParallel = null;
+
 });
 
 // Finger is moving on the screen
-document.addEventListener("touchmove", e => {
+document.addEventListener("touchmove", (e) => {
     e.preventDefault(); // Prevent default touch behavior to track custom touch events
 
     const touch = e.changedTouches[0];
-    let currentX = touch.pageX; // Store current x location as finger is moving
-    let currentY = touch.pageY; // Store current y location as finger is moving
+    let currentX = touch.pageX; // Current x-coordinate of the touch
+    let currentY = touch.pageY; // Current y-coordinate of the touch
 
-    // Calculate deviation from intended path using the calculateDeviation function
-    const deviation = calculateDeviation(deviationTouchStartX, deviationTouchStartY, targetPoint.offsetLeft, targetPoint.offsetTop, currentX, currentY);
-    deviations.push(deviation); // Store each deviation in the array
+    // Calculate deviation from the intended path
+    const deviation = calculateDeviation(
+        deviationTouchStartX,
+        deviationTouchStartY,
+        targetPoint.offsetLeft,
+        targetPoint.offsetTop,
+        currentX,
+        currentY
+    );
+    deviations.push(deviation); // Store deviation
 
-    // Calculate instantaneous acceleration
     const currentTime = Date.now();
-    const changeInTime = currentTime - previousTime; // Time difference between the current and previous touch points
-    if (changeInTime > 0) {
-        // Calculate distance change between current and previous touch points
-        const changeInDistance = calculateDistance(deviationTouchStartX, currentX, deviationTouchStartY, currentY);
-        // Calculate speed change (change in distance divided by change in time)
-        const changeInSpeed = changeInDistance / changeInTime;
-        // Calculate instantaneous acceleration (change in speed divided by change in time)
-        const instantaneousAcceleration = (changeInSpeed - previousChangeInSpeed) / changeInTime;
+    const changeInTime = currentTime - previousTime; // Time elapsed since last move
 
-        // Store valid acceleration values
-        if (!isNaN(instantaneousAcceleration) && isFinite(instantaneousAcceleration)) {
-            accelerations.push(instantaneousAcceleration);
+    if (changeInTime > 0) {
+        // Calculate change in x and y
+        const dx = currentX - deviationTouchStartX;
+        const dy = currentY - deviationTouchStartY;
+
+        // Calculate speed
+        const speed = Math.sqrt(dx ** 2 + dy ** 2) / changeInTime;
+
+        // Update submovement tracking
+        if (speed > currentSubmovementPeakSpeed) {
+            currentSubmovementPeakSpeed = speed; // Update peak speed
         }
 
-        // Update previous values for the next move
+        const speedThreshold = 0.1; // Minimum speed to count as a submovement
+        if (speed < previousSpeed - speedThreshold && currentSubmovementPeakSpeed > speedThreshold) {
+            submovements.push(currentSubmovementPeakSpeed); // Record submovement
+            currentSubmovementPeakSpeed = 0; // Reset for the next submovement
+        }
+
+        // Detect orthogonal (vertical) direction changes
+        const directionThreshold = 2; // Threshold to filter out noise
+        const currentDirectionOrthogonal = Math.sign(dy); // Current vertical direction
+        if (
+            previousDirectionOrthogonal !== null &&
+            currentDirectionOrthogonal !== previousDirectionOrthogonal &&
+            Math.abs(dy) > directionThreshold
+        ) {
+            movementDirectionChangeCounter++; // Count direction change
+        }
+
+        // Detect parallel (horizontal) direction changes
+        const currentDirectionParallel = Math.sign(dx); // Current horizontal direction
+        if (
+            previousDirectionParallel !== null &&
+            currentDirectionParallel !== previousDirectionParallel &&
+            Math.abs(dx) > directionThreshold
+        ) {
+            orthogonalDirectionChangeCounter++; // Count direction change
+        }
+
+        // Update previous values
         previousTime = currentTime;
-        previousChangeInSpeed = changeInSpeed;
-        deviationTouchStartX = currentX; // Update the start coordinates for the next move
+        previousSpeed = speed;
+        previousDirectionOrthogonal = currentDirectionOrthogonal;
+        previousDirectionParallel = currentDirectionParallel;
+        deviationTouchStartX = currentX;
         deviationTouchStartY = currentY;
     }
 
     // Handle pauses
-    if (pauseIdentifier != deviationStartTime) {
+    if (pauseIdentifier !== deviationStartTime) {
         if (pauseIdentifier <= currentTime - 100) {
             pauseCounter++;
             specificPauseDuration = currentTime - pauseIdentifier;
@@ -109,14 +161,19 @@ document.addEventListener("touchmove", e => {
     const targetRect = targetPoint.getBoundingClientRect(); 
 
     // Check if the touch is within the bounds of the target element
-    if (touch.clientX >= targetRect.left && touch.clientX <= targetRect.right &&
-        touch.clientY >= targetRect.top && touch.clientY <= targetRect.bottom && !reachedTarget) {
-
+    if (
+        touch.clientX >= targetRect.left &&
+        touch.clientX <= targetRect.right &&
+        touch.clientY >= targetRect.top &&
+        touch.clientY <= targetRect.bottom &&
+        !reachedTarget
+    ) {
         reachedTarget = true;
         movementTime = currentTime - deviationStartTime; // Calculate the movement time when the user reaches the target
         console.log(`Target reached. Movement time: ${movementTime} ms`);
     }
 });
+
 
 // Finger leaves the screen
 document.addEventListener("touchend", e => {
@@ -130,6 +187,15 @@ document.addEventListener("touchend", e => {
     if (!reachedTarget) {
         movementTime = touchTime;
     }
+
+    // Finalize the current submovement
+    if (currentSubmovementPeakSpeed > 0) {
+        submovements.push(currentSubmovementPeakSpeed);
+    }
+
+    // Identify the main submovement (highest peak speed)
+    const mainSubmovementPeakSpeed = Math.max(...submovements);
+
 
     // Store both execution and movement times in local storage
     storeTouchAndMovementTimes(touchTime, movementTime, accelerations);
@@ -164,8 +230,10 @@ document.addEventListener("touchend", e => {
     <strong>Execution Time Variability (without Pauses):</strong> ${executionTimeWithoutPausesVariability.toFixed(2)}%<br>
     <strong>Last Block Times (Execution Time):</strong> ${formattedLastBlockTimes}<br>
     <strong>Last Block Movements:</strong> ${formattedLastBlockMovements}<br>
-    <strong>Peak Acceleration Variability:</strong> ${peakAccelerationVariability.toFixed(2)}%<br>`;
-
+    <strong>Peak Acceleration Variability:</strong> ${peakAccelerationVariability.toFixed(2)}%<br>
+    <strong>Movement Direction Changes:</strong> ${movementDirectionChangeCounter}<br>
+    <strong>Orthogonal Direction Changes:</strong> ${orthogonalDirectionChangeCounter}<br>
+    <strong>Main Submovement Peak Speed:</strong> ${mainSubmovementPeakSpeed.toFixed(2)} px/ms<br>`
     // Display the results in a modal
     modalContent.innerHTML += deviationResults;
     modal.style.display = 'block';
