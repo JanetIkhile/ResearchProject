@@ -3,60 +3,66 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE-edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="style.css" rel="stylesheet" />
-  <title>Touch Events Example</title>
-  <!-- <script src="database.js" defer></script> -->
-  <script type="module" src="app.js" defer> </script>
-  <!-- Added so that the results can be shown -->
-  <script type="module" src="test.js" defer> </script>
-  <script type="module" src="deviation.js" defer> </script>
-  <script type="module" src="lincolnfiles.js" defer> </script>
+  <title>Motor Performance System</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 0.3em;
+      color: #003366;
+    }
+
+    p {
+      color: #444;
+      max-width: 420px;
+      margin-bottom: 2em;
+    }
+
+    .task-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 240px;
+    }
+
+    .task-btn {
+      background-color: #007bff;
+      border: none;
+      color: white;
+      padding: 15px;
+      font-size: 1.1em;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .task-btn:hover {
+      background-color: #005fcc;
+    }
+  </style>
 </head>
 
 <body>
-  <div id="startPoint">
-    <div id="startInnerDot"></div>
-    <span class="label">Start</span>
+  <h1>Motor Performance Assessment</h1>
+  <p>Select a task to begin. Each task measures different components of movement performance.</p>
+
+  <div class="task-buttons">
+    <button class="task-btn" onclick="location.href='drag/drag.html'">🖐️ Drag Task</button>
+    <button class="task-btn" onclick="location.href='tap/tap.html'">👆 Tap Task</button>
+    <button class="task-btn" onclick="location.href='hold/hold.html'">✊ Hold Task</button>
   </div>
-
-  <div id="targetPoint">
-    <div id="targetInnerDot"></div>
-    <div class="label">Target</div>
-  </div>
-
-  <div id="resultsModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <span class="modal-title">Drag Results</span>
-        <span class="modal-close" onclick="closeModal()">&times;</span>
-      </div>
-      <div class="modal-body" id="modalBodyContent">
-      </div>
-      <div class="modal-footer">
-        <button onclick="closeModal()">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="fetchedDataContainer" class="fetched-data-container">
-  </div>
-
-  <script>
-    // Get the modal
-    var modal = document.getElementById("resultsModal");
-    function closeModal() {
-      modal.style.display = 'none';
-    }
-
-    // When the user clicks anywhere outside of the modal, close it
-    window.onclick = function (event) {
-      if (event.target == modal) {
-        modal.style.display = "none";
-      }
-    }
-  </script>
 </body>
 
 </html>

@@ -1,0 +1,172 @@
+.dot {
+    background-color: black;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    position: absolute;
+    transform: translate(-50%, -50%);
+}
+
+body {
+    margin: 0;
+    background-color: gray;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#startPoint,
+#targetPoint {
+    width: clamp(70px, 8vmin, 90px);
+    height: clamp(70px, 8vmin, 90px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: right;
+    position: absolute;
+}
+
+#startPoint,
+#targetPoint,
+canvas {
+    touch-action: none;
+}
+
+#startPoint {
+    background-color: green;
+    top: calc(12vh + 60px);
+    left: min(8vw, 60px);
+}
+
+#targetPoint {
+    background-color: red;
+    bottom: 14vh;
+    right: min(10vw, 60px);
+}
+
+
+#startInnerDot,
+#targetInnerDot {
+    width: 35%;
+    height: 35%;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+
+.label {
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    color: black;
+    position: absolute;
+    margin-left: 10px;
+    white-space: nowrap;
+}
+
+#startPoint .label {
+    top: 50%;
+    left: 110%;
+    transform: translateY(-50%);
+}
+
+#targetPoint .label {
+    top: 50%;
+    right: 110%;
+    transform: translateY(-50%);
+}
+
+
+/* --- MODAL --- */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.modal[style*="display: none"] {
+    z-index: -1 !important;
+}
+
+.modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 10px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 400px;
+}
+
+.modal-header,
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header {
+    margin-bottom: 10px;
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.modal-close {
+    cursor: pointer;
+}
+
+#taskHeader {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    text-align: center;
+    z-index: 5;
+    color: #003366;
+    font-family: Arial, sans-serif;
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 12px 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+#taskHeader h2 {
+    margin: 0;
+    font-size: 1.4em;
+}
+
+#taskHeader p {
+    margin: 4px 0 0;
+    font-size: 0.9em;
+    color: #555;
+}
+
+#nextTaskButton {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    font-size: 1em;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: 0.3s;
+    z-index: 10;
+}
+
+#nextTaskButton:hover {
+    background-color: #005fcc;
+}
