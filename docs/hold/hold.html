@@ -3,31 +3,31 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="X-UA-Compatible" content="IE-edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tap Task</title>
-    <link rel="stylesheet" href="tap.css">
-    <script type="module" src="tap.js" defer></script>
+    <title>Hold Task</title>
+    <link rel="stylesheet" href="hold.css">
+    <script type="module" src="hold.js" defer></script>
 </head>
 
 <body>
     <!-- Header -->
     <header id="taskHeader">
-        <h2>👆 Tap Task</h2>
-        <p>Tap repeatedly and rhythmically on the target circle as quickly as you can.</p>
+        <h2>✋ Hold Task</h2>
+        <p>Tap and hold the circle steadily for 5 seconds without moving.</p>
     </header>
 
-    <!-- Tap Area -->
-    <div id="tapArea">
-        <div id="tapTarget"></div>
-        <p id="tapInstruction">Tap inside the red circle</p>
+    <!-- Hold Area -->
+    <div id="holdArea">
+        <div id="holdTarget"></div>
+        <p id="holdInstruction">Touch and hold inside the blue circle</p>
     </div>
 
     <!-- Modal -->
     <div id="resultsModal" class="modal" style="display:none;">
         <div class="modal-content" id="modalContentArea">
             <div class="modal-header">
-                <span class="modal-title">Tap Results</span>
+                <span class="modal-title">Hold Results</span>
                 <span id="modalCloseX" class="modal-close">&times;</span>
             </div>
             <div class="modal-body" id="modalBodyContent"></div>
@@ -37,16 +37,17 @@
         </div>
     </div>
 
-    <!-- Next Task Button (hidden until ready) -->
-    <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/public/hold/hold.html'">
-        Next: Hold Task
+    <!-- Next Task -->
+    <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/docs/end/summary.html'">
+        Finish Tasks
     </button>
 
     <script>
-
         const modal = document.getElementById("resultsModal");
         const closeBtn = document.getElementById("modalCloseButton");
         const closeX = document.getElementById("modalCloseX");
+        const holdTarget = document.getElementById("holdTarget");
+
         window.isModalOpen = false;
 
         // --- Show Modal ---
@@ -84,8 +85,8 @@
         modal.addEventListener('touchstart', e => e.stopPropagation(), true);
         modal.addEventListener('touchmove', e => e.stopPropagation(), true);
         modal.addEventListener('touchend', e => e.stopPropagation(), true);
-
     </script>
+
 </body>
 
 </html>
