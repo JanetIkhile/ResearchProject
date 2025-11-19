@@ -4,13 +4,14 @@ const holdTarget = document.getElementById("holdTarget");
 const modalContent = document.getElementById("modalBodyContent");
 const nextButton = document.getElementById("nextTaskButton");
 const holdInstruction = document.getElementById("holdInstruction");
+const startButton = document.getElementById("startTaskButton");
 
 let holdStartTime = 0;
 let releaseTime = 0;
 let readyTime = 0;
 let trialCount = 0;
 const TRIAL_LIMIT = 3;
-const HOLD_DURATION = 5000; // ms — 5 seconds hold
+const HOLD_DURATION = 5000;
 
 let isHolding = false;
 let trialActive = false;
@@ -19,26 +20,29 @@ let akineticDelay = null;
 let countdownTimer = null;
 let readyToRelease = false;
 
-// Initial color
 holdTarget.style.backgroundColor = "blue";
 
+// Start button listener
+startButton.addEventListener("click", () => {
+    if (!trialActive) startHoldTrial();
+});
+
 holdTarget.addEventListener("touchstart", () => {
-    if (window.isModalOpen) return;
+    if (window.isModalOpen || !trialActive) return;
 
-    // Start new trial
-    if (!trialActive) {
-        startHoldTrial();
-        return;
-    }
-
-    // Start hold after countdown (only if active)
-    if (!isHolding && !readyToRelease) {
-        beginHold();
-    }
+    if (!isHolding && !readyToRelease) beginHold();
 });
 
 holdTarget.addEventListener("touchend", () => {
-    // Only count release after the "release cue"
+    if (!trialActive) return;
+
+    // Early release before cue
+    if (!readyToRelease && isHolding) {
+        handleEarlyRelease();
+        return;
+    }
+
+    // Normal release after cue
     if (readyToRelease) {
         endHold();
     }
@@ -49,7 +53,7 @@ function playBeep() {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = ctx.createOscillator();
         const gainNode = ctx.createGain();
-        oscillator.type = 'sine';
+        oscillator.type = "sine";
         oscillator.frequency.value = 880;
         gainNode.gain.value = 0.1;
         oscillator.connect(gainNode);
@@ -66,7 +70,9 @@ function startHoldTrial() {
     isHolding = false;
     readyToRelease = false;
     akineticDelay = null;
-    holdInstruction.innerText = "Get ready…";
+    startButton.style.display = "none";
+
+    holdInstruction.innerText = "Get ready...";
     holdTarget.style.backgroundColor = "blue";
 
     let countdown = 3;
@@ -85,7 +91,6 @@ function startHoldTrial() {
 
 function beginHold() {
     if (!readyTime) return;
-
     holdStartTime = Date.now();
     akineticDelay = holdStartTime - readyTime;
     isHolding = true;
@@ -93,7 +98,6 @@ function beginHold() {
     holdInstruction.innerText = "⏱️ Keep holding steady...";
     holdTarget.style.backgroundColor = "yellow";
 
-    // After 5 seconds, signal to release — don't end automatically
     holdTimer = setTimeout(() => {
         readyToRelease = true;
         holdInstruction.innerText = "✅ You can release now!";
@@ -102,19 +106,30 @@ function beginHold() {
     }, HOLD_DURATION);
 }
 
+function handleEarlyRelease() {
+    const releaseTime = Date.now();
+    const totalHoldTime = releaseTime - holdStartTime;
+    clearTimeout(holdTimer);
+    isHolding = false;
+    trialActive = false;
+
+    modalContent.innerText = `
+Trial: ${++trialCount}
+Akinetic Delay (Reaction Start): ${akineticDelay ?? "N/A"} ms
+Hold Duration: ${totalHoldTime} ms (Released early)
+`;
+
+    window.showModal();
+    resetTrial();
+}
+
 function endHold() {
     releaseTime = Date.now();
     const totalHoldTime = releaseTime - holdStartTime;
 
     clearTimeout(holdTimer);
 
-    holdTarget.style.backgroundColor = "red";
-    isHolding = false;
-    trialActive = false;
-    readyToRelease = false;
-
     const releaseDelay = releaseTime - (holdStartTime + HOLD_DURATION);
-
     const akineticInterpret =
         akineticDelay === null
             ? "(Not captured)"
@@ -138,15 +153,21 @@ function endHold() {
 
     modalContent.innerText = `
 Trial: ${++trialCount}
-Akinetic Delay (Reaction Start): ${akineticDelay !== null ? akineticDelay : "N/A"
-        } ms ${akineticInterpret}
+Akinetic Delay (Reaction Start): ${akineticDelay ?? "N/A"} ms ${akineticInterpret}
 Hold Duration: ${totalHoldTime} ms ${durationInterpret}
 Release Delay (after cue): ${releaseDelay > 0 ? releaseDelay : 0} ms ${releaseInterpret}
 `;
 
     window.showModal();
-    holdInstruction.innerText = "Press the circle to start next trial.";
+    resetTrial();
+}
+
+function resetTrial() {
+    holdInstruction.innerText = "Click 'Start Task' when you're ready to begin.";
     holdTarget.style.backgroundColor = "blue";
+    startButton.style.display = "block";
+    trialActive = false;
+    readyToRelease = false;
     readyTime = 0;
 
     if (trialCount >= TRIAL_LIMIT) {

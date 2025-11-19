@@ -19,8 +19,9 @@
 
     <!-- Tap Area -->
     <div id="tapArea">
-        <div id="tapTarget"></div>
         <p id="tapInstruction">Tap inside the red circle</p>
+        <p id="countdownTimer" style="display:none;">Time left: 10s</p>
+        <div id="tapTarget"></div>
     </div>
 
     <!-- Modal -->
@@ -42,8 +43,8 @@
         Next: Hold Task
     </button>
 
+    <!-- Modal logic -->
     <script>
-
         const modal = document.getElementById("resultsModal");
         const closeBtn = document.getElementById("modalCloseButton");
         const closeX = document.getElementById("modalCloseX");

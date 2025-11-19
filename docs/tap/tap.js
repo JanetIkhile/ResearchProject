@@ -27,15 +27,37 @@ function startTapTrial() {
     tapTimes = [];
     taskActive = true;
 
+    const countdown = document.getElementById("countdownTimer");
+
     tapTarget.style.backgroundColor = "yellow";
     tapInstruction.innerText = "⏱️ Keep tapping for 10 seconds!";
 
     const startTime = Date.now();
+    countdown.style.display = "block";
+
+
+    let timeLeft = TASK_DURATION / 1000;
+    countdown.innerText = `Time left: ${timeLeft}s`;
+
+    const timerInterval = setInterval(() => {
+        timeLeft--;
+        countdown.innerText = `Time left: ${timeLeft}s`;
+
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            countdown.innerText = "Time's up!";
+        }
+    }, 1000);
+
 
     taskTimer = setTimeout(() => {
         taskActive = false;
         const endTime = Date.now();
         console.log("📊 Trial finished, calling analyzeTaps()");
+
+        clearInterval(timerInterval);
+        countdown.innerText = "";
+
         analyzeTaps(startTime, endTime);
         trialCount++;
 

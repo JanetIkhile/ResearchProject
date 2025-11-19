@@ -85,8 +85,6 @@ document.addEventListener("touchstart", e => {
     pauseCount = 0;
     pauseDurations = [];
     pauseStartTime = null;
-
-
 });
 
 // ---------------- TOUCH MOVE ----------------
@@ -298,27 +296,23 @@ document.addEventListener("touchend", e => {
 
     });
 
-
     //print out trial data to console
     console.log(`trialData: `, trialData);
 
     // --- SEQUENCE EFFECT (Across-trial Decrement) ---
     const { seqAmp, seqAmpInterpret, seqSpeed, seqSpeedInterpret } = computeSequenceEffect(trialData);
 
-
     // Display results
     results = `Trial: ${trialCount}
 Akinetic Delay (Initiation Time): ${akineticDelay} ms ${akineticInterpretation}
 Hypokinesia (Reduced Movement Size): ${amplitudeRatio.toFixed(3)} ${amplitudeInterpretation}
-Bradykinesia (Reduced Movement Speed ): ${bradykinesiaSlowness.toFixed(3)} ${bradykinesiaInterpretation}
+Bradykinesia (Reduced Movement Speed ): ${bradykinesiaSlowness.toFixed(3)} ms/px ${bradykinesiaInterpretation}
 Irregular Rhythm (Speed Variability): ${arrhythmicityIndex.toFixed(3)} ${arrhythmicityInterpretation}
 Irregular Rhythm (Pauses): ${pauseCount} pauses, avg ${meanPauseDuration.toFixed(1)} ms ${pauseInterpretation}
 Path Efficiency (Movement Smoothness): ${pathEfficiency.toFixed(3)}
 Sequence Effect (Amplitude Decrement): ${seqAmp.toFixed(3)} ${seqAmpInterpret}
 Sequence Effect (Speed Decrement): ${seqSpeed.toFixed(3)} ${seqSpeedInterpret}
 `;
-
-
     modalContent.innerText = results;
     window.showModal();
 

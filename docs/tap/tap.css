@@ -30,27 +30,41 @@ body {
 
 #tapArea {
     position: fixed;
-    top: 25vh;
+    top: 20vh;
     left: 50%;
     transform: translateX(-50%);
+    width: 100%;
     text-align: center;
     z-index: 1;
 }
 
+#tapInstruction,
+#countdownTimer {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin: 0 auto;
+}
+
+
+#countdownTimer {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #003366;
+    margin-bottom: 1rem;
+}
+
 #tapTarget {
+    position: absolute;
+    top: 25vh;
+    left: 50%;
+    transform: translateX(-50%);
     width: 120px;
     height: 120px;
     background-color: red;
     border-radius: 50%;
-    margin: 0 auto 15px;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
     touch-action: none;
-}
-
-#tapInstruction {
-    color: #222;
-    font-size: 1em;
-    margin: 0;
 }
 
 .modal {
@@ -65,7 +79,6 @@ body {
     pointer-events: all;
     transition: opacity 0.2s ease-in-out;
     opacity: 0;
-
 }
 
 .modal.show {
@@ -107,7 +120,6 @@ body.modal-open #tapInstruction {
     font-weight: bold;
 }
 
-/* Next task button */
 #nextTaskButton {
     position: fixed;
     bottom: 40px;

@@ -2,25 +2,24 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE-edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hold Task</title>
-    <link rel="stylesheet" href="hold.css">
+    <link rel="stylesheet" href="hold.css" />
     <script type="module" src="hold.js" defer></script>
 </head>
 
 <body>
-    <!-- Header -->
     <header id="taskHeader">
         <h2>✋ Hold Task</h2>
-        <p>Tap and hold the circle steadily for 5 seconds without moving.</p>
+        <p>Tap “Start” when ready, then hold the circle steadily for 5 seconds.</p>
     </header>
 
-    <!-- Hold Area -->
     <div id="holdArea">
+        <p id="holdInstruction">Click “Start” when you’re ready to begin.</p>
         <div id="holdTarget"></div>
-        <p id="holdInstruction">Touch and hold inside the blue circle</p>
+        <button id="startTaskButton">Start</button>
     </div>
 
     <!-- Modal -->
@@ -36,17 +35,15 @@
             </div>
         </div>
     </div>
-
     <!-- Next Task -->
-    <button id="nextTaskButton" style="display:none;" onclick="window.location.href='end/summary.html'">
+    <button id="nextTaskButton" style="display:none;"
+        onclick="window.location.href='/ResearchProject/hold/summary.html'">
         Finish Tasks
     </button>
-
     <script>
         const modal = document.getElementById("resultsModal");
         const closeBtn = document.getElementById("modalCloseButton");
         const closeX = document.getElementById("modalCloseX");
-        const holdTarget = document.getElementById("holdTarget");
 
         window.isModalOpen = false;
 
@@ -67,26 +64,18 @@
         };
 
         // --- Event listeners ---
-        if (closeBtn) {
-            closeBtn.addEventListener('click', (e) => {
+        [closeBtn, closeX].forEach(btn => {
+            if (btn) btn.addEventListener("click", e => {
                 e.stopPropagation();
                 window.closeModal();
             });
-        }
-
-        if (closeX) {
-            closeX.addEventListener('click', (e) => {
-                e.stopPropagation();
-                window.closeModal();
-            });
-        }
+        });
 
         // Prevent accidental background closing
-        modal.addEventListener('touchstart', e => e.stopPropagation(), true);
-        modal.addEventListener('touchmove', e => e.stopPropagation(), true);
-        modal.addEventListener('touchend', e => e.stopPropagation(), true);
+        modal.addEventListener("touchstart", e => e.stopPropagation(), true);
+        modal.addEventListener("touchmove", e => e.stopPropagation(), true);
+        modal.addEventListener("touchend", e => e.stopPropagation(), true);
     </script>
-
 </body>
 
 </html>
