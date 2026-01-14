@@ -5,19 +5,18 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE-edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="drag.css" rel="stylesheet" />
-    <title>Drag Task</title>
+    <link href="../drag/drag.css" rel="stylesheet" />
+    <title>Adaptive Drag Task</title>
 
-    <script type="module" src="app.js" defer></script>
-    <script type="module" src="drag.js" defer></script>
+    <script type="module" src="adaptive_drag.js" defer></script>
 </head>
 
 <body>
     <header id="taskHeader">
-        <h2>🖐️ Drag Task</h2>
-        <p>Drag from <strong>Start</strong> to <strong>Target</strong> as quickly and accurately as you can.</p>
+        <h2>🖐️ Adaptive Drag Task</h2>
+        <p>Drag from <strong>Start</strong> to <strong>Target</strong>. The target will move to a new position
+            automatically after each drag.</p>
     </header>
-    <div class="drag-area"></div>
 
     <div id="startPoint">
         <div id="startInnerDot"></div>
@@ -33,27 +32,21 @@
     <div id="resultsModal" class="modal" style="display:none;">
         <div class="modal-content" id="modalContentArea">
             <div class="modal-header">
-                <span class="modal-title">Drag Results</span>
+                <span class="modal-title">Adaptive Drag Results</span>
                 <span id="modalCloseX" class="modal-close">&times;</span>
             </div>
-
             <div class="modal-body" id="modalBodyContent"></div>
-
             <div class="modal-footer">
                 <button id="modalCloseButton">Close</button>
             </div>
         </div>
     </div>
-    // --- Next Task Button (hidden until ready) ---
-    <!-- <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/docs/drag/adaptive_drag.html'"> -->
-    <!-- <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/docs/tap/tap.html'"> -->
 
-    <button id="nextTaskButton" style="display:none;"
-        onclick="window.location.href='/ResearchProject/drag/adaptive_drag.html'">
-        Next: adaptive_drag Task
+    <!-- Next Task Button -->
+    <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/ResearchProject/tap/tap.html'">
+        Next: Tap Task
     </button>
 
-    <div id="fetchedDataContainer" class="fetched-data-container"></div>
     <canvas id="pathCanvas" width="100%" height="100%"
         style="position: fixed; top: 0; left: 0; z-index: 0; pointer-events: none;">
     </canvas>
@@ -63,36 +56,24 @@
         const modal = document.getElementById("resultsModal");
         const closeBtn = document.getElementById("modalCloseButton");
         const closeX = document.getElementById("modalCloseX");
-        const canvas = document.getElementById("pathCanvas");
-
         window.isModalOpen = false;
 
-        // --- Show Modal ---
         window.showModal = function () {
             modal.classList.add("show");
             modal.style.display = "block";
             document.body.classList.add("modal-open");
             window.isModalOpen = true;
         };
-        // --- Close Modal ---
+
         window.closeModal = function () {
             modal.classList.remove("show");
             modal.style.display = "none";
             document.body.classList.remove("modal-open");
             window.isModalOpen = false;
-            window.trialReadyTime = Date.now();
         };
-        // --- Event listeners ---
-        window.addEventListener('click', function (event) {
-            if (event.target === modal) window.closeModal();
-        });
 
         closeBtn.addEventListener('click', window.closeModal);
         closeX.addEventListener('click', window.closeModal);
-
-        modal.addEventListener('touchstart', e => e.stopPropagation(), true);
-        modal.addEventListener('touchmove', e => e.stopPropagation(), true);
-        modal.addEventListener('touchend', e => e.stopPropagation(), true);
     </script>
 </body>
 
