@@ -1,4 +1,34 @@
 'use strict';
+import { supabase } from "../../client/supabaseClient.js";
+
+let participantId = null;
+let sessionId = null;
+let trialNumber = 0;
+const TASK_TYPE = "drag";
+
+// async setup
+(async function initContext() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        window.location.href = "/auth/login.html";
+        return;
+    }
+
+    participantId = user.id;
+
+    sessionId = sessionStorage.getItem("session_id");
+    if (!sessionId) {
+        window.location.href = "/index.html";
+        return;
+    }
+
+    console.log("Drag task started");
+    console.log("Participant:", participantId);
+    console.log("Session:", sessionId);
+})();
+
+
 
 let startTime = 0;
 let totalTime = 0;
@@ -28,6 +58,8 @@ let pauseCount = 0;
 let pauseDurations = [];
 let pauseStartTime = null;
 let TRIAL_LIMIT = 3;
+let trajectoryLog = [];
+
 
 
 // Hypokinesia tracking
@@ -61,6 +93,8 @@ document.addEventListener("touchstart", e => {
     touchStartX = touch.pageX;
     touchStartY = touch.pageY;
     startTime = Date.now();
+    trialNumber += 1;
+    trajectoryLog = [];
 
     if (window.trialReadyTime && window.trialReadyTime > 0) {
         akineticDelay = Date.now() - window.trialReadyTime;
@@ -97,6 +131,12 @@ document.addEventListener("touchmove", e => {
     let currentX = touch.pageX;
     let currentY = touch.pageY;
     let currentTime = Date.now();
+    trajectoryLog.push({
+        x: currentX,
+        y: currentY,
+        t: currentTime
+    });
+
 
     const pointer = document.getElementById(touch.identifier);
     pointer.style.top = `${touch.pageY}px`;
@@ -159,7 +199,7 @@ document.addEventListener("touchmove", e => {
 });
 
 // ---------------- TOUCH END ----------------
-document.addEventListener("touchend", e => {
+document.addEventListener("touchend", async e => {
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
     const touch = e.changedTouches[0];
     touchEndX = touch.pageX;
@@ -353,6 +393,48 @@ Sequence Effect (Speed Decrement): ${seqSpeed.toFixed(3)} ${seqSpeedInterpret}
 
     sendDataToServer(measureResults);
     fetchDataFromServer();
+
+    const trialPayload = {
+        // ---- independent variables ----
+        participant_id: participantId,
+        session_id: sessionId,
+        task_type: TASK_TYPE,
+        trial_number: trialNumber,
+        timestamp: new Date().toISOString(),
+
+        // ---- context ----
+        viewport_width: window.innerWidth,
+        viewport_height: window.innerHeight,
+        device_pixel_ratio: window.devicePixelRatio,
+
+        // ---- dependent variables ----
+        akinetic_delay_ms: akineticDelay,
+        total_time_ms: totalTime,
+        total_distance_px: totalDistanceTraveled,
+        straight_line_distance_px: straightLineDistance,
+        shortest_path_distance_px: shortestPathDistance,
+        path_efficiency: pathEfficiency,
+        amplitude_ratio: amplitudeRatio,
+        mean_speed_px_per_ms: averageDragSpeed,
+        peak_speed_px_per_ms: peakSpeed,
+        time_to_peak_speed_ms: timeToPeakSpeed,
+        arrhythmicity_cv: arrhythmicityIndex,
+        pause_count: pauseCount,
+        mean_pause_duration_ms: meanPauseDuration,
+
+        // ---- raw ----
+        trajectory: trajectoryLog
+    };
+
+    const { error } = await supabase
+        .from("trial_results")
+        .insert(trialPayload);
+
+    if (error) {
+        console.error("Failed to save trial:", error);
+    } else {
+        console.log("Trial saved:", trialNumber);
+    }
 
     // After each trial, check if limit reached
     if (trialCount >= TRIAL_LIMIT) {

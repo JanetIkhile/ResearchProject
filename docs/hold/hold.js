@@ -1,5 +1,33 @@
 'use strict';
 
+import { supabase } from "../../client/supabaseClient.js";
+
+let participantId = null;
+let sessionId = null;
+let trialNumber = 0;
+const TASK_TYPE = "hold";
+
+(async function initContext() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        window.location.href = "/auth/login.html";
+        return;
+    }
+
+    participantId = user.id;
+
+    sessionId = sessionStorage.getItem("session_id");
+    if (!sessionId) {
+        window.location.href = "/index.html";
+        return;
+    }
+
+    console.log("Hold task started");
+    console.log("Participant:", participantId);
+    console.log("Session:", sessionId);
+})();
+
 const holdTarget = document.getElementById("holdTarget");
 const modalContent = document.getElementById("modalBodyContent");
 const nextButton = document.getElementById("nextTaskButton");
@@ -106,7 +134,7 @@ function beginHold() {
     }, HOLD_DURATION);
 }
 
-function handleEarlyRelease() {
+async function handleEarlyRelease() {
     const releaseTime = Date.now();
     const totalHoldTime = releaseTime - holdStartTime;
     clearTimeout(holdTimer);
@@ -118,12 +146,29 @@ Trial: ${++trialCount}
 Akinetic Delay (Reaction Start): ${akineticDelay ?? "N/A"} ms
 Hold Duration: ${totalHoldTime} ms (Released early)
 `;
+    trialNumber++;
+
+    const trialPayload = {
+        participant_id: participantId,
+        session_id: sessionId,
+        task_type: TASK_TYPE,
+        trial_number: trialNumber,
+        timestamp: new Date().toISOString(),
+
+        akinetic_delay_ms: akineticDelay,
+        total_hold_time_ms: totalHoldTime,
+        release_delay_ms: null,
+        released_early: true,
+        hold_target_duration_ms: HOLD_DURATION
+    };
+
+    await supabase.from("trial_results").insert(trialPayload);
 
     window.showModal();
     resetTrial();
 }
 
-function endHold() {
+async function endHold() {
     releaseTime = Date.now();
     const totalHoldTime = releaseTime - holdStartTime;
 
@@ -157,6 +202,23 @@ Akinetic Delay (Reaction Start): ${akineticDelay ?? "N/A"} ms ${akineticInterpre
 Hold Duration: ${totalHoldTime} ms ${durationInterpret}
 Release Delay (after cue): ${releaseDelay > 0 ? releaseDelay : 0} ms ${releaseInterpret}
 `;
+    trialNumber++;
+
+    const trialPayload = {
+        participant_id: participantId,
+        session_id: sessionId,
+        task_type: TASK_TYPE,
+        trial_number: trialNumber,
+        timestamp: new Date().toISOString(),
+
+        akinetic_delay_ms: akineticDelay,
+        total_hold_time_ms: totalHoldTime,
+        release_delay_ms: releaseDelay > 0 ? releaseDelay : 0,
+        released_early: false,
+        hold_target_duration_ms: HOLD_DURATION
+    };
+
+    await supabase.from("trial_results").insert(trialPayload);
 
     window.showModal();
     resetTrial();

@@ -1,5 +1,33 @@
 'use strict';
 
+import { supabase } from "../../client/supabaseClient.js";
+
+let participantId = null;
+let sessionId = null;
+let trialNumber = 0;
+const TASK_TYPE = "tap";
+
+(async function initContext() {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        window.location.href = "/auth/login.html";
+        return;
+    }
+
+    participantId = user.id;
+
+    sessionId = sessionStorage.getItem("session_id");
+
+    if (!sessionId) {
+        window.location.href = "/index.html";
+        return;
+    }
+    console.log("Tap task started");
+    console.log("Participant:", participantId);
+    console.log("Session:", sessionId);
+})();
+
 const tapTarget = document.getElementById("tapTarget");
 const modalContent = document.getElementById("modalBodyContent");
 const nextButton = document.getElementById("nextTaskButton");
@@ -17,6 +45,7 @@ tapTarget.addEventListener("touchstart", () => {
     if (window.isModalOpen) return; // prevent taps when modal open
 
     if (!taskActive) {
+        trialNumber++;
         startTapTrial();
     } else {
         recordTap();
@@ -72,7 +101,7 @@ function recordTap() {
 }
 
 // --- Analysis ---
-function analyzeTaps(startTime, endTime) {
+async function analyzeTaps(startTime, endTime) {
     if (tapTimes.length < 2) {
         modalContent.innerText = "Not enough taps recorded.";
         window.showModal();
@@ -113,4 +142,24 @@ Rhythmic Consistency (CV): ${cv.toFixed(2)} ${rhythmInterpret}
 `;
     window.showModal();
     tapInstruction.innerText = "Tap inside the red circle to start next trial";
+    const trialPayload = {
+        // -------- independent variables --------
+        participant_id: participantId,
+        session_id: sessionId,
+        task_type: TASK_TYPE,
+        trial_number: trialNumber,
+        timestamp: new Date().toISOString(),
+
+        // -------- dependent variables --------
+        total_taps: totalTaps,
+        total_time_ms: endTime - startTime,
+        taps_per_second: tapsPerSecond,
+        arrhythmicity_cv: cv,
+
+        // -------- raw data --------
+        trajectory: tapTimes
+    };
+
+    await supabase.from("trial_results").insert(trialPayload);
+
 }
