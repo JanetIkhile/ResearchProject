@@ -1,4 +1,4 @@
-import { supabase } from "/client/supabaseClient.js";
+import { supabase } from "./client/supabaseClient.js";
 
 console.log("login.js loaded");
 

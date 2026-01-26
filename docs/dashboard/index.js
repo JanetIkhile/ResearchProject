@@ -1,6 +1,6 @@
 console.log("index.js running");
 
-import { supabase } from "../../client/supabaseClient.js";
+import { supabase } from "../client/supabaseClient.js";
 
 (async function initDashboard() {
     // 1. Check authentication

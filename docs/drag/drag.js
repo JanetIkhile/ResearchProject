@@ -1,5 +1,5 @@
 'use strict';
-import { supabase } from "../../client/supabaseClient.js";
+import { supabase } from "../client/supabaseClient.js";
 
 let participantId = null;
 let sessionId = null;
