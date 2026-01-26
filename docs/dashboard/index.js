@@ -1,6 +1,6 @@
 console.log("index.js running");
 
-import { supabase } from "../client/supabaseClient.js";
+import { supabase } from "../../client/supabaseClient.js";
 
 (async function initDashboard() {
     // 1. Check authentication
@@ -8,7 +8,7 @@ import { supabase } from "../client/supabaseClient.js";
 
     if (!user) {
         // Not logged in → go to login
-        window.location.href = "/auth/login.html";
+        window.location.href = "/login.html";
         return;
     }
 

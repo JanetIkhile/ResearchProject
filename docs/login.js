@@ -1,4 +1,4 @@
-import { supabase } from "../../client/supabaseClient.js";
+import { supabase } from "../client/supabaseClient.js";
 
 console.log("login.js loaded");
 
@@ -40,7 +40,7 @@ loginBtn.onclick = async () => {
     if (!login.error) {
         // LOGIN SUCCESS
         console.log("Logged in:", login.data.user.id);
-        window.location.href = "/docs/index.html";
+        window.location.href = "/docs/dashboard/index.html";
         return;
     }
 
@@ -78,5 +78,5 @@ loginBtn.onclick = async () => {
         });
 
     console.log("Registered new user:", user.id);
-    window.location.href = "/docs/index.html";
+    window.location.href = "/docs/dashboard/index.html";
 };
