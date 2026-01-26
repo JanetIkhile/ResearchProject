@@ -1,7 +1,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
 const SUPABASE_URL =
-    (import.meta && import.meta.env && import.meta.env.SUPABASE_URL) ||
+    (import.meta && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ||
     "https://cuodmwpzyyhycubctetf.supabase.co";
 const SUPABASE_ANON_KEY =
     (import.meta && import.meta.env && import.meta.env.SUPABASE_ANON_KEY) ||
