@@ -8,7 +8,7 @@ import { supabase } from "../../client/supabaseClient.js";
 
     if (!user) {
         // Not logged in → go to login
-        window.location.href = "/login.html";
+        window.location.href = "/index.html";
         return;
     }
 
