@@ -31,32 +31,20 @@ create table if not exists trial_results (
   trial_number int not null,
   timestamp timestamptz not null,
 
+   -- trial timing
+  trial_start_time timestamptz,
+  trial_end_time timestamptz,
+
+  -- task geometry (coordinates in page pixels)
+  start_x numeric,
+  start_y numeric,
+  target_x numeric,
+  target_y numeric,
+
   -- -------- device / context --------
   viewport_width int,
   viewport_height int,
-  device_pixel_ratio float,
-
-  -- -------- motor measures --------
-  akinetic_delay_ms float,
-  total_time_ms float,
-  total_distance_px float,
-  straight_line_distance_px float,
-  shortest_path_distance_px float,
-
-  path_efficiency float,
-  amplitude_ratio float,
-
-  mean_speed_px_per_ms float,
-  peak_speed_px_per_ms float,
-  time_to_peak_speed_ms float,
-
-  arrhythmicity_cv float,
-  pause_count int,
-  mean_pause_duration_ms float,
-  pause_ratio float,
-
-  sequence_effect_amplitude float,
-  sequence_effect_speed float,
+  device_pixel_ratio float, 
 
   -- -------- raw trajectory --------
   trajectory jsonb
@@ -71,6 +59,8 @@ on trial_results (session_id);
 create index if not exists trial_results_task_type_idx
 on trial_results (task_type);
 
+create index if not exists trial_results_participant_trial_created_at_idx
+on trial_results (created_at);
 -- for pilot
 -- alter table participants disable row level security;
 -- alter table sessions disable row level security;

@@ -3,21 +3,49 @@
 
 <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Task Summary</title>
-    <link rel="stylesheet" href="summary.css" />
-    <script type="module" src="summary.js" defer></script>
+    <script type="module">
+        import { supabase } from "../client/supabaseClient.js";
+
+        async function startNewSession() {
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                window.location.href = ". /index.html";
+                return;
+            }
+
+            const participantId = user.id;
+
+            // Remove existing session from sessionStorage
+            sessionStorage.removeItem(`session_${participantId}`);
+            window.CURRENT_SESSION_ID = null;
+
+            // Redirect back to dashboard
+            window.location.href = "../dashboard/dashboard.html";
+        }
+
+        window.startNewSession = startNewSession;
+    </script>
 </head>
 
 <body>
     <header>
-        <h3>Task Summary (In Progress)</h3>
+        <h3>Task Summary</h3>
     </header>
+
     <main>
         <section id="summary">
-            <p id="summaryText"> We are working on this section to provide a detailed summary of your performance across
-                all tasks.</p>
+            <p>
+                Thank you for completing the tasks.
+                <br><br>
+                You may now start another session.
+            </p>
+
+            <button onclick="startNewSession()" style="padding:10px 20px; font-size:16px;">
+                Start New Session
+            </button>
         </section>
     </main>
 </body>

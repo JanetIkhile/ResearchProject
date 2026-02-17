@@ -22,7 +22,7 @@ loginBtn.onclick = async () => {
         return;
     }
 
-    const email = `${username}@motorstudy.local`;
+    const email = `${username}@motorstudy.com`;
 
     // ---------- CHECK IF USERNAME EXISTS ----------
     const { data: existingUser } = await supabase
@@ -40,7 +40,7 @@ loginBtn.onclick = async () => {
     if (!login.error) {
         // LOGIN SUCCESS
         console.log("Logged in:", login.data.user.id);
-        window.location.href = "/dashboard/index.html";
+        window.location.href = "./dashboard/dashboard.html";
         return;
     }
 
@@ -78,5 +78,5 @@ loginBtn.onclick = async () => {
         });
 
     console.log("Registered new user:", user.id);
-    window.location.href = "/dashboard/index.html";
+    window.location.href = "./dashboard/dashboard.html";
 };

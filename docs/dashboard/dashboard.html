@@ -51,8 +51,15 @@
     .task-btn:hover {
       background-color: #005fcc;
     }
+
+    .task-btn:disabled {
+      background-color: #cbd5e1;
+      color: #6b7280;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
   </style>
-  <script type="module" src="index.js"></script>
+  <script type="module" src="dashboard.js"></script>
 
 </head>
 
@@ -61,10 +68,11 @@
   <p>Select a task to begin. Each task measures different components of movement performance.</p>
 
   <div class="task-buttons">
-    <button class="task-btn" onclick="location.href='../drag/drag.html'">🖐️ Drag Task</button>
-    <button class="task-btn" onclick="location.href='../tap/tap.html'">👆 Tap Task</button>
-    <button class="task-btn" onclick="location.href='../hold/hold.html'">✊ Hold Task</button>
+    <button id="dragBtn" class="task-btn">🖐️ Drag Task</button>
+    <button id="tapBtn" class="task-btn">👆 Tap Task</button>
+    <button id="holdBtn" class="task-btn">✊ Hold Task</button>
   </div>
+
 </body>
 
 </html>

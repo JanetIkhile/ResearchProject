@@ -1,165 +1,280 @@
 'use strict';
 
 import { supabase } from "../client/supabaseClient.js";
+import { initSession, updateSessionFlags } from "../utils/sessionManager.js";
 
 let participantId = null;
 let sessionId = null;
 let trialNumber = 0;
 const TASK_TYPE = "tap";
+const TRIAL_LIMIT = 3;
+const TASK_DURATION = 10000;
+const INTER_TRIAL_COOLDOWN = 1000;
+
+let taskActive = false;
+let isBetweenTrials = true;
+let taskTimer = null;
+let timerInterval = null;
+let tapEvents = [];
+let taskCompleted = false;
+let savingInProgress = false;
+
+let trialStartTime = null;
+
+let tapTarget = null;
+let nextButton = null;
+let tapInstruction = null;
+let countdown = null;
+
+function isTouchInsideTarget(touch) {
+    if (!tapTarget) return false;
+    const rect = tapTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = touch.pageX - centerX;
+    const dy = touch.pageY - centerY;
+    const radius = Math.min(rect.width, rect.height) / 2;
+    return (dx * dx + dy * dy) <= (radius * radius);
+}
+
+// attach handler reference so we can remove it later
+function handleTouchStart(e) {
+    if (window.isModalOpen) return;
+    if (taskCompleted) return;
+
+    // block starts while saving is in progress to prevent race
+    if (savingInProgress) return;
+
+    // If we've already finished the allowed trials, ignore everything
+    if (trialNumber >= TRIAL_LIMIT && !taskActive) return;
+
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    const now = Date.now();
+
+    // ONLY proceed if touch is inside the circular target
+    if (!isTouchInsideTarget(touch)) return;
+
+    // If we're BETWEEN trials, a touch starts the trial and is recorded as first tap
+    if (!taskActive && isBetweenTrials) {
+        if (trialNumber >= TRIAL_LIMIT) return;
+
+        // prevent race double-starts
+        if (taskActive) return;
+
+        trialNumber += 1;
+        startTapTrial(now);
+        recordTapEvent(touch, now);
+        return;
+    }
+
+    // If a trial is active, record taps normally
+    if (taskActive) {
+        recordTapEvent(touch, now);
+    }
+}
 
 (async function initContext() {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        window.location.href = "/auth/login.html";
+    try {
+        const result = await initSession({ dashboardPath: "/dashboard.html" });
+        participantId = result.participantId;
+        sessionId = result.sessionId;
+        console.log("Session verified:", sessionId, result.sessionRow);
+    } catch (err) {
         return;
     }
 
-    participantId = user.id;
+    // DOM elements
+    tapTarget = document.getElementById("tapTarget");
+    nextButton = document.getElementById("nextTaskButton");
+    tapInstruction = document.getElementById("tapInstruction");
+    countdown = document.getElementById("countdownTimer");
 
-    sessionId = sessionStorage.getItem("session_id");
-
-    if (!sessionId) {
-        window.location.href = "/index.html";
+    if (!tapTarget) {
+        console.error("tapTarget element not found in DOM.");
         return;
     }
-    console.log("Tap task started");
-    console.log("Participant:", participantId);
-    console.log("Session:", sessionId);
+
+    tapTarget.style.touchAction = 'none';
+    if (tapInstruction) tapInstruction.innerText = "Tap inside the red circle to start the first trial";
+    if (tapTarget) tapTarget.style.backgroundColor = "red";
+
+    tapTarget.addEventListener("touchstart", handleTouchStart, { passive: false });
 })();
 
-const tapTarget = document.getElementById("tapTarget");
-const modalContent = document.getElementById("modalBodyContent");
-const nextButton = document.getElementById("nextTaskButton");
-const tapInstruction = document.getElementById("tapInstruction");
+// ---------- Start a trial ----------
+function startTapTrial(startTs) {
+    if (taskCompleted) return;
+    if (trialNumber > TRIAL_LIMIT) return;
 
-let tapTimes = [];
-let trialCount = 0;
-const TRIAL_LIMIT = 3;
-const TASK_DURATION = 10000; // 10 seconds
-let taskActive = false;
-let taskTimer = null;
+    clearTimers();
 
-// --- Handle touch input ---
-tapTarget.addEventListener("touchstart", () => {
-    if (window.isModalOpen) return; // prevent taps when modal open
-
-    if (!taskActive) {
-        trialNumber++;
-        startTapTrial();
-    } else {
-        recordTap();
-    }
-});
-
-function startTapTrial() {
-    tapTimes = [];
+    tapEvents = [];
     taskActive = true;
+    isBetweenTrials = false;
 
-    const countdown = document.getElementById("countdownTimer");
+    const startTime = startTs || Date.now();
+    trialStartTime = startTime;
 
-    tapTarget.style.backgroundColor = "yellow";
-    tapInstruction.innerText = "⏱️ Keep tapping for 10 seconds!";
+    if (tapInstruction) {
+        tapInstruction.innerText = `Trial ${trialNumber} — Keep tapping for ${TASK_DURATION / 1000} s`;
+    }
+    if (tapTarget) {
+        tapTarget.style.backgroundColor = "yellow";
+        tapTarget.style.pointerEvents = 'auto'; // ensure pointer enabled during trial
+    }
 
-    const startTime = Date.now();
-    countdown.style.display = "block";
-
-
-    let timeLeft = TASK_DURATION / 1000;
-    countdown.innerText = `Time left: ${timeLeft}s`;
-
-    const timerInterval = setInterval(() => {
-        timeLeft--;
+    // countdown UI
+    if (countdown) {
+        countdown.style.display = "block";
+        let timeLeft = Math.ceil(TASK_DURATION / 1000);
         countdown.innerText = `Time left: ${timeLeft}s`;
 
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            countdown.innerText = "Time's up!";
-        }
-    }, 1000);
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            if (countdown) countdown.innerText = `Time left: ${timeLeft}s`;
+            if (timeLeft <= 0 && timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }, 1000);
+    }
 
+    if (taskTimer) {
+        clearTimeout(taskTimer);
+        taskTimer = null;
+    }
 
-    taskTimer = setTimeout(() => {
+    taskTimer = setTimeout(async () => {
+        // Trial finished — flip states and clear timers
         taskActive = false;
-        const endTime = Date.now();
-        console.log("📊 Trial finished, calling analyzeTaps()");
+        const reachedFinal = (trialNumber >= TRIAL_LIMIT);
 
-        clearInterval(timerInterval);
-        countdown.innerText = "";
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+        if (countdown) countdown.innerText = "";
 
-        analyzeTaps(startTime, endTime);
-        trialCount++;
+        // Block any touch-based starts now (immediate)
+        if (tapTarget) {
+            tapTarget.style.pointerEvents = 'none';
+        }
+        // mark save in progress
+        savingInProgress = true;
 
-        if (trialCount >= TRIAL_LIMIT) nextButton.style.display = "block";
+        // Save raw behavior only (use trialStartTime as start)
+        try {
+            await saveTapTrial(trialStartTime, Date.now());
+        } finally {
+            savingInProgress = false;
+        }
+
+        if (reachedFinal) {
+            if (!taskCompleted) {
+                taskCompleted = true;
+                try {
+                    await updateSessionFlags(sessionId, { tap: true });
+                } catch (err) {
+                    console.error("Failed to update session tap flag:", err);
+                }
+            }
+
+            // final cleanup
+            try {
+                tapTarget.removeEventListener("touchstart", handleTouchStart, { passive: false });
+            } catch (e) {
+                try { tapTarget.removeEventListener("touchstart", handleTouchStart); } catch (er) { }
+            }
+            if (tapTarget) tapTarget.style.pointerEvents = 'none';
+            if (nextButton) nextButton.style.display = "block";
+            if (tapInstruction) tapInstruction.innerText = `All ${TRIAL_LIMIT} trials complete — tap Next Task to continue.`;
+            if (countdown) countdown.style.display = "none";
+        } else {
+            // non-final: wait cooldown then re-enable start
+            if (tapInstruction) tapInstruction.innerText = `Trial ${trialNumber} finished — saving...`;
+            if (tapTarget) tapTarget.style.backgroundColor = "lightgray";
+
+            setTimeout(() => {
+                isBetweenTrials = true;
+                if (tapTarget) {
+                    tapTarget.style.pointerEvents = 'auto'; // re-enable touches
+                    tapTarget.style.backgroundColor = "red";
+                }
+                if (tapInstruction) tapInstruction.innerText = `Trial ${trialNumber} finished — saved. Tap inside the red circle to start trial ${trialNumber + 1}.`;
+            }, INTER_TRIAL_COOLDOWN);
+        }
+
+        clearTimers();
     }, TASK_DURATION);
 }
 
-function recordTap() {
-    tapTarget.style.backgroundColor = "white";
-    setTimeout(() => (tapTarget.style.backgroundColor = "red"), 100);
-    tapTimes.push(Date.now());
+// helper timers clear
+function clearTimers() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    if (taskTimer) {
+        clearTimeout(taskTimer);
+        taskTimer = null;
+    }
 }
 
-// --- Analysis ---
-async function analyzeTaps(startTime, endTime) {
-    if (tapTimes.length < 2) {
-        modalContent.innerText = "Not enough taps recorded.";
-        window.showModal();
-        return;
+// ---------- record a tap only while a trial is active ----------
+function recordTapEvent(touch, ts) {
+    if (!taskActive) return; // only capture taps during active trial
+    if (!isTouchInsideTarget(touch)) return;
+
+    const evt = {
+        t: ts || Date.now(),
+        x: touch.pageX,
+        y: touch.pageY,
+        force: (typeof touch.force === "number") ? touch.force : null
+    };
+    tapEvents.push(evt);
+
+    // small visual feedback
+    if (tapTarget) {
+        tapTarget.style.backgroundColor = "white";
+        setTimeout(() => {
+            if (tapTarget) {
+                if (taskActive) tapTarget.style.backgroundColor = "yellow";
+                else if (isBetweenTrials) tapTarget.style.backgroundColor = "red";
+            }
+        }, 100);
     }
+}
 
-    const intervals = [];
-    for (let i = 1; i < tapTimes.length; i++) {
-        intervals.push(tapTimes[i] - tapTimes[i - 1]);
-    }
-
-    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const stdInterval = Math.sqrt(
-        intervals.reduce((a, b) => a + Math.pow(b - avgInterval, 2), 0) / intervals.length
-    );
-    const cv = stdInterval / avgInterval;
-    const totalTaps = tapTimes.length;
-    const duration = (endTime - startTime) / 1000;
-    const tapsPerSecond = totalTaps / duration;
-
-    // --- Interpretations ---
-    const rhythmInterpret =
-        cv < 0.15 ? "(Highly regular)" :
-            cv < 0.3 ? "(Moderately regular)" :
-                "(Irregular tapping rhythm)";
-
-    const speedInterpret =
-        tapsPerSecond > 4 ? "(Normal speed)" :
-            tapsPerSecond > 2 ? "(Mild bradykinesia)" :
-                "(Severe bradykinesia)";
-
-    modalContent.innerText = `
-Trial: ${trialCount + 1}
-Total Taps: ${totalTaps}
-Duration: ${duration.toFixed(1)} s
-Tapping Speed: ${tapsPerSecond.toFixed(2)} taps/sec ${speedInterpret}
-Rhythmic Consistency (CV): ${cv.toFixed(2)} ${rhythmInterpret}
-`;
-    window.showModal();
-    tapInstruction.innerText = "Tap inside the red circle to start next trial";
-    const trialPayload = {
-        // -------- independent variables --------
+// ---------- Persist raw taps ----------
+async function saveTapTrial(startTime, endTime) {
+    const totalTaps = tapEvents.length;
+    const payload = {
         participant_id: participantId,
         session_id: sessionId,
         task_type: TASK_TYPE,
         trial_number: trialNumber,
         timestamp: new Date().toISOString(),
 
-        // -------- dependent variables --------
         total_taps: totalTaps,
-        total_time_ms: endTime - startTime,
-        taps_per_second: tapsPerSecond,
-        arrhythmicity_cv: cv,
+        total_tap_time_ms: endTime - startTime,
 
-        // -------- raw data --------
-        trajectory: tapTimes
+        viewport_width: window.innerWidth,
+        viewport_height: window.innerHeight,
+        device_pixel_ratio: window.devicePixelRatio,
+
+        taps: tapEvents
     };
 
-    await supabase.from("trial_results").insert(trialPayload);
-
+    try {
+        const { error } = await supabase.from("trial_results").insert(payload);
+        if (error) {
+            console.error("Failed to save tap trial:", error);
+        } else {
+            console.log(`Tap trial saved: ${trialNumber} events:`, totalTaps);
+        }
+    } catch (err) {
+        console.error("Unexpected error saving tap trial:", err);
+    }
 }
