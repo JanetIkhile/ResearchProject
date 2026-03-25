@@ -1,39 +1,40 @@
 // shared/sessionManager.js
+// shared/sessionManager.js
 import { supabase } from "../client/supabaseClient.js";
 
 /**
  * initSession(options)
- * - Verifies the current signed-in user and resolves a session id.
- * - Prefers window.CURRENT_SESSION_ID, then session_<participantId>.
- * - If no valid session exists, redirects to the provided dashboardPath.
- *
- * Returns: { participantId, sessionId, sessionRow } on success.
+ * Lab version: uses participant_uuid instead of auth user
  */
 export async function initSession({ dashboardPath = "/dashboard/dashboard.html" } = {}) {
-    // 1) get auth user
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr) {
-        console.error("Error fetching auth user:", userErr);
-        window.location.href = "/index.html";
-        throw new Error("no-user");
-    }
-    if (!user) {
-        window.location.href = "/index.html";
-        throw new Error("no-user");
-    }
-    const participantId = user.id;
 
-    // 2) resolve candidate session id
+    // -----------------------------
+    // 1) get participant from sessionStorage
+    // -----------------------------
+    const participantId = sessionStorage.getItem("participant_uuid");
+
+    if (!participantId) {
+        console.warn("No participant found → redirecting");
+        window.location.href = "/docs/index.html";
+        throw new Error("no-participant");
+    }
+
     const perUserKey = `session_${participantId}`;
-    let candidateSessionId = window.CURRENT_SESSION_ID || sessionStorage.getItem(perUserKey);
+    let candidateSessionId =
+        window.CURRENT_SESSION_ID || sessionStorage.getItem(perUserKey);
 
+    // -----------------------------
+    // 2) no session → redirect to dashboard
+    // -----------------------------
     if (!candidateSessionId) {
-        console.warn("No session id found for user. Redirecting to dashboard to start session.");
+        console.warn("No session found → redirecting to dashboard");
         window.location.href = dashboardPath;
         throw new Error("no-session");
     }
 
-    // helper: create a new session for this participant and persist it locally
+    // -----------------------------
+    // helper: create new session
+    // -----------------------------
     async function createNewSession() {
         const payload = {
             participant_id: participantId,
@@ -43,24 +44,31 @@ export async function initSession({ dashboardPath = "/dashboard/dashboard.html" 
             tap_completed: false,
             hold_completed: false
         };
-        const { data: inserted, error: insertErr } = await supabase
+
+        const { data: inserted, error } = await supabase
             .from("sessions")
             .insert(payload)
             .select("id, started_at")
             .single();
 
-        if (insertErr) {
-            console.error("Failed to create new session:", insertErr);
-            throw insertErr;
+        if (error) {
+            console.error("Failed to create new session:", error);
+            throw error;
         }
+
         const newId = inserted.id;
+
         sessionStorage.setItem(perUserKey, newId);
         window.CURRENT_SESSION_ID = newId;
-        console.log("Created new session for user:", participantId, newId);
+
+        console.log("Created new session:", newId);
+
         return newId;
     }
 
-    // 3) verify session row belongs to user
+    // -----------------------------
+    // 3) fetch session row
+    // -----------------------------
     const { data: sessionRow, error: fetchErr } = await supabase
         .from("sessions")
         .select("id, participant_id, completed, completed_at, drag_completed, tap_completed, hold_completed, started_at")
@@ -68,50 +76,87 @@ export async function initSession({ dashboardPath = "/dashboard/dashboard.html" 
         .maybeSingle();
 
     if (fetchErr) {
-        console.error("Error fetching session row:", fetchErr);
+        console.error("Error fetching session:", fetchErr);
         window.location.href = dashboardPath;
         throw new Error("session-fetch-error");
     }
+
     if (!sessionRow) {
-        console.warn("Session id provided does not exist in DB. Redirecting to dashboard.");
+        console.warn("Session not found → redirecting");
         window.location.href = dashboardPath;
         throw new Error("session-not-found");
     }
+
     if (sessionRow.participant_id !== participantId) {
-        console.warn("Session belongs to another user. Redirecting to dashboard.");
+        console.warn("Session belongs to another participant");
         window.location.href = dashboardPath;
         throw new Error("session-wrong-owner");
     }
 
-    // NEW: if the candidate session is already completed, create & use a fresh session
+    // -----------------------------
+    // 4) if completed → create new session
+    // -----------------------------
     if (sessionRow.completed) {
-        console.info("Candidate session is already completed — creating a new session for user.");
+        console.info("Session already completed → creating new one");
+
         const newSessionId = await createNewSession();
 
-        // fetch the newly created row to return its data
-        const { data: newRow, error: newFetchErr } = await supabase
+        const { data: newRow } = await supabase
             .from("sessions")
-            .select("id, participant_id, completed, completed_at, drag_completed, tap_completed, hold_completed, started_at")
+            .select("*")
             .eq("id", newSessionId)
             .single();
 
-        if (newFetchErr) {
-            console.error("Created a new session but failed to fetch it:", newFetchErr);
-            // still persist the id and return minimal info
-            return { participantId, sessionId: newSessionId, sessionRow: null };
-        }
+        // -----------------------------
+        // GET SESSION NUMBER
+        // -----------------------------
+        const { data: sessions } = await supabase
+            .from("sessions")
+            .select("id, started_at")
+            .eq("participant_id", participantId)
+            .order("started_at", { ascending: true });
 
-        // persist and return new session
-        sessionStorage.setItem(perUserKey, newSessionId);
-        window.CURRENT_SESSION_ID = newSessionId;
-        return { participantId, sessionId: newSessionId, sessionRow: newRow };
+        // session index (1-based)
+        let sessionNumber = sessions.findIndex(s => s.id === newSessionId) + 1;
+
+        // fallback
+        if (sessionNumber === 0) sessionNumber = sessions.length;
+
+        return {
+            participantId,
+            sessionId: newSessionId,
+            sessionRow: newRow,
+            sessionNumber
+        };
     }
 
-    // persist per-user key for future reloads (existing, unfinished session)
+    // -----------------------------
+    // 5) persist valid session
+    // -----------------------------
     sessionStorage.setItem(perUserKey, sessionRow.id);
     window.CURRENT_SESSION_ID = sessionRow.id;
 
-    return { participantId, sessionId: sessionRow.id, sessionRow };
+    // -----------------------------
+    // GET SESSION NUMBER
+    // -----------------------------
+    const { data: sessions } = await supabase
+        .from("sessions")
+        .select("id, started_at")
+        .eq("participant_id", participantId)
+        .order("started_at", { ascending: true });
+
+    // session index (1-based)
+    let sessionNumber = sessions.findIndex(s => s.id === sessionRow.id) + 1;
+
+    // fallback
+    if (sessionNumber === 0) sessionNumber = sessions.length;
+
+    return {
+        participantId,
+        sessionId: sessionRow.id,
+        sessionRow,
+        sessionNumber
+    };
 }
 
 /**

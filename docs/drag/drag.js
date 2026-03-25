@@ -7,25 +7,44 @@ let participantId = null;
 let sessionId = null;
 let trialNumber = 0;
 const TASK_TYPE = "drag";
-const TRIAL_LIMIT = 10;
+let TRIAL_LIMIT = 10;
 let taskCompleted = false;
+let pageLoadTime = Date.now();
+let lastTrialEndTime = pageLoadTime;
+let initiationDelay = null;
+const dragInstruction = document.getElementById("dragInstruction");
 
 // async setup
 (async function initContext() {
     try {
         const result = await initSession({ dashboardPath: "/dashboard.html" });
+
         participantId = result.participantId;
         sessionId = result.sessionId;
-        // sessionRow available at result.sessionRow if you need flags
+
+        const sessionNumber = result.sessionNumber;
+
+        if (sessionNumber === 1) {
+            TRIAL_LIMIT = 1;   // practice session
+        } else {
+            TRIAL_LIMIT = 10;  // real session
+        }
+        const dragInstruction = document.getElementById("dragInstruction");
+
+        if (dragInstruction) {
+            dragInstruction.innerText = `Attempts left: ${TRIAL_LIMIT}`;
+        }
+
         console.log("Drag task started");
         console.log("Participant:", participantId);
         console.log("Session:", sessionId);
+        console.log("Session number:", sessionNumber);
+        console.log("Trial limit:", TRIAL_LIMIT);
+
     } catch (err) {
-        // initSession already redirected or threw; stop further execution
         return;
     }
 })();
-
 
 let touchStartX, touchStartY;
 let touchEndX, touchEndY;
@@ -60,6 +79,9 @@ function touchForce(touch) {
 function handleTouchStart(e) {
     if (taskCompleted) return;  // prevent further trials
 
+    trialStartTime = Date.now();
+    initiationDelay = trialStartTime - lastTrialEndTime;
+
     if (trialNumber >= TRIAL_LIMIT) {
         taskCompleted = true;
         const nextButton = document.getElementById('nextTaskButton');
@@ -74,9 +96,13 @@ function handleTouchStart(e) {
     const touch = e.changedTouches[0];
     touchStartX = touch.pageX;
     touchStartY = touch.pageY;
-    trialStartTime = Date.now();
 
     trialNumber += 1;
+    const remaining = TRIAL_LIMIT - trialNumber;
+
+    if (dragInstruction && remaining > 0) {
+        dragInstruction.innerText = `Attempts left: ${remaining}`;
+    }
     trajectoryLog = [];
 
     trajectoryLog.push({
@@ -146,6 +172,7 @@ async function handleTouchEnd(e) {
     touchEndX = touch.pageX;
     touchEndY = touch.pageY;
     trialEndTime = Date.now();
+    lastTrialEndTime = trialEndTime;
 
     trajectoryLog.push({
         x: touchEndX,
@@ -166,9 +193,13 @@ async function handleTouchEnd(e) {
         trial_number: trialNumber,
         timestamp: new Date().toISOString(),
 
-        // ---- trial timing ----
+        // ---- timing ----
         trial_start_time: new Date(trialStartTime).toISOString(),
         trial_end_time: new Date(trialEndTime).toISOString(),
+
+        // NEW METRICS
+        initiation_delay_ms: initiationDelay,
+        movement_time_ms: trialEndTime - trialStartTime,
 
         // ---- task geometry ----
         start_x: startX,
@@ -181,7 +212,7 @@ async function handleTouchEnd(e) {
         viewport_height: window.innerHeight,
         device_pixel_ratio: window.devicePixelRatio,
 
-        // ---- raw behavioral data ----
+        // ---- behavior ----
         trajectory: trajectoryLog
     };
     console.log("Saving trial data:", trialPayload);
@@ -210,7 +241,14 @@ async function handleTouchEnd(e) {
     // ---- CHECK IF TASK COMPLETE ----
     if (trialNumber >= TRIAL_LIMIT) {
         console.log("All trials completed.");
-
+        // 🔥 visual + text feedback
+        if (dragInstruction) {
+            dragInstruction.innerText = "✅ Task complete";
+        }
+        // indicate stop
+        if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
         const nextButton = document.getElementById('nextTaskButton');
         if (nextButton) {
             nextButton.style.display = 'block';

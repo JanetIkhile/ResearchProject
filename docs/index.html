@@ -6,13 +6,19 @@
 </head>
 
 <body>
-    <h2>Motor Study</h2>
+    <h2>Motor Study (Lab Mode)</h2>
 
-    <input id="username" placeholder="Enter your name" />
-    <input id="password" type="password" placeholder="Password" />
-    <button id="loginBtn">Login / Register</button>
+    <label for="username">Participant ID:</label>
+    <select id="username">
+        <option value="">-- Select Participant --</option>
+    </select>
 
-    <p id="error"></p>
+    <br><br>
+
+    <button id="nextBtn">Auto Select Next</button>
+    <button id="loginBtn">Start Session</button>
+
+    <p id="error" style="color:red;"></p>
 
     <script type="module" src="index.js"></script>
 </body>

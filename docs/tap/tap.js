@@ -7,9 +7,9 @@ let participantId = null;
 let sessionId = null;
 let trialNumber = 0;
 const TASK_TYPE = "tap";
-const TRIAL_LIMIT = 3;
+let TRIAL_LIMIT = 3;
 const TASK_DURATION = 10000;
-const INTER_TRIAL_COOLDOWN = 1000;
+const INTER_TRIAL_COOLDOWN = 1500;
 
 let taskActive = false;
 let isBetweenTrials = true;
@@ -25,6 +25,10 @@ let tapTarget = null;
 let nextButton = null;
 let tapInstruction = null;
 let countdown = null;
+
+let pageLoadTime = Date.now();
+let lastTrialEndTime = pageLoadTime;
+let initiationDelay = null;
 
 function isTouchInsideTarget(touch) {
     if (!tapTarget) return false;
@@ -62,6 +66,10 @@ function handleTouchStart(e) {
         // prevent race double-starts
         if (taskActive) return;
 
+        const now = Date.now();
+
+        initiationDelay = now - lastTrialEndTime;
+
         trialNumber += 1;
         startTapTrial(now);
         recordTapEvent(touch, now);
@@ -80,6 +88,18 @@ function handleTouchStart(e) {
         participantId = result.participantId;
         sessionId = result.sessionId;
         console.log("Session verified:", sessionId, result.sessionRow);
+
+        const sessionNumber = result.sessionNumber;
+        if (sessionNumber === 1) {
+            TRIAL_LIMIT = 1;   // practice
+        } else {
+            TRIAL_LIMIT = 3;   // real
+        }
+
+        console.log("Tap task started");
+        console.log("Session number:", sessionNumber);
+        console.log("Trial limit:", TRIAL_LIMIT);
+
     } catch (err) {
         return;
     }
@@ -96,8 +116,8 @@ function handleTouchStart(e) {
     }
 
     tapTarget.style.touchAction = 'none';
-    if (tapInstruction) tapInstruction.innerText = "Tap inside the red circle to start the first trial";
-    if (tapTarget) tapTarget.style.backgroundColor = "red";
+    if (tapInstruction) tapInstruction.innerText = "Tap inside the blue circle to start";
+    if (tapTarget) tapTarget.style.backgroundColor = "blue";
 
     tapTarget.addEventListener("touchstart", handleTouchStart, { passive: false });
 })();
@@ -117,7 +137,7 @@ function startTapTrial(startTs) {
     trialStartTime = startTime;
 
     if (tapInstruction) {
-        tapInstruction.innerText = `Trial ${trialNumber} — Keep tapping for ${TASK_DURATION / 1000} s`;
+        tapInstruction.innerText = `Keep tapping the yellow circle for ${TASK_DURATION / 1000} seconds`;
     }
     if (tapTarget) {
         tapTarget.style.backgroundColor = "yellow";
@@ -150,6 +170,13 @@ function startTapTrial(startTs) {
         // Trial finished — flip states and clear timers
         taskActive = false;
         const reachedFinal = (trialNumber >= TRIAL_LIMIT);
+        if (tapInstruction) {
+            tapInstruction.innerText = "✔ Done";
+        }
+
+        if (tapTarget) {
+            tapTarget.style.backgroundColor = "green";
+        }
 
         if (timerInterval) {
             clearInterval(timerInterval);
@@ -166,7 +193,12 @@ function startTapTrial(startTs) {
 
         // Save raw behavior only (use trialStartTime as start)
         try {
-            await saveTapTrial(trialStartTime, Date.now());
+            const endTime = Date.now();
+
+            // 🔥 update last trial end time
+            lastTrialEndTime = endTime;
+
+            await saveTapTrial(trialStartTime, endTime);
         } finally {
             savingInProgress = false;
         }
@@ -189,20 +221,20 @@ function startTapTrial(startTs) {
             }
             if (tapTarget) tapTarget.style.pointerEvents = 'none';
             if (nextButton) nextButton.style.display = "block";
-            if (tapInstruction) tapInstruction.innerText = `All ${TRIAL_LIMIT} trials complete — tap Next Task to continue.`;
+            if (tapInstruction) tapInstruction.innerText = "✅ Task complete";
             if (countdown) countdown.style.display = "none";
         } else {
             // non-final: wait cooldown then re-enable start
-            if (tapInstruction) tapInstruction.innerText = `Trial ${trialNumber} finished — saving...`;
-            if (tapTarget) tapTarget.style.backgroundColor = "lightgray";
+            if (tapInstruction) tapInstruction.innerText = "✔ Done";;
+            if (tapTarget) tapTarget.style.backgroundColor = "green";
 
             setTimeout(() => {
                 isBetweenTrials = true;
                 if (tapTarget) {
                     tapTarget.style.pointerEvents = 'auto'; // re-enable touches
-                    tapTarget.style.backgroundColor = "red";
+                    tapTarget.style.backgroundColor = "blue";
                 }
-                if (tapInstruction) tapInstruction.innerText = `Trial ${trialNumber} finished — saved. Tap inside the red circle to start trial ${trialNumber + 1}.`;
+                if (tapInstruction) tapInstruction.innerText = `Tap inside the blue circle to start`;
             }, INTER_TRIAL_COOLDOWN);
         }
 
@@ -241,7 +273,7 @@ function recordTapEvent(touch, ts) {
         setTimeout(() => {
             if (tapTarget) {
                 if (taskActive) tapTarget.style.backgroundColor = "yellow";
-                else if (isBetweenTrials) tapTarget.style.backgroundColor = "red";
+                else if (isBetweenTrials) tapTarget.style.backgroundColor = "blue";
             }
         }, 100);
     }
@@ -259,6 +291,7 @@ async function saveTapTrial(startTime, endTime) {
 
         total_taps: totalTaps,
         total_tap_time_ms: endTime - startTime,
+        initiation_delay_ms: initiationDelay,
 
         viewport_width: window.innerWidth,
         viewport_height: window.innerHeight,

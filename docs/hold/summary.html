@@ -12,7 +12,8 @@
             const { data: { user } } = await supabase.auth.getUser();
 
             if (!user) {
-                window.location.href = ". /index.html";
+                console.log("Not user");
+                window.location.href = "../index.html";
                 return;
             }
 
@@ -39,12 +40,10 @@
         <section id="summary">
             <p>
                 Thank you for completing the tasks.
-                <br><br>
-                You may now start another session.
             </p>
 
             <button onclick="startNewSession()" style="padding:10px 20px; font-size:16px;">
-                Start New Session
+                Return to Dashboard
             </button>
         </section>
     </main>

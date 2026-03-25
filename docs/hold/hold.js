@@ -18,7 +18,7 @@ let holdStartTime = 0;
 let releaseTime = 0;
 let readyTime = 0;
 let trialCount = 0;
-const TRIAL_LIMIT = 3;
+let TRIAL_LIMIT = 3;
 const HOLD_DURATION = 5000;
 
 let isHolding = false;
@@ -31,12 +31,28 @@ let holdEvents = [];
 let taskCompleted = false;
 let holdFlagUpdated = false;
 
+let pageLoadTime = Date.now();
+let lastTrialEndTime = pageLoadTime;
+let initiationDelay = null;
+
 (async function initContext() {
     try {
         const result = await initSession({ dashboardPath: "/dashboard.html" });
         participantId = result.participantId;
         sessionId = result.sessionId;
         console.log("Session verified:", sessionId, result.sessionRow);
+
+        const sessionNumber = result.sessionNumber;
+
+        if (sessionNumber === 1) {
+            TRIAL_LIMIT = 1;   // practice
+        } else {
+            TRIAL_LIMIT = 3;   // real
+        }
+
+        console.log("Hold task started");
+        console.log("Session number:", sessionNumber);
+        console.log("Trial limit:", TRIAL_LIMIT);
     } catch (err) {
         // initSession already redirected or threw; stop further execution
         return;
@@ -62,6 +78,9 @@ let holdFlagUpdated = false;
         startButton.addEventListener("click", () => {
             // don't start if we've already finished all trials
             if (taskCompleted || trialCount >= TRIAL_LIMIT) return;
+
+            const now = Date.now();
+            initiationDelay = now - lastTrialEndTime;
             if (!trialActive) startHoldTrial();
         });
     }
@@ -174,7 +193,7 @@ function startHoldTrial() {
 
     // immediate cue
     readyTime = Date.now();
-    if (holdInstruction) holdInstruction.innerText = "Go! Touch and hold the circle now.";
+    if (holdInstruction) holdInstruction.innerText = "Touch and hold the circle now.";
 
     playBeep(); // cue sound
     // wait for user to touch; HOLD_DURATION applies once holding begins
@@ -223,6 +242,7 @@ async function handleEarlyRelease(touch) {
     if (!isHolding) return;
 
     const releaseTime = Date.now();
+    lastTrialEndTime = releaseTime;
 
     // record raw end event
     holdEvents.push({
@@ -246,12 +266,23 @@ async function handleEarlyRelease(touch) {
     trialCount++;
     trialNumber++;
 
+    const isFinalTrial = (trialCount >= TRIAL_LIMIT);
+
+    if (holdTarget) {
+        if (isFinalTrial) {
+            holdTarget.style.backgroundColor = "green";
+        } else {
+            holdTarget.style.backgroundColor = "blue";
+        }
+    }
+
     const trialPayload = {
         participant_id: participantId,
         session_id: sessionId,
         task_type: TASK_TYPE,
         trial_number: trialNumber,
         timestamp: new Date().toISOString(),
+        initiation_delay_ms: initiationDelay,
 
         // minimal metadata
         akinetic_delay_hold_ms: akinetic,
@@ -276,16 +307,18 @@ async function handleEarlyRelease(touch) {
         console.error("Unexpected error saving hold trial (early):", err);
     }
 
-    resetTrial();
-
-    // check finish
     await maybeFinishSession();
+
+    if (!taskCompleted) {
+        resetTrial();   // only reset if NOT finished
+    }
 }
 
 async function endHold(touch) {
     if (!isHolding) return;
 
     const releaseTimeLocal = Date.now();
+    lastTrialEndTime = releaseTimeLocal;
 
     // record raw end event
     holdEvents.push({
@@ -316,6 +349,7 @@ async function endHold(touch) {
         task_type: TASK_TYPE,
         trial_number: trialNumber,
         timestamp: new Date().toISOString(),
+        initiation_delay_ms: initiationDelay,
 
         akinetic_delay_hold_ms: akinetic,
         total_hold_time_ms: totalHoldTime,
@@ -338,8 +372,11 @@ async function endHold(touch) {
         console.error("Unexpected error saving hold trial:", err);
     }
 
-    resetTrial();
     await maybeFinishSession();
+
+    if (!taskCompleted) {
+        resetTrial();   // only reset if NOT finished
+    }
 }
 
 function resetTrial() {
@@ -357,6 +394,9 @@ function resetTrial() {
 
 async function maybeFinishSession() {
     if (trialCount >= TRIAL_LIMIT) {
+        if (holdInstruction) {
+            holdInstruction.innerText = "✅ Task complete";
+        }
         if (!taskCompleted) {
             taskCompleted = true;
             try {
