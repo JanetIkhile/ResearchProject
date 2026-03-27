@@ -13,7 +13,8 @@
 <body>
     <header id="taskHeader">
         <h2>✋ Hold Task</h2>
-        <p>Tap “Start” when ready, then hold the circle steadily for 5 seconds.</p>
+        <div class="session-label real">Main Session</div>
+
     </header>
 
     <div id="holdArea">
@@ -35,10 +36,13 @@
             </div>
         </div>
     </div>
-    <!-- Next Task -->
-    <button id="nextTaskButton" style="display:none;" onclick="window.location.href='./summary.html'">
-        Finish Tasks
-    </button>
+    <div id="completionBox" style="display:none;">
+        <p id="completionText">✅ Task complete</p>
+
+        <button id="nextTaskButton">
+            Finish Tasks
+        </button>
+    </div>
     <script>
         const modal = document.getElementById("resultsModal");
         const closeBtn = document.getElementById("modalCloseButton");

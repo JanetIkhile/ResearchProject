@@ -129,7 +129,7 @@ let initiationDelay = null;
 
                 const { error } = await supabase
                     .from('sessions')
-                    .update({ session_completed: true })
+                    .update({ completed: true })
                     .eq('id', sessionId);
 
                 if (error) {
@@ -139,16 +139,14 @@ let initiationDelay = null;
                 }
 
                 console.log("Session marked completed:", sessionId);
-
-                // Disable further interactions on this page
-                if (holdTarget) holdTarget.style.pointerEvents = 'none';
-                if (startButton) {
-                    startButton.disabled = true;
-                    startButton.style.display = 'none';
+                if (TRIAL_LIMIT === 1) {
+                    // Practice session → go to start main session page
+                    window.location.href = "../start-main.html";
+                } else {
+                    // Main session → go to thank you page
+                    window.location.href = "../thank-you.html";
                 }
 
-                // Give user visible confirmation
-                nextButton.innerText = "Session completed ✓";
             } catch (err) {
                 console.error("Unexpected error while finishing session:", err);
                 if (nextButton) nextButton.disabled = false;
@@ -307,10 +305,23 @@ async function handleEarlyRelease(touch) {
         console.error("Unexpected error saving hold trial (early):", err);
     }
 
+    // ---------- FEEDBACK ----------
+    if (holdInstruction) {
+        holdInstruction.innerText = "⚠️ Released too early. Try again.";
+    }
+
+    if (holdTarget && !isFinalTrial) {
+        holdTarget.style.backgroundColor = "red";
+    }
+
+    // ---------- SAVE ----------
     await maybeFinishSession();
 
-    if (!taskCompleted) {
-        resetTrial();   // only reset if NOT finished
+    // ---------- DELAY BEFORE RESET ----------
+    if (!taskCompleted && !isFinalTrial) {
+        setTimeout(() => {
+            resetTrial();
+        }, 1500);  // 🔥 1.5 seconds feedback window
     }
 }
 
@@ -394,9 +405,9 @@ function resetTrial() {
 
 async function maybeFinishSession() {
     if (trialCount >= TRIAL_LIMIT) {
-        if (holdInstruction) {
-            holdInstruction.innerText = "✅ Task complete";
-        }
+
+        document.getElementById("completionBox").style.display = "flex";
+        if (holdInstruction) holdInstruction.style.display = "none";
         if (!taskCompleted) {
             taskCompleted = true;
             try {

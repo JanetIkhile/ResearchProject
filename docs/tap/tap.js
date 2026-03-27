@@ -171,7 +171,7 @@ function startTapTrial(startTs) {
         taskActive = false;
         const reachedFinal = (trialNumber >= TRIAL_LIMIT);
         if (tapInstruction) {
-            tapInstruction.innerText = "✔ Done";
+            tapInstruction.innerText = "Stop tapping";
         }
 
         if (tapTarget) {
@@ -221,11 +221,12 @@ function startTapTrial(startTs) {
             }
             if (tapTarget) tapTarget.style.pointerEvents = 'none';
             if (nextButton) nextButton.style.display = "block";
-            if (tapInstruction) tapInstruction.innerText = "✅ Task complete";
-            if (countdown) countdown.style.display = "none";
+            document.getElementById("completionBox").style.display = "flex";
+            nextButton.style.display = "block";
+            tapInstruction.style.display = "none"; if (countdown) countdown.style.display = "none";
         } else {
             // non-final: wait cooldown then re-enable start
-            if (tapInstruction) tapInstruction.innerText = "✔ Done";;
+            if (tapInstruction) tapInstruction.innerText = "Stop tapping";;
             if (tapTarget) tapTarget.style.backgroundColor = "green";
 
             setTimeout(() => {

@@ -12,7 +12,9 @@ let taskCompleted = false;
 let pageLoadTime = Date.now();
 let lastTrialEndTime = pageLoadTime;
 let initiationDelay = null;
-const dragInstruction = document.getElementById("dragInstruction");
+const instructionMain = document.getElementById("instructionMain");
+const instructionSub = document.getElementById("instructionSub");
+// const dragInstruction = document.getElementById("dragInstruction");
 
 // async setup
 (async function initContext() {
@@ -23,17 +25,32 @@ const dragInstruction = document.getElementById("dragInstruction");
         sessionId = result.sessionId;
 
         const sessionNumber = result.sessionNumber;
+        const header = document.getElementById("taskHeader");
+
+        if (header) {
+            const label = document.createElement("div");
+            label.classList.add("session-label");
+
+            if (sessionNumber === 1) {
+                label.classList.add("practice");
+                label.innerText = "Practice Session";
+                document.body.classList.add("practice-mode");
+
+            } else {
+                label.classList.add("real");
+                label.innerText = "Main Session";
+            }
+
+            header.appendChild(label);
+        }
 
         if (sessionNumber === 1) {
             TRIAL_LIMIT = 1;   // practice session
         } else {
             TRIAL_LIMIT = 10;  // real session
         }
-        const dragInstruction = document.getElementById("dragInstruction");
-
-        if (dragInstruction) {
-            dragInstruction.innerText = `Attempts left: ${TRIAL_LIMIT}`;
-        }
+        instructionMain.innerText = "Drag from Start to Target";
+        instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
 
         console.log("Drag task started");
         console.log("Participant:", participantId);
@@ -100,8 +117,8 @@ function handleTouchStart(e) {
     trialNumber += 1;
     const remaining = TRIAL_LIMIT - trialNumber;
 
-    if (dragInstruction && remaining > 0) {
-        dragInstruction.innerText = `Attempts left: ${remaining}`;
+    if (remaining > 0) {
+        instructionSub.innerText = `Attempts left: ${remaining}`;
     }
     trajectoryLog = [];
 
@@ -241,10 +258,11 @@ async function handleTouchEnd(e) {
     // ---- CHECK IF TASK COMPLETE ----
     if (trialNumber >= TRIAL_LIMIT) {
         console.log("All trials completed.");
-        // 🔥 visual + text feedback
-        if (dragInstruction) {
-            dragInstruction.innerText = "✅ Task complete";
-        }
+        const completionBox = document.getElementById("completionBox");
+        const instructionBox = document.getElementById("instructionBox");
+
+        if (instructionBox) instructionBox.style.display = "none";
+        if (completionBox) completionBox.style.display = "block";
         // indicate stop
         if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);

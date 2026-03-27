@@ -44,21 +44,24 @@ body {
     width: 100%;
     text-align: center;
     margin: 0 auto;
-    font-size: 1em;
+    font-size: clamp(1.3rem, 2.5vw, 2rem);
+    font-weight: 600;
     color: #333;
 }
 
 #holdTarget {
-    position: absolute;
-    top: 25vh;
+    position: fixed;
+    top: clamp(180px, 28vh, 320px);
     left: 50%;
     transform: translateX(-50%);
-    width: 120px;
-    height: 120px;
+
+    /* 🔥 match tap */
+    width: clamp(120px, 20vw, 220px);
+    height: clamp(120px, 20vw, 220px);
+
     background-color: #007bff;
     border-radius: 50%;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
-    touch-action: none;
 }
 
 .modal {
@@ -120,13 +123,14 @@ body.modal-open #holdInstruction {
 
 #startTaskButton {
     position: absolute;
-    top: 12vh;
+    top: clamp(120px, 16vh, 200px);
     left: 50%;
     transform: translateX(-50%);
 
-    width: 160px;
-    height: 55px;
-    font-size: 1.2em;
+    /* 🔥 responsive size */
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    padding: clamp(16px, 3vw, 26px) clamp(28px, 5vw, 50px);
+
     font-weight: bold;
 
     background-color: #007bff;
@@ -134,37 +138,96 @@ body.modal-open #holdInstruction {
     border: none;
     border-radius: 12px;
 
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     cursor: pointer;
-    transition: 0.2s ease;
 }
 
 #startTaskButton:hover {
     background-color: #005fcc;
 }
 
-#nextTaskButton {
+#nextTaskButton:hover {
+    background-color: #005fcc;
+}
+
+#completionBox {
     position: fixed;
-    bottom: 40px;
+    top: calc(clamp(180px, 28vh, 320px) - clamp(60px, 10vh, 100px));
     left: 50%;
     transform: translateX(-50%);
 
-    width: 200px;
-    height: 60px;
-    font-size: 1.2em;
-    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
 
-    background-color: #16a34a;
-    /* green */
-    color: white;
-    border: none;
-    border-radius: 12px;
-
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
-    cursor: pointer;
-    z-index: 10;
+    text-align: center;
+    z-index: 2000;
 }
 
-#nextTaskButton:hover {
-    background-color: #005fcc;
+#completionText {
+    font-size: clamp(1.2rem, 2.2vw, 1.8rem);
+    white-space: nowrap;
+    font-weight: bold;
+}
+
+#nextTaskButton {
+    position: static;
+    white-space: nowrap;
+
+    font-size: clamp(1rem, 2.5vw, 1.8rem);
+    padding: clamp(14px, 3vw, 28px) clamp(20px, 5vw, 48px);
+
+    background-color: #16a34a;
+    color: white;
+    border-radius: 12px;
+    border: none;
+
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.session-label {
+    margin-top: 6px;
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-weight: bold;
+    display: inline-block;
+    font-size: clamp(1rem, 1.8vw, 1.6rem);
+}
+
+.session-label.real {
+    background-color: #16a34a;
+    color: #fff;
+}
+
+@media (min-width: 600px) {
+
+    #completionText {
+        font-size: 2rem;
+    }
+
+    #nextTaskButton {
+        font-size: 1.8rem;
+        padding: 28px 50px;
+    }
+
+    #taskHeader h2 {
+        font-size: 2rem;
+    }
+
+    .session-label {
+        font-size: 1.5rem;
+        padding: 10px 22px;
+    }
+
+    #holdInstruction {
+        font-size: 2rem;
+    }
+
+    #startTaskButton {
+        font-size: 1.8rem;
+        padding: 22px 48px;
+    }
+
 }

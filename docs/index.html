@@ -1,4 +1,176 @@
 <!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Login</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #e5e7eb;
+
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            padding: 40px 20px;
+        }
+
+        h2 {
+            font-size: clamp(2rem, 4vw, 2.8rem);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 28px;
+        }
+
+        .question {
+            font-size: clamp(1.4rem, 2.5vw, 2rem);
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+        }
+
+        .option-card {
+            display: block;
+            padding: 18px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            background: #f3f4f6;
+            cursor: pointer;
+
+            font-size: clamp(1.2rem, 2vw, 1.6rem);
+            transition: 0.2s;
+        }
+
+        .option-card input {
+            display: none;
+        }
+
+        .option-card:hover {
+            background: #e5e7eb;
+        }
+
+        .option-card input:checked+span {
+            color: #16a34a;
+            font-weight: bold;
+        }
+
+        button {
+            font-size: clamp(1.3rem, 3vw, 1.8rem);
+            padding: 16px 32px;
+            font-weight: bold;
+
+            background-color: #16a34a;
+            color: white;
+            border: none;
+            border-radius: 12px;
+
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            cursor: pointer;
+            margin-right: 12px;
+        }
+
+        #error {
+            color: red;
+            margin-top: 12px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        /* 🔥 Small screens → stack */
+        @media (max-width: 480px) {
+            .button-group {
+                flex-direction: column;
+            }
+
+            .button-group button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <h2>Motor Study</h2>
+
+        <!-- Participant -->
+        <div class="form-group">
+            <p class="question">Participant ID</p>
+            <select id="username">
+                <option value="">-- Select Participant --</option>
+            </select>
+        </div>
+
+        <!-- Identity -->
+        <div class="form-group">
+            <p class="question">Do you identify as:</p>
+
+            <label class="option-card">
+                <input type="radio" name="identity" value="parkinsons">
+                <span>Person with Parkinson’s</span>
+            </label>
+
+            <label class="option-card">
+                <input type="radio" name="identity" value="caregiver">
+                <span>Caregiver</span>
+            </label>
+
+            <label class="option-card">
+                <input type="radio" name="identity" value="other">
+                <span>Other</span>
+            </label>
+        </div>
+
+        <!-- Dominant arm -->
+        <div class="form-group">
+            <p class="question">Dominant arm:</p>
+
+            <label class="option-card">
+                <input type="radio" name="dominant_arm" value="left">
+                <span>Left</span>
+            </label>
+
+            <label class="option-card">
+                <input type="radio" name="dominant_arm" value="right">
+                <span>Right</span>
+            </label>
+        </div>
+
+        <div class="button-group">
+            <button id="nextBtn">Auto Select Next</button>
+            <button id="loginBtn">Start Session</button>
+        </div>
+
+        <p id="error"></p>
+
+    </div>
+
+    <script type="module" src="index.js"></script>
+</body>
+
+</html>
+
+<!-- <!DOCTYPE html>
 <html>
 
 <head>
@@ -6,11 +178,20 @@
 </head>
 
 <body>
-    <h2>Motor Study (Lab Mode)</h2>
+    <h2>Motor Study</h2>
 
     <label for="username">Participant ID:</label>
     <select id="username">
         <option value="">-- Select Participant --</option>
+    </select>
+
+    <br><br>
+
+    <label for="category">Group:</label>
+    <select id="category">
+        <option value="">-- Select Group --</option>
+        <option value="PD">Parkinson's Disease (PD)</option>
+        <option value="Control">Control</option>
     </select>
 
     <br><br>
@@ -23,4 +204,4 @@
     <script type="module" src="index.js"></script>
 </body>
 
-</html>
+</html> -->

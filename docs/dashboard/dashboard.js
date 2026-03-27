@@ -20,31 +20,72 @@ const holdBtn = document.getElementById("holdBtn");
     }
 
     const perUserKey = `session_${participantUUID}`;
-    let sessionId = sessionStorage.getItem(perUserKey);
 
-    // -----------------------------
-    // 2. Validate existing session
-    // -----------------------------
-    if (sessionId) {
-        try {
-            const { data: sessionRow } = await supabase
-                .from("sessions")
-                .select("id, participant_id")
-                .eq("id", sessionId)
-                .maybeSingle();
+    let sessionId = null;
 
-            if (!sessionRow || sessionRow.participant_id !== participantUUID) {
-                sessionId = null;
-                sessionStorage.removeItem(perUserKey);
-            }
-        } catch (err) {
-            console.error(err);
-            sessionId = null;
-        }
+    try {
+        const { data: inserted, error } = await supabase
+            .from("sessions")
+            .insert({
+                participant_id: participantUUID,
+                started_at: new Date().toISOString(),
+                completed: false,
+                drag_completed: false,
+                tap_completed: false,
+                hold_completed: false
+            })
+            .select("id")
+            .single();
+
+        if (error) throw error;
+
+        sessionId = inserted.id;
+
+        sessionStorage.setItem(perUserKey, sessionId);
+        window.CURRENT_SESSION_ID = sessionId;
+
+        console.log("New session created:", sessionId);
+
+    } catch (err) {
+        console.error("Failed to create session:", err);
+        alert("Could not start session.");
+        return;
     }
 
     window.CURRENT_SESSION_ID = sessionId;
+    const instructionEl = document.getElementById("instructionText");
 
+    // Try sessionStorage first
+    let dominantArm = sessionStorage.getItem("dominant_arm");
+
+    if (!dominantArm) {
+        // fallback → fetch from DB
+        const participantId = sessionStorage.getItem("participant_uuid");
+
+        if (participantId) {
+            const { data, error } = await supabase
+                .from("participants")
+                .select("dominant_arm")
+                .eq("id", participantId)
+                .single();
+
+            if (!error && data?.dominant_arm) {
+                dominantArm = data.dominant_arm;
+
+                // restore sessionStorage
+                sessionStorage.setItem("dominant_arm", dominantArm);
+            }
+        }
+    }
+
+    // Set instruction
+    if (dominantArm) {
+        instructionEl.innerText =
+            `Please use the index finger of your ${dominantArm} hand to perform the following tasks.`;
+    } else {
+        instructionEl.innerText =
+            "Please use your index finger to perform the following tasks.";
+    }
     // -----------------------------
     // 3. Default button state
     // -----------------------------
@@ -55,41 +96,7 @@ const holdBtn = document.getElementById("holdBtn");
     // -----------------------------
     // 4. TASK HANDLER (CORE FIX)
     // -----------------------------
-    async function startTask(taskPath) {
-
-        let currentSessionId = sessionStorage.getItem(perUserKey);
-
-        // Create session ONLY if it doesn't exist
-        if (!currentSessionId) {
-            try {
-                const { data: inserted, error } = await supabase
-                    .from("sessions")
-                    .insert({
-                        participant_id: participantUUID,
-                        started_at: new Date().toISOString(),
-                        completed: false,
-                        drag_completed: false,
-                        tap_completed: false,
-                        hold_completed: false
-                    })
-                    .select("id")
-                    .single();
-
-                if (error) throw error;
-
-                currentSessionId = inserted.id;
-                sessionStorage.setItem(perUserKey, currentSessionId);
-
-                console.log("Session created:", currentSessionId);
-
-            } catch (err) {
-                console.error("Failed to create session:", err);
-                alert("Failed to start session.");
-                return;
-            }
-        }
-
-        // Navigate AFTER session is ready
+    function startTask(taskPath) {
         window.location.href = taskPath;
     }
 

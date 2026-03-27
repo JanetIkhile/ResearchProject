@@ -34,18 +34,20 @@
       display: flex;
       flex-direction: column;
       gap: 15px;
-      width: 240px;
+      width: clamp(260px, 40vw, 420px);
     }
 
     .task-btn {
       background-color: #007bff;
       border: none;
       color: white;
-      padding: 15px;
-      font-size: 1.1em;
-      border-radius: 10px;
+      font-size: clamp(1.3rem, 3vw, 1.8rem);
+      padding: clamp(16px, 3vw, 28px);
+      font-weight: bold;
+      border-radius: 12px;
       cursor: pointer;
       transition: 0.3s;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     }
 
     .task-btn:hover {
@@ -58,6 +60,24 @@
       cursor: not-allowed;
       opacity: 0.7;
     }
+
+    #instructionText {
+      font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+      max-width: 600px;
+      margin: 0 auto 16px;
+      line-height: 1.4;
+    }
+
+    @media (min-width: 600px) {
+      #instructionText {
+        font-size: 1.8rem;
+      }
+
+      .task-btn {
+        font-size: 1.6rem;
+        padding: 22px;
+      }
+    }
   </style>
   <script type="module" src="dashboard.js"></script>
 
@@ -65,8 +85,7 @@
 
 <body>
   <h1>Motor Performance Assessment</h1>
-  <p>Select a task to begin. Each task measures different components of movement performance.</p>
-
+  <p id="instructionText"></p>
   <div class="task-buttons">
     <button id="dragBtn" class="task-btn">🖐️ Drag Task</button>
     <button id="tapBtn" class="task-btn">👆 Tap Task</button>

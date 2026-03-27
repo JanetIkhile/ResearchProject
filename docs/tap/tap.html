@@ -14,12 +14,11 @@
     <!-- Header -->
     <header id="taskHeader">
         <h2>👆 Tap Task</h2>
-        <p>Tap repeatedly and rhythmically on the target circle as quickly as you can.</p>
+        <div class="session-label real">Main Session</div>
     </header>
-
     <!-- Tap Area -->
     <div id="tapArea">
-        <p id="tapInstruction">Tap inside the blue circle</p>
+        <p id="tapInstruction"></p>
         <p id="countdownTimer" style="display:none;">Time left: 10s</p>
         <div id="tapTarget"></div>
     </div>
@@ -37,11 +36,13 @@
             </div>
         </div>
     </div>
+    <div id="completionBox" style="display:none;">
+        <p id="completionText">✅ Task complete</p>
 
-    <!-- Next Task Button (hidden until ready) -->
-    <button id="nextTaskButton" style="display:none;" onclick="window.location.href='../hold/hold.html'">
-        Next: Hold Task
-    </button>
+        <button id="nextTaskButton" onclick="window.location.href='../hold/hold.html'">
+            Next: Hold Task
+        </button>
+    </div>
 
     <!-- Modal logic -->
     <script>

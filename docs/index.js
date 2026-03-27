@@ -43,7 +43,7 @@ async function populateParticipants() {
         });
 
         // Populate P01–P30
-        for (let i = 1; i <= 30; i++) {
+        for (let i = 1; i <= 50; i++) {
             const code = `P${String(i).padStart(2, "0")}`;
 
             const option = document.createElement("option");
@@ -60,13 +60,17 @@ async function populateParticipants() {
                 count = sessionCountMap[participant.id] || 0;
             }
 
-            option.textContent = `${code} (${count} sessions)`;
+            let status = "";
 
-            // Disable if already has 2+ sessions
-            if (count >= 2) {
-                option.disabled = true;
+            if (count === 0) {
+                status = " (0/2)";
+            } else if (count === 1) {
+                status = " (1/2)";
+            } else {
+                status = " (2/2 ⚠️)";
             }
 
+            option.textContent = `${code}${status}`;
             participantSelect.appendChild(option);
         }
 
@@ -105,12 +109,24 @@ loginBtn.onclick = async () => {
         errorEl.textContent = "Please select a participant.";
         return;
     }
+    const identity = document.querySelector('input[name="identity"]:checked')?.value;
+    const dominantArm = document.querySelector('input[name="dominant_arm"]:checked')?.value;
+
+    if (!identity) {
+        errorEl.textContent = "Please select how you identify.";
+        return;
+    }
+
+    if (!dominantArm) {
+        errorEl.textContent = "Please select your dominant arm.";
+        return;
+    }
 
     try {
         // ---------- GET OR CREATE PARTICIPANT ----------
         let { data: participant, error } = await supabase
             .from("participants")
-            .select("id")
+            .select("id, participant_group")
             .eq("participant_code", participantCode)
             .maybeSingle();
 
@@ -120,7 +136,9 @@ loginBtn.onclick = async () => {
             const { data: newParticipant, error: insertError } = await supabase
                 .from("participants")
                 .insert({
-                    participant_code: participantCode
+                    participant_code: participantCode,
+                    participant_group: identity,
+                    dominant_arm: dominantArm
                 })
                 .select()
                 .single();
@@ -131,6 +149,17 @@ loginBtn.onclick = async () => {
         }
 
         const participantUUID = participant.id;
+
+        // ---------- UPDATE GROUP IF NEEDED ----------
+        if (participant && !participant.participant_group) {
+            await supabase
+                .from("participants")
+                .update({
+                    participant_group: identity,
+                    dominant_arm: dominantArm
+                })
+                .eq("id", participant.id);
+        }
 
         // ---------- COUNT SESSIONS ----------
         const { data: sessions, error: sessionError } = await supabase
@@ -149,14 +178,19 @@ loginBtn.onclick = async () => {
         // ---------- WARNING (optional) ----------
         if (sessionCount >= 2) {
             const confirmReuse = confirm(
-                `${participantCode} already has ${sessionCount} sessions.\n\nContinue anyway?`
+                `${participantCode} has already completed both sessions (2/2).\n\nDo you want to continue anyway?`
             );
             if (!confirmReuse) return;
         }
+        const sessionType = (sessionCount === 0) ? "practice" : "real";
 
         // ---------- STORE CONTEXT ----------
         sessionStorage.setItem("participant_uuid", participantUUID);
         sessionStorage.setItem("participant_code", participantCode);
+        sessionStorage.setItem("participant_group", identity);
+        sessionStorage.setItem("dominant_arm", dominantArm);
+        sessionStorage.setItem("session_type", sessionType);
+
 
         // ---------- REDIRECT ----------
         window.location.href = "./dashboard/dashboard.html";

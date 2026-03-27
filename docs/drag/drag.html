@@ -15,10 +15,13 @@
 <body>
     <header id="taskHeader">
         <h2>🖐️ Drag Task</h2>
-        <p>Drag from <strong>Start</strong> to <strong>Target</strong> as quickly and accurately as you can.</p>
     </header>
-    <p id="dragInstruction" style="text-align:center; margin-top: 80px;"></p>
-    <div class="drag-area"></div>
+    <div id="mainContainer">
+        <div id="instructionBox">
+            <p id="instructionMain"></p>
+            <p id="instructionSub"></p>
+        </div>
+    </div>
 
     <div id="startPoint">
         <div id="startInnerDot"></div>
@@ -46,9 +49,13 @@
         </div>
     </div>
     <!-- <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/docs/drag/adaptive_drag.html'"> -->
-    <button id="nextTaskButton" style="display:none;" onclick="window.location.href='../tap/tap.html'">
-        Next: Tap Task
-    </button>
+    <div id="completionBox" style="display:none;">
+        <p id="completionText">✅ Task Complete</p>
+        <button id="nextTaskButton" style="display:none;" onclick="window.location.href='../tap/tap.html'">
+            Next: Tap Task
+        </button>
+    </div>
+
 
     <div id="fetchedDataContainer" class="fetched-data-container"></div>
     <canvas id="pathCanvas" width="100%" height="100%"
