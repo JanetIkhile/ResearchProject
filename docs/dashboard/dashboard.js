@@ -80,10 +80,10 @@ const holdBtn = document.getElementById("holdBtn");
 
     // Set instruction
     if (dominantArm) {
-        instructionEl.innerText =
-            `Please use the index finger of your ${dominantArm} hand to perform the following tasks.`;
+        instructionEl.innerHTML =
+            `Please use the <span class="highlight">index finger</span> of your <span class="highlight">${dominantArm} hand</span> to perform the following tasks.`;;
     } else {
-        instructionEl.innerText =
+        instructionEl.innerHTML =
             "Please use your index finger to perform the following tasks.";
     }
     // -----------------------------

@@ -7,7 +7,6 @@ console.log("lab login loaded");
 // -----------------------------
 const participantSelect = document.getElementById("username");
 const loginBtn = document.getElementById("loginBtn");
-const nextBtn = document.getElementById("nextBtn");
 const errorEl = document.getElementById("error");
 
 // -----------------------------
@@ -79,22 +78,6 @@ async function populateParticipants() {
         errorEl.textContent = "Failed to load participants.";
     }
 }
-
-// -----------------------------
-// Auto-select next available
-// -----------------------------
-nextBtn.onclick = () => {
-    for (let option of participantSelect.options) {
-        if (!option.value) continue;
-
-        if (!option.disabled) {
-            participantSelect.value = option.value;
-            return;
-        }
-    }
-
-    alert("All participants already have 2+ sessions.");
-};
 
 // -----------------------------
 // START SESSION (login flow)

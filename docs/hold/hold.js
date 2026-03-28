@@ -87,15 +87,17 @@ let initiationDelay = null;
 
     // Touch handlers: they now early-return if not active or task finished
     holdTarget.addEventListener("touchstart", (e) => {
+        e.preventDefault();
         if (taskCompleted) return;
         if (trialCount >= TRIAL_LIMIT) return;
         if (!trialActive) return; // won't register touches before Start
 
         const touch = e.changedTouches[0];
         if (!isHolding && !readyToRelease) beginHold(touch);
-    });
+    }, { passive: false });
 
     holdTarget.addEventListener("touchend", (e) => {
+        e.preventDefault();
         if (taskCompleted) return;
         if (trialCount >= TRIAL_LIMIT) return;
         if (!trialActive) return;
@@ -112,7 +114,7 @@ let initiationDelay = null;
         if (readyToRelease && isHolding) {
             endHold(touch);
         }
-    });
+    }, { passive: false });
 
     // --- Minimal addition: Finish session handler ---
     if (nextButton) {
