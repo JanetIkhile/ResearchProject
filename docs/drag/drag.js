@@ -49,7 +49,7 @@ const instructionSub = document.getElementById("instructionSub");
         } else {
             TRIAL_LIMIT = 10;  // real session
         }
-        instructionMain.innerText = "Drag from Start to Target";
+        instructionMain.innerHTML = "Drag from Start to Target as fast and<br>accurately as possible.";
         instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
 
         console.log("Drag task started");
@@ -69,6 +69,8 @@ let trajectoryLog = [];
 let trialStartTime = null;
 let trialEndTime = null;
 let startX, startY, targetX, targetY;
+let activeTouchId = null;
+let clearCanvasTimeout = null;
 
 // Get DOM elements
 const startPoint = document.getElementById('startInnerDot');
@@ -96,8 +98,7 @@ function touchForce(touch) {
 function handleTouchStart(e) {
     if (taskCompleted) return;  // prevent further trials
 
-    trialStartTime = Date.now();
-    initiationDelay = trialStartTime - lastTrialEndTime;
+    if (activeTouchId !== null) return; // Prevent multiple fingers
 
     if (trialNumber >= TRIAL_LIMIT) {
         taskCompleted = true;
@@ -111,15 +112,20 @@ function handleTouchStart(e) {
 
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
     const touch = e.changedTouches[0];
+    activeTouchId = touch.identifier;
+
+    if (clearCanvasTimeout) {
+        clearTimeout(clearCanvasTimeout);
+        clearCanvasTimeout = null;
+    }
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    trialStartTime = Date.now();
+    initiationDelay = trialStartTime - lastTrialEndTime;
+
     touchStartX = touch.pageX;
     touchStartY = touch.pageY;
 
-    trialNumber += 1;
-    const remaining = TRIAL_LIMIT - trialNumber;
-
-    if (remaining > 0) {
-        instructionSub.innerText = `Attempts left: ${remaining}`;
-    }
     trajectoryLog = [];
 
     trajectoryLog.push({
@@ -150,9 +156,11 @@ function handleTouchStart(e) {
 function handleTouchMove(e) {
     if (taskCompleted) return;
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
-    e.preventDefault();
+    
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
+    if (!touch) return;
 
-    const touch = e.changedTouches[0];
+    e.preventDefault();
     let currentX = touch.pageX;
     let currentY = touch.pageY;
     let currentTime = Date.now();
@@ -185,9 +193,29 @@ function handleTouchMove(e) {
 async function handleTouchEnd(e) {
     if (taskCompleted) return;
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
-    const touch = e.changedTouches[0];
+    
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
+    if (!touch) return;
+    activeTouchId = null;
+
     touchEndX = touch.pageX;
     touchEndY = touch.pageY;
+
+    // Ignore taps (distance < 20px)
+    const dist = Math.hypot(touchEndX - touchStartX, touchEndY - touchStartY);
+    if (dist < 20) {
+        const pointer = document.getElementById(`pointer-${touch.identifier}`);
+        if (pointer) pointer.remove();
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    trialNumber += 1;
+    const remaining = TRIAL_LIMIT - trialNumber;
+    if (remaining >= 0) {
+        instructionSub.innerText = `Attempts left: ${remaining}`;
+    }
+
     trialEndTime = Date.now();
     lastTrialEndTime = trialEndTime;
 
@@ -253,7 +281,9 @@ async function handleTouchEnd(e) {
         ctx.lineTo(last.x, last.y);
         ctx.stroke();
     }
-    setTimeout(() => ctx.clearRect(0, 0, canvas.width, canvas.height), 1500);
+    clearCanvasTimeout = setTimeout(() => {
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }, 300);
 
     // ---- CHECK IF TASK COMPLETE ----
     if (trialNumber >= TRIAL_LIMIT) {
@@ -282,14 +312,31 @@ async function handleTouchEnd(e) {
     }
 }
 
+function handleTouchCancel(e) {
+    if (taskCompleted) return;
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
+    if (!touch) return;
+    
+    // Abort cleanly without recording a trial
+    activeTouchId = null;
+    const pointer = document.getElementById(`pointer-${touch.identifier}`);
+    if (pointer) pointer.remove();
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 // helper to detach listeners
 function removeTouchListeners() {
     document.removeEventListener("touchstart", handleTouchStart);
     document.removeEventListener("touchmove", handleTouchMove);
     document.removeEventListener("touchend", handleTouchEnd);
+    document.removeEventListener("touchcancel", handleTouchCancel);
 }
 
 // attach handlers (use named functions so we can remove them)
 document.addEventListener("touchstart", handleTouchStart);
 document.addEventListener("touchmove", handleTouchMove, { passive: false });
 document.addEventListener("touchend", handleTouchEnd);
+document.addEventListener("touchcancel", handleTouchCancel);
+
+// Prevent long-press context menu globally
+document.addEventListener("contextmenu", function(e) { e.preventDefault(); });

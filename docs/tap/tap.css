@@ -1,3 +1,11 @@
+body,
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+
 body {
     margin: 0;
     background-color: gray;
@@ -127,7 +135,7 @@ body.modal-open #tapInstruction {
 }
 
 #tapInstruction {
-    font-size: clamp(1.3rem, 2.5vw, 2rem);
+    font-size: clamp(1.2rem, 5.5vw, 2.2rem);
     font-weight: 600;
     margin-bottom: 10px;
 }
@@ -145,6 +153,11 @@ body.modal-open #tapInstruction {
     font-weight: bold;
     display: inline-block;
     font-size: clamp(1rem, 1.8vw, 1.6rem);
+}
+
+.session-label.practice {
+    background-color: #facc15;
+    color: #000;
 }
 
 .session-label.real {
@@ -193,6 +206,22 @@ body.modal-open #tapInstruction {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
+.timer-badge {
+    color: #b91c1c;
+    background-color: #fee2e2;
+    padding: 4px 8px;
+    /* reduced to help fit on 1 line */
+    border-radius: 8px;
+    font-weight: bold;
+    display: inline-block;
+    line-height: 1.1;
+    transform: translateY(2px);
+
+    min-width: 2.5ch;
+    /* strictly lock pixel width to 2+ chars so 10 and 9 are physically identical */
+    text-align: center;
+}
+
 @media (min-width: 600px) {
 
     #tapTarget {
@@ -201,7 +230,7 @@ body.modal-open #tapInstruction {
     }
 
     #tapInstruction {
-        font-size: 2rem;
+        font-size: 2.2rem;
     }
 
     #countdownTimer {

@@ -93,6 +93,9 @@ const holdBtn = document.getElementById("holdBtn");
     tapBtn.disabled = true;
     holdBtn.disabled = true;
 
+    tapBtn.style.display = "none";
+    holdBtn.style.display = "none";
+
     // -----------------------------
     // 4. TASK HANDLER (CORE FIX)
     // -----------------------------
@@ -119,11 +122,15 @@ const holdBtn = document.getElementById("holdBtn");
                 .single();
 
             if (sessionRow.drag_completed) {
+                dragBtn.style.display = "none";
                 tapBtn.disabled = false;
+                tapBtn.style.display = "block";
             }
 
             if (sessionRow.tap_completed) {
+                tapBtn.style.display = "none";
                 holdBtn.disabled = false;
+                holdBtn.style.display = "block";
             }
 
         } catch (err) {

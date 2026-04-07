@@ -6,6 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Motor Performance System</title>
   <style>
+    body, * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+
     body {
       font-family: Arial, sans-serif;
       background: #f4f7fb;
@@ -90,13 +97,17 @@
 
 <body>
   <h1>Motor Performance Assessment</h1>
-  <p id="instructionText"></p>
+  <p id="instructionText">Please use your index finger to perform the following tasks.</p>
   <div class="task-buttons">
     <button id="dragBtn" class="task-btn">🖐️ Drag Task</button>
-    <button id="tapBtn" class="task-btn">👆 Tap Task</button>
-    <button id="holdBtn" class="task-btn">✊ Hold Task</button>
+    <button id="tapBtn" class="task-btn" style="display: none;" disabled>👆 Tap Task</button>
+    <button id="holdBtn" class="task-btn" style="display: none;" disabled>✊ Hold Task</button>
   </div>
 
+  <script>
+    // Prevent long-press context menu globally
+    document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
+  </script>
 </body>
 
 </html>

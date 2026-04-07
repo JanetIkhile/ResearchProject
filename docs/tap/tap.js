@@ -90,6 +90,26 @@ function handleTouchStart(e) {
         console.log("Session verified:", sessionId, result.sessionRow);
 
         const sessionNumber = result.sessionNumber;
+
+        const header = document.getElementById("taskHeader");
+        if (header) {
+            const existing = header.querySelector(".session-label");
+            if (existing) existing.remove();
+
+            const label = document.createElement("div");
+            label.classList.add("session-label");
+
+            if (sessionNumber === 1) {
+                label.classList.add("practice");
+                label.innerText = "Practice Session";
+                document.body.classList.add("practice-mode");
+            } else {
+                label.classList.add("real");
+                label.innerText = "Main Session";
+            }
+            header.appendChild(label);
+        }
+
         if (sessionNumber === 1) {
             TRIAL_LIMIT = 1;   // practice
         } else {
@@ -116,7 +136,7 @@ function handleTouchStart(e) {
     }
 
     tapTarget.style.touchAction = 'none';
-    if (tapInstruction) tapInstruction.innerText = "Tap inside the blue circle to start";
+    if (tapInstruction) tapInstruction.innerHTML = 'Tap the blue circle as fast as you can<br>for <span class="timer-badge">10</span> seconds!';
     if (tapTarget) tapTarget.style.backgroundColor = "blue";
 
     tapTarget.addEventListener("touchstart", handleTouchStart, { passive: false });
@@ -136,30 +156,27 @@ function startTapTrial(startTs) {
     const startTime = startTs || Date.now();
     trialStartTime = startTime;
 
-    if (tapInstruction) {
-        tapInstruction.innerText = `Keep tapping the yellow circle for ${TASK_DURATION / 1000} seconds`;
-    }
+    // Do NOT change instruction text or color to prevent distraction
     if (tapTarget) {
-        tapTarget.style.backgroundColor = "yellow";
+        tapTarget.style.backgroundColor = "blue";
         tapTarget.style.pointerEvents = 'auto'; // ensure pointer enabled during trial
     }
 
     // countdown UI
-    if (countdown) {
-        countdown.style.display = "block";
-        let timeLeft = Math.ceil(TASK_DURATION / 1000);
-        countdown.innerText = `Time left: ${timeLeft}s`;
+    if (countdown) countdown.style.display = "none";
+    let timeLeft = Math.ceil(TASK_DURATION / 1000);
 
-        if (timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            if (countdown) countdown.innerText = `Time left: ${timeLeft}s`;
-            if (timeLeft <= 0 && timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-        }, 1000);
-    }
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        if (tapInstruction && timeLeft > 0) {
+            tapInstruction.innerHTML = `Tap the blue circle as fast as you can<br>for <span class="timer-badge">${timeLeft}</span> seconds!`;
+        }
+        if (timeLeft <= 0 && timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+    }, 1000);
 
     if (taskTimer) {
         clearTimeout(taskTimer);
@@ -226,7 +243,7 @@ function startTapTrial(startTs) {
             tapInstruction.style.display = "none"; if (countdown) countdown.style.display = "none";
         } else {
             // non-final: wait cooldown then re-enable start
-            if (tapInstruction) tapInstruction.innerText = "Stop tapping";;
+            if (tapInstruction) tapInstruction.innerText = "Stop tapping";
             if (tapTarget) tapTarget.style.backgroundColor = "green";
 
             setTimeout(() => {
@@ -235,7 +252,8 @@ function startTapTrial(startTs) {
                     tapTarget.style.pointerEvents = 'auto'; // re-enable touches
                     tapTarget.style.backgroundColor = "blue";
                 }
-                if (tapInstruction) tapInstruction.innerText = `Tap inside the blue circle to start`;
+                if (tapInstruction) tapInstruction.innerHTML = 'Tap the blue circle as fast as you can<br>for <span class="timer-badge">10</span> seconds!';
+                if (countdown) countdown.style.display = "none";
             }, INTER_TRIAL_COOLDOWN);
         }
 
@@ -273,8 +291,7 @@ function recordTapEvent(touch, ts) {
         tapTarget.style.backgroundColor = "white";
         setTimeout(() => {
             if (tapTarget) {
-                if (taskActive) tapTarget.style.backgroundColor = "yellow";
-                else if (isBetweenTrials) tapTarget.style.backgroundColor = "blue";
+                tapTarget.style.backgroundColor = "blue"; // Always return to blue
             }
         }, 100);
     }
@@ -312,3 +329,6 @@ async function saveTapTrial(startTime, endTime) {
         console.error("Unexpected error saving tap trial:", err);
     }
 }
+
+// Prevent long-press context menu globally
+document.addEventListener("contextmenu", function (e) { e.preventDefault(); });

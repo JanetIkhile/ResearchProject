@@ -24,6 +24,7 @@ const HOLD_DURATION = 5000;
 let isHolding = false;
 let trialActive = false;
 let holdTimer = null;
+let holdDisplayInterval = null;
 let akineticDelay = null;
 let readyToRelease = false;
 
@@ -43,6 +44,25 @@ let initiationDelay = null;
         console.log("Session verified:", sessionId, result.sessionRow);
 
         const sessionNumber = result.sessionNumber;
+
+        const header = document.getElementById("taskHeader");
+        if (header) {
+            const existing = header.querySelector(".session-label");
+            if (existing) existing.remove();
+
+            const label = document.createElement("div");
+            label.classList.add("session-label");
+
+            if (sessionNumber === 1) {
+                label.classList.add("practice");
+                label.innerText = "Practice Session";
+                document.body.classList.add("practice-mode");
+            } else {
+                label.classList.add("real");
+                label.innerText = "Main Session";
+            }
+            header.appendChild(label);
+        }
 
         if (sessionNumber === 1) {
             TRIAL_LIMIT = 1;   // practice
@@ -193,7 +213,7 @@ function startHoldTrial() {
 
     // immediate cue
     readyTime = Date.now();
-    if (holdInstruction) holdInstruction.innerText = "Touch and hold the circle now.";
+    // Intentionally omitting instruction text change to prevent reading delay
 
     playBeep(); // cue sound
     // wait for user to touch; HOLD_DURATION applies once holding begins
@@ -224,12 +244,22 @@ function beginHold(touch) {
         value_ms: akineticDelay
     });
 
-    if (holdInstruction) holdInstruction.innerText = "⏱️ Keep holding steady...";
+    let timeLeft = HOLD_DURATION / 1000;
+    if (holdInstruction) holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${timeLeft}</span> seconds...`;
     if (holdTarget) holdTarget.style.backgroundColor = "yellow";
+
+    if (holdDisplayInterval) clearInterval(holdDisplayInterval);
+    holdDisplayInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0 && holdInstruction) {
+            holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${timeLeft}</span> seconds...`;
+        }
+    }, 1000);
 
     // schedule allowed-release marker
     if (holdTimer) clearTimeout(holdTimer);
     holdTimer = setTimeout(() => {
+        if (holdDisplayInterval) clearInterval(holdDisplayInterval);
         readyToRelease = true;
         if (holdInstruction) holdInstruction.innerText = "✅ You can release now!";
         if (holdTarget) holdTarget.style.backgroundColor = "green";
@@ -256,6 +286,10 @@ async function handleEarlyRelease(touch) {
     if (holdTimer) {
         clearTimeout(holdTimer);
         holdTimer = null;
+    }
+    if (holdDisplayInterval) {
+        clearInterval(holdDisplayInterval);
+        holdDisplayInterval = null;
     }
 
     const totalHoldTime = holdStartTime ? (releaseTime - holdStartTime) : 0;
@@ -346,6 +380,10 @@ async function endHold(touch) {
         clearTimeout(holdTimer);
         holdTimer = null;
     }
+    if (holdDisplayInterval) {
+        clearInterval(holdDisplayInterval);
+        holdDisplayInterval = null;
+    }
 
     const totalHoldTime = holdStartTime ? (releaseTimeLocal - holdStartTime) : 0;
     const releaseDelay = releaseTimeLocal - (holdStartTime + HOLD_DURATION);
@@ -393,7 +431,11 @@ async function endHold(touch) {
 }
 
 function resetTrial() {
-    if (holdInstruction) holdInstruction.innerText = "Click 'Start Task' when you're ready to begin.";
+    if (holdDisplayInterval) {
+        clearInterval(holdDisplayInterval);
+        holdDisplayInterval = null;
+    }
+    if (holdInstruction) holdInstruction.innerHTML = "Click Start and immediately hold<br>the blue circle.";
     if (holdTarget) holdTarget.style.backgroundColor = "blue";
     if (startButton) startButton.style.display = "block";
     // after resetting UI, prevent touches until next Start (user must click Start again)
@@ -409,6 +451,10 @@ async function maybeFinishSession() {
     if (trialCount >= TRIAL_LIMIT) {
 
         document.getElementById("completionBox").style.display = "flex";
+        if (holdDisplayInterval) {
+            clearInterval(holdDisplayInterval);
+            holdDisplayInterval = null;
+        }
         if (holdInstruction) holdInstruction.style.display = "none";
         if (!taskCompleted) {
             taskCompleted = true;
@@ -429,3 +475,6 @@ async function maybeFinishSession() {
         if (nextButton) nextButton.style.display = "block";
     }
 }
+
+// Prevent long-press context menu globally
+document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
