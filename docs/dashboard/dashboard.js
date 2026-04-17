@@ -28,6 +28,7 @@ const holdBtn = document.getElementById("holdBtn");
             .from("sessions")
             .insert({
                 participant_id: participantUUID,
+                session_type: sessionStorage.getItem("session_type"),
                 started_at: new Date().toISOString(),
                 completed: false,
                 drag_completed: false,

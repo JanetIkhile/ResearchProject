@@ -55,11 +55,11 @@ let initiationDelay = null;
 
             if (sessionNumber === 1) {
                 label.classList.add("practice");
-                label.innerText = "Practice Session";
+                label.innerText = "Practice Phase";
                 document.body.classList.add("practice-mode");
             } else {
                 label.classList.add("real");
-                label.innerText = "Main Session";
+                label.innerText = "Main Phase";
             }
             header.appendChild(label);
         }
@@ -95,6 +95,7 @@ let initiationDelay = null;
 
     // Start button listener
     if (startButton) {
+        startButton.style.display = "block";
         startButton.addEventListener("click", () => {
             // don't start if we've already finished all trials
             if (taskCompleted || trialCount >= TRIAL_LIMIT) return;

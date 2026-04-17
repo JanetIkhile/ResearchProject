@@ -165,7 +165,7 @@ loginBtn.onclick = async () => {
             );
             if (!confirmReuse) return;
         }
-        const sessionType = (sessionCount === 0) ? "practice" : "real";
+        const sessionType = (sessionCount === 0) ? "practice" : "main";
 
         // ---------- STORE CONTEXT ----------
         sessionStorage.setItem("participant_uuid", participantUUID);

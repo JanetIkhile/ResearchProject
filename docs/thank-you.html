@@ -70,8 +70,18 @@
 
         <p>You have successfully completed all tasks.</p>
         <p>Thank you — this was extremely helpful!</p>
+        
+        <button id="closeBtn" style="margin-top: 20px; padding: 15px 30px; font-size: 1.5rem; background-color: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer;">Close Application</button>
     </div>
     <script>
+        document.getElementById("closeBtn").addEventListener("click", () => {
+            // Browsers often block window.close() unless opened by script.
+            window.close();
+            // Fallback message if window doesn't close:
+            setTimeout(() => {
+                alert("You may now safely close this browser tab or application.");
+            }, 300);
+        });
         // Prevent long-press context menu globally
         document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
     </script>

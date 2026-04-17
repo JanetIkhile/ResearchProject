@@ -38,6 +38,7 @@ export async function initSession({ dashboardPath = "/dashboard/dashboard.html" 
     async function createNewSession() {
         const payload = {
             participant_id: participantId,
+            session_type: sessionStorage.getItem("session_type"),
             started_at: new Date().toISOString(),
             completed: false,
             drag_completed: false,
