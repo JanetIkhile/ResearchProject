@@ -7,12 +7,17 @@ let participantId = null;
 let sessionId = null;
 let trialNumber = 0;
 const TASK_TYPE = "hold";
+const PRESSURE_FEEDBACK_ENABLED = true;
 
 // DOM refs (will be assigned after session init)
 let holdTarget = null;
 let nextButton = null;
 let holdInstruction = null;
 let startButton = null;
+
+let pressureGaugeContainer = null;
+let pressureGaugeFill = null;
+let pressureFeedbackText = null;
 
 let holdStartTime = 0;
 let releaseTime = 0;
@@ -27,6 +32,10 @@ let holdTimer = null;
 let holdDisplayInterval = null;
 let akineticDelay = null;
 let readyToRelease = false;
+let holdPollingInterval = null;
+let currentTouchX = null;
+let currentTouchY = null;
+let currentTouchForce = null;
 
 let holdEvents = [];
 let taskCompleted = false;
@@ -84,6 +93,10 @@ let initiationDelay = null;
     holdInstruction = document.getElementById("holdInstruction");
     startButton = document.getElementById("startTaskButton");
 
+    pressureGaugeContainer = document.getElementById("pressureGaugeContainer");
+    pressureGaugeFill = document.getElementById("pressureGaugeFill");
+    pressureFeedbackText = document.getElementById("pressureFeedbackText");
+
     if (!holdTarget) {
         console.error("holdTarget element not found");
         return;
@@ -105,7 +118,6 @@ let initiationDelay = null;
             if (!trialActive) startHoldTrial();
         });
     }
-
     // Touch handlers: they now early-return if not active or task finished
     holdTarget.addEventListener("touchstart", (e) => {
         e.preventDefault();
@@ -116,6 +128,28 @@ let initiationDelay = null;
         const touch = e.changedTouches[0];
         if (!isHolding && !readyToRelease) beginHold(touch);
     }, { passive: false });
+
+    document.addEventListener("touchmove", (e) => {
+        if (!isHolding || taskCompleted || trialCount >= TRIAL_LIMIT || !trialActive) return;
+        e.preventDefault();
+
+        const touch = e.changedTouches[0];
+        currentTouchX = touch.pageX;
+        currentTouchY = touch.pageY;
+        currentTouchForce = (typeof touch.force === "number") ? touch.force : null;
+    }, { passive: false });
+
+    // For browser testing fallbacks
+    document.addEventListener("mousemove", (e) => {
+        if (!isHolding || taskCompleted || trialCount >= TRIAL_LIMIT || !trialActive) return;
+
+        // Ensure primary mouse button is depressed (e.buttons === 1)
+        if (e.buttons !== 1) return;
+
+        currentTouchX = e.pageX;
+        currentTouchY = e.pageY;
+        currentTouchForce = null;
+    });
 
     holdTarget.addEventListener("touchend", (e) => {
         e.preventDefault();
@@ -229,13 +263,17 @@ function beginHold(touch) {
     akineticDelay = holdStartTime - readyTime;
     isHolding = true;
 
+    currentTouchX = touch ? touch.pageX : null;
+    currentTouchY = touch ? touch.pageY : null;
+    currentTouchForce = (touch && typeof touch.force === "number") ? touch.force : null;
+
     // record raw start event
     holdEvents.push({
         event: "start",
         t: holdStartTime,
-        x: touch ? touch.pageX : null,
-        y: touch ? touch.pageY : null,
-        force: (touch && typeof touch.force === "number") ? touch.force : null
+        x: currentTouchX,
+        y: currentTouchY,
+        force: currentTouchForce
     });
 
     // store akinetic delay as an event for raw trace
@@ -248,6 +286,44 @@ function beginHold(touch) {
     let timeLeft = HOLD_DURATION / 1000;
     if (holdInstruction) holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${timeLeft}</span> seconds...`;
     if (holdTarget) holdTarget.style.backgroundColor = "yellow";
+
+    // Show pressure gauge
+    if (PRESSURE_FEEDBACK_ENABLED && pressureGaugeContainer) {
+        pressureGaugeContainer.style.display = "block";
+    }
+
+    // Fire active 60Hz telemetry polling loop
+    if (holdPollingInterval) clearInterval(holdPollingInterval);
+    holdPollingInterval = setInterval(() => {
+        if (!isHolding || currentTouchX === null) return;
+
+        let forceVal = currentTouchForce || 0; // fallback
+
+        // Update UI
+        if (PRESSURE_FEEDBACK_ENABLED && pressureGaugeFill && pressureFeedbackText) {
+            let percentage = Math.min(forceVal * 100, 100);
+            pressureGaugeFill.style.width = percentage + "%";
+            console.log("Force:", forceVal, "percentage:", percentage);
+            if (forceVal > 0.5) {
+                pressureGaugeFill.style.backgroundColor = "#ef4444"; // red
+                pressureFeedbackText.innerText = "Apply less force!";
+            } else if (forceVal < 0.1) {
+                pressureGaugeFill.style.backgroundColor = "#eab308"; // yellow
+                pressureFeedbackText.innerText = "Apply more force!";
+            } else {
+                pressureGaugeFill.style.backgroundColor = "#10b981"; // green
+                pressureFeedbackText.innerText = "Force: Optimal";
+            }
+        }
+
+        holdEvents.push({
+            event: "move",
+            t: Date.now(),
+            x: currentTouchX,
+            y: currentTouchY,
+            force: currentTouchForce
+        });
+    }, 16);
 
     if (holdDisplayInterval) clearInterval(holdDisplayInterval);
     holdDisplayInterval = setInterval(() => {
@@ -283,6 +359,11 @@ async function handleEarlyRelease(touch) {
         y: touch ? touch.pageY : null,
         force: (touch && typeof touch.force === "number") ? touch.force : null
     });
+
+    if (holdPollingInterval) {
+        clearInterval(holdPollingInterval);
+        holdPollingInterval = null;
+    }
 
     if (holdTimer) {
         clearTimeout(holdTimer);
@@ -437,6 +518,7 @@ function resetTrial() {
         holdDisplayInterval = null;
     }
     if (holdInstruction) holdInstruction.innerHTML = "Click Start and immediately hold<br>the blue circle.";
+    if (pressureGaugeContainer) pressureGaugeContainer.style.display = "none";
     if (holdTarget) holdTarget.style.backgroundColor = "blue";
     if (startButton) startButton.style.display = "block";
     // after resetting UI, prevent touches until next Start (user must click Start again)
@@ -456,6 +538,7 @@ async function maybeFinishSession() {
             clearInterval(holdDisplayInterval);
             holdDisplayInterval = null;
         }
+        if (pressureGaugeContainer) pressureGaugeContainer.style.display = "none";
         if (holdInstruction) holdInstruction.style.display = "none";
         if (!taskCompleted) {
             taskCompleted = true;

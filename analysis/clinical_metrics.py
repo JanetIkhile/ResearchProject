@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 import warnings
 warnings.filterwarnings('ignore') # Clean up plotting logs
-from scipy.signal import savgol_filter
+from scipy.signal import savgol_filter, welch
+from scipy.interpolate import interp1d
 
 def smooth_coordinates(coords, window_length=5, polyorder=2):
     """Smooth coordinate array using Savitzky-Golay filter."""
@@ -27,6 +28,7 @@ def calculate_derivatives(times, coords):
     
     vel = dist / dt
     
+    
     if len(vel) < 2:
         return vel, np.array([]), np.array([])
         
@@ -37,6 +39,58 @@ def calculate_derivatives(times, coords):
         
     jerk = np.diff(acc) / dt[2:]
     return vel, acc, jerk
+
+def extract_tremor(times, coords):
+    """
+    Interpolates touch coordinates into a uniform timestamp geometry and applies Welch's PSD 
+    to robustly calculate physiological tremor characteristics inside a 3-8 Hz target band.
+    """
+    # Use 2-3 seconds as minimum duration threshold (2000 ms)
+    if len(times) < 10 or (times[-1] - times[0]) < 2000:
+        return np.nan, np.nan, np.nan
+        
+    # Target uniform grid: 100 Hz (10ms steps). 
+    # We hardcode 100 Hz because it satisfies the Nyquist theorem for frequencies up to 50 Hz, 
+    # which easily covers and safely oversamples our target tremor band of 3-8 Hz.
+    target_fs = 100.0
+    uniform_times = np.arange(times[0], times[-1], 10.0)
+    
+    # Calculate euclidean magnitude from center immediately
+    centroid = np.mean(coords, axis=0)
+    deviations = np.linalg.norm(coords - centroid, axis=1)
+    
+    # Interpolate non-uniform touch events onto stable baseline 
+    f_interp = interp1d(times, deviations, kind='linear', fill_value='extrapolate')
+    uniform_deviations = f_interp(uniform_times)
+    
+    # Remove DC offset (zero mean)
+    uniform_deviations -= np.mean(uniform_deviations)
+    
+    # Calculate PSD using Welch's method
+    f, Pxx = welch(uniform_deviations, fs=target_fs, nperseg=min(len(uniform_deviations), int(target_fs * 1.5)))
+    
+    # Isolate clinical Tremor Band (Postural + Resting Action typically 3-8 Hz)
+    band_mask = (f >= 3.0) & (f <= 8.0)
+    
+    if not np.any(band_mask):
+        return np.nan, np.nan, np.nan
+        
+    f_band = f[band_mask]
+    Pxx_band = Pxx[band_mask]
+    
+    # Frequency corresponding to peak spectral power
+    peak_idx = np.argmax(Pxx_band)
+    tremor_freq = f_band[peak_idx]
+    
+    # Power Spectral Density (peak power) inside the clinical band
+    tremor_power = Pxx_band[peak_idx]
+    
+    # Clinical amplitude is best estimated as the RMS amplitude in the tremor band.
+    # This is calculated as the square root of the total area under the PSD curve (total band power).
+    total_band_power = np.trapz(Pxx_band, f_band)
+    tremor_amp = np.sqrt(total_band_power)
+    
+    return tremor_freq, tremor_power, tremor_amp
 
 def extract_features_from_trial(row):
     """
@@ -126,19 +180,19 @@ def extract_features_from_trial(row):
             target_pt = np.array([t_x, t_y])
             start_center = coords[0]  # Clinically updated to use physical touch anchor!
             
-            endpoint_error = np.linalg.norm(end_pt - target_pt)
+            endpoint_deviation_error = np.linalg.norm(end_pt - target_pt)
             
             task_axis = target_pt - start_center
             task_mag = np.linalg.norm(task_axis)
             if task_mag > 0:
                 user_axis = end_pt - start_center
                 projection = np.dot(user_axis, task_axis) / task_mag
-                amplitude_error = projection - task_mag  # + is Overshoot, - is Undershoot
+                endpoint_abs_deviation_error = projection - task_mag  # + is Overshoot, - is Undershoot
             else:
-                amplitude_error = np.nan
+                endpoint_abs_deviation_error = np.nan
         else:
-            endpoint_error = np.nan
-            amplitude_error = np.nan
+            endpoint_deviation_error = np.nan
+            endpoint_abs_deviation_error = np.nan
 
         return pd.Series({
             'total_distance': total_dist,
@@ -148,8 +202,8 @@ def extract_features_from_trial(row):
             'max_deviation': max_deviation,
             'movement_error': movement_error,
             'initial_targeting_error': initial_targeting_error,
-            'endpoint_error': endpoint_error,
-            'amplitude_error': amplitude_error,
+            'endpoint_deviation_error': endpoint_deviation_error,
+            'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
             'mean_speed': mean_speed,
             'peak_speed_ms': peak_speed,
             'mean_acceleration': mean_accel,
@@ -214,12 +268,30 @@ def extract_features_from_trial(row):
         centroid = np.mean(coords, axis=0)
         spatial_sd = np.std(np.linalg.norm(coords - centroid, axis=1))
         
+        # Spectral Extraction
+        tremor_freq, tremor_power, tremor_amp = extract_tremor(times, coords)
+        
+        # Pressure (Force) Extraction
+        forces = [pt.get('force') for pt in events if 'force' in pt and pt.get('force') is not None]
+        forces = np.array(forces) if len(forces) > 0 else np.array([])
+        
+        force_valid = 1.0 if (len(forces) > 0 and np.max(forces) > 0) else 0.0
+        
         return pd.Series({
             'hold_duration_ms': row.get('total_hold_time_ms'),
             'hold_drift_distance': total_drift,
             'hold_spatial_sd': spatial_sd,
             'hold_mean_speed': np.mean(vel) if len(vel) > 0 else np.nan,
             'hold_mean_abs_jerk': np.mean(np.abs(jerk)) if len(jerk) > 0 else np.nan,
+            'hold_tremor_frequency_hz': tremor_freq,
+            'hold_tremor_power': tremor_power,
+            'hold_tremor_amplitude': tremor_amp,
+            'hold_mean_force': np.mean(forces) if force_valid else np.nan,
+            'hold_max_force': np.max(forces) if force_valid else np.nan,
+            'hold_force_variability': np.std(forces) if force_valid else np.nan,
+            'hold_force_range': (np.max(forces) - np.min(forces)) if force_valid else np.nan,
+            'hold_force_median': np.median(forces) if force_valid else np.nan,
+            'hold_force_valid': force_valid,
             'akinetic_delay_hold_ms': row.get('akinetic_delay_hold_ms'),
             'initiation_delay': row.get('initiation_delay_ms')
         })

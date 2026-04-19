@@ -268,3 +268,35 @@ body.modal-open #holdInstruction {
     /* strictly lock pixel width to 2+ chars so 10 and 9 are physically identical */
     text-align: center;
 }
+/* Pressure Feedback Gauge */
+#pressureGaugeContainer {
+    position: relative;
+    width: 60%;
+    max-width: 300px;
+    margin: 0 auto 20px auto;
+    text-align: center;
+    transition: opacity 0.3s;
+}
+
+#pressureFeedbackText {
+    margin: 0 0 8px 0;
+    font-size: clamp(1rem, 3vw, 1.4rem);
+    font-weight: bold;
+    color: #333;
+}
+
+#pressureGaugeBar {
+    width: 100%;
+    height: 12px;
+    background-color: #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+#pressureGaugeFill {
+    width: 0%;
+    height: 100%;
+    background-color: #10b981; /* Default optimal green */
+    transition: width 0.1s linear, background-color 0.2s ease;
+}
