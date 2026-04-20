@@ -387,7 +387,7 @@ def analyze_all(trials_df, participants_df):
     pivot_df.columns = [f"{col[1]}_{col[0]}" if col[1] else col[0] for col in pivot_df.columns]
     pivot_df = pivot_df.reset_index()
     
-    master = participants_df[['id', 'participant_group', 'dominant_arm']].copy()
+    master = participants_df[['id', 'participant_code', 'participant_group', 'dominant_arm']].copy()
     master = master.rename(columns={'id': 'participant_id', 'participant_group': 'diagnosis'})
     master = master.merge(pivot_df, on='participant_id', how='left')
     
