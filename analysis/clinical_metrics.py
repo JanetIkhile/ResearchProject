@@ -137,19 +137,26 @@ def extract_features_from_trial(row):
             
             if task_axis_dist > 0:
                 # Calculates perpendicular distance of every tapped pixel from the UNIFIED geometric task line
-                cross_out = np.abs((target_pt[0] - start_pt[0]) * (start_pt[1] - coords[:, 1]) - (start_pt[0] - coords[:, 0]) * (target_pt[1] - start_pt[1]))
+                signed_cross = (target_pt[0] - start_pt[0]) * (start_pt[1] - coords[:, 1]) - (start_pt[0] - coords[:, 0]) * (target_pt[1] - start_pt[1])
+                cross_out = np.abs(signed_cross)
                 orthogonal_dists = cross_out / task_axis_dist
                 movement_variability = np.std(orthogonal_dists)
                 max_deviation = np.max(orthogonal_dists)
                 movement_error = np.mean(orthogonal_dists)
+                
+                signs = np.sign(signed_cross)
+                signs = signs[signs != 0] # Remove zeros
+                task_axis_crossings_count = np.sum(np.diff(signs) != 0) if len(signs) > 0 else 0
             else:
                 movement_variability = np.nan
                 max_deviation = np.nan
                 movement_error = np.nan
+                task_axis_crossings_count = np.nan
         else:
             movement_variability = np.nan
             max_deviation = np.nan
             movement_error = np.nan
+            task_axis_crossings_count = np.nan
             
         # Velocity / Pauses
         mean_speed = np.mean(vel) if len(vel) > 0 else np.nan
@@ -201,6 +208,7 @@ def extract_features_from_trial(row):
             'movement_variability': movement_variability,
             'max_deviation': max_deviation,
             'movement_error': movement_error,
+            'task_axis_crossings_count': task_axis_crossings_count,
             'initial_targeting_error': initial_targeting_error,
             'endpoint_deviation_error': endpoint_deviation_error,
             'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
