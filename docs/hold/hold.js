@@ -7,7 +7,7 @@ let participantId = null;
 let sessionId = null;
 let trialNumber = 0;
 const TASK_TYPE = "hold";
-const PRESSURE_FEEDBACK_ENABLED = true;
+const PRESSURE_FEEDBACK_ENABLED = false;
 
 // DOM refs (will be assigned after session init)
 let holdTarget = null;
