@@ -285,7 +285,7 @@ function beginHold(touch) {
 
     let timeLeft = HOLD_DURATION / 1000;
     if (holdInstruction) holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${timeLeft}</span> seconds...`;
-    if (holdTarget) holdTarget.style.backgroundColor = "yellow";
+    if (holdTarget) holdTarget.style.transform = "translateX(-50%) scale(0.95)";
 
     // Show pressure gauge
     if (PRESSURE_FEEDBACK_ENABLED && pressureGaugeContainer) {
@@ -385,6 +385,7 @@ async function handleEarlyRelease(touch) {
     const isFinalTrial = (trialCount >= TRIAL_LIMIT);
 
     if (holdTarget) {
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
         if (isFinalTrial) {
             holdTarget.style.backgroundColor = "green";
         } else {
@@ -476,6 +477,8 @@ async function endHold(touch) {
     trialCount++;
     trialNumber++;
 
+    if (holdTarget) holdTarget.style.transform = "translateX(-50%) scale(1)";
+
     const trialPayload = {
         participant_id: participantId,
         session_id: sessionId,
@@ -519,7 +522,10 @@ function resetTrial() {
     }
     if (holdInstruction) holdInstruction.innerHTML = "Click Start and immediately hold<br>the blue circle.";
     if (pressureGaugeContainer) pressureGaugeContainer.style.display = "none";
-    if (holdTarget) holdTarget.style.backgroundColor = "blue";
+    if (holdTarget) {
+        holdTarget.style.backgroundColor = "blue";
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
+    }
     if (startButton) startButton.style.display = "block";
     // after resetting UI, prevent touches until next Start (user must click Start again)
     if (holdTarget) holdTarget.style.pointerEvents = 'none';
