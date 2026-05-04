@@ -71,8 +71,8 @@ canvas {
     left: 50%;
     transform: translateX(-50%);
 
-    width: clamp(120px, 20vw, 220px);
-    height: clamp(120px, 20vw, 220px);
+    width: clamp(150px, 25vw, 250px);
+    height: clamp(150px, 25vw, 250px);
 
     background-color: blue;
     border-radius: 50%;
@@ -223,6 +223,11 @@ body.modal-open #holdInstruction {
 }
 
 @media (min-width: 600px) {
+
+    #holdTarget {
+        width: clamp(200px, 28vw, 300px);
+        height: clamp(200px, 28vw, 300px);
+    }
 
     #completionText {
         font-size: 2rem;
