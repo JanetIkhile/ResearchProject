@@ -288,10 +288,10 @@ function recordTapEvent(touch, ts) {
 
     // small visual feedback
     if (tapTarget) {
-        tapTarget.style.backgroundColor = "white";
+        tapTarget.style.transform = "translateX(-50%) scale(0.95)";
         setTimeout(() => {
             if (tapTarget) {
-                tapTarget.style.backgroundColor = "blue"; // Always return to blue
+                tapTarget.style.transform = "translateX(-50%) scale(1)";
             }
         }, 100);
     }

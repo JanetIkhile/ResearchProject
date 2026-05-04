@@ -86,9 +86,9 @@ blinkDot.addEventListener("touchstart", () => {
         currentRedTime = null;
     }
 
-    blinkDot.style.backgroundColor = "white";
+    blinkDot.style.transform = "translateX(-50%) scale(0.95)";
     setTimeout(() => {
-        blinkDot.style.backgroundColor = isRed ? "red" : "gray";
+        blinkDot.style.transform = "translateX(-50%) scale(1)";
     }, 100);
 });
 
