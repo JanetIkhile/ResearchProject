@@ -92,6 +92,50 @@ def extract_tremor(times, coords):
     
     return tremor_freq, tremor_power, tremor_amp
 
+def extract_kinetic_tremor(times, deviations):
+    """
+    Interpolates orthogonal deviations into a uniform timestamp geometry and applies Welch's PSD 
+    to robustly calculate physiological kinetic tremor characteristics inside a 3-8 Hz target band.
+    """
+    # Use 1 second as minimum duration threshold (1000 ms) for drag movements
+    if len(times) < 10 or (times[-1] - times[0]) < 1000:
+        return np.nan, np.nan, np.nan
+        
+    target_fs = 100.0
+    uniform_times = np.arange(times[0], times[-1], 10.0)
+    
+    # Interpolate non-uniform touch events onto stable baseline 
+    f_interp = interp1d(times, deviations, kind='linear', fill_value='extrapolate')
+    uniform_deviations = f_interp(uniform_times)
+    
+    # Remove DC offset (zero mean)
+    uniform_deviations -= np.mean(uniform_deviations)
+    
+    # Calculate PSD using Welch's method
+    f, Pxx = welch(uniform_deviations, fs=target_fs, nperseg=min(len(uniform_deviations), int(target_fs * 1.5)))
+    
+    # Isolate clinical Tremor Band (Postural + Resting Action typically 3-8 Hz)
+    band_mask = (f >= 3.0) & (f <= 8.0)
+    
+    if not np.any(band_mask):
+        return np.nan, np.nan, np.nan
+        
+    f_band = f[band_mask]
+    Pxx_band = Pxx[band_mask]
+    
+    # Frequency corresponding to peak spectral power
+    peak_idx = np.argmax(Pxx_band)
+    tremor_freq = f_band[peak_idx]
+    
+    # Power Spectral Density (peak power) inside the clinical band
+    tremor_power = Pxx_band[peak_idx]
+    
+    # Clinical amplitude is best estimated as the RMS amplitude in the tremor band.
+    total_band_power = np.trapz(Pxx_band, f_band)
+    tremor_amp = np.sqrt(total_band_power)
+    
+    return tremor_freq, tremor_power, tremor_amp
+
 def extract_features_from_trial(row):
     """
     Tier 1: Parses high-fidelity raw events JSON and extracts ALL continuous features.
@@ -147,16 +191,26 @@ def extract_features_from_trial(row):
                 signs = np.sign(signed_cross)
                 signs = signs[signs != 0] # Remove zeros
                 task_axis_crossings_count = np.sum(np.diff(signs) != 0) if len(signs) > 0 else 0
+                
+                # Extract kinetic tremor from signed orthogonal deviations
+                signed_dists = signed_cross / task_axis_dist
+                k_freq, k_power, k_amp = extract_kinetic_tremor(times, signed_dists)
             else:
                 movement_variability = np.nan
                 max_deviation = np.nan
                 movement_error = np.nan
                 task_axis_crossings_count = np.nan
+                k_freq = np.nan
+                k_power = np.nan
+                k_amp = np.nan
         else:
             movement_variability = np.nan
             max_deviation = np.nan
             movement_error = np.nan
             task_axis_crossings_count = np.nan
+            k_freq = np.nan
+            k_power = np.nan
+            k_amp = np.nan
             
         # Velocity / Pauses
         mean_speed = np.mean(vel) if len(vel) > 0 else np.nan
@@ -209,6 +263,9 @@ def extract_features_from_trial(row):
             'max_deviation': max_deviation,
             'movement_error': movement_error,
             'task_axis_crossings_count': task_axis_crossings_count,
+            'kinetic_tremor_frequency_hz': k_freq,
+            'kinetic_tremor_power': k_power,
+            'kinetic_tremor_amplitude': k_amp,
             'initial_targeting_error': initial_targeting_error,
             'endpoint_deviation_error': endpoint_deviation_error,
             'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
