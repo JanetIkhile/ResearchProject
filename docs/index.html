@@ -44,11 +44,44 @@
             margin-bottom: 12px;
         }
 
-        select {
+        select, input[type="text"] {
             width: 100%;
             padding: 12px;
             font-size: 1.2rem;
             border-radius: 8px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        .custom-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 250px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-top: 4px;
+        }
+
+        .dropdown-item {
+            padding: 12px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: #f3f4f6;
         }
 
         .option-card {
@@ -121,11 +154,10 @@
         <h2>Motor Study</h2>
 
         <!-- Participant -->
-        <div class="form-group">
+        <div class="form-group" style="position: relative;">
             <p class="question">Participant ID</p>
-            <select id="username">
-                <option value="">-- Select Participant --</option>
-            </select>
+            <input type="text" id="username" placeholder="Type or select ID (e.g. P01)" autocomplete="off">
+            <div id="participantDropdown" class="custom-dropdown"></div>
         </div>
 
         <!-- Identity -->

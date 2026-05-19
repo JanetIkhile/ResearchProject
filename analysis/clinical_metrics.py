@@ -214,6 +214,7 @@ def extract_features_from_trial(row):
             
         # Velocity / Pauses
         mean_speed = np.mean(vel) if len(vel) > 0 else np.nan
+        median_speed = np.median(vel) if len(vel) > 0 else np.nan
         peak_speed = np.max(vel) if len(vel) > 0 else np.nan
         
         pause_threshold = 10.0 # arbitrary px/s threshold for halt
@@ -270,6 +271,7 @@ def extract_features_from_trial(row):
             'endpoint_deviation_error': endpoint_deviation_error,
             'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
             'mean_speed': mean_speed,
+            'median_speed': median_speed,
             'peak_speed_ms': peak_speed,
             'mean_acceleration': mean_accel,
             'mean_abs_jerk': mean_abs_jerk,

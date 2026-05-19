@@ -5,9 +5,11 @@ console.log("lab login loaded");
 // -----------------------------
 // ELEMENTS
 // -----------------------------
-const participantSelect = document.getElementById("username");
+const participantInput = document.getElementById("username");
+const participantDropdown = document.getElementById("participantDropdown");
 const loginBtn = document.getElementById("loginBtn");
 const errorEl = document.getElementById("error");
+let allParticipants = [];
 
 // -----------------------------
 // INIT
@@ -62,21 +64,63 @@ async function populateParticipants() {
             let status = "";
 
             if (count === 0) {
-                status = " (0/2)";
+                status = " (Not started)";
             } else if (count === 1) {
-                status = " (1/2)";
+                status = " (In Progress)";
             } else {
-                status = " (2/2 ⚠️)";
+                status = " (Complete ⚠️)";
             }
 
-            option.textContent = `${code}${status}`;
-            participantSelect.appendChild(option);
+            allParticipants.push({ code, text: `${code}${status}` });
         }
+
+        renderDropdown();
+
+        participantInput.addEventListener("focus", () => {
+            participantDropdown.style.display = "block";
+            renderDropdown(participantInput.value);
+        });
+
+        participantInput.addEventListener("input", (e) => {
+            participantDropdown.style.display = "block";
+            renderDropdown(e.target.value);
+        });
+
+        document.addEventListener("click", (e) => {
+            if (!participantInput.contains(e.target) && !participantDropdown.contains(e.target)) {
+                participantDropdown.style.display = "none";
+            }
+        });
 
     } catch (err) {
         console.error(err);
         errorEl.textContent = "Failed to load participants.";
     }
+}
+
+function renderDropdown(filterText = "") {
+    participantDropdown.innerHTML = "";
+    const filtered = allParticipants.filter(opt => opt.text.toLowerCase().includes(filterText.toLowerCase()));
+    
+    if (filtered.length === 0) {
+        const div = document.createElement("div");
+        div.className = "dropdown-item";
+        div.textContent = "No matches found";
+        div.style.color = "#666";
+        participantDropdown.appendChild(div);
+        return;
+    }
+
+    filtered.forEach(opt => {
+        const div = document.createElement("div");
+        div.className = "dropdown-item";
+        div.textContent = opt.text;
+        div.onclick = () => {
+            participantInput.value = opt.code;
+            participantDropdown.style.display = "none";
+        };
+        participantDropdown.appendChild(div);
+    });
 }
 
 // -----------------------------
@@ -85,7 +129,7 @@ async function populateParticipants() {
 loginBtn.onclick = async () => {
     errorEl.textContent = "";
 
-    const participantCode = participantSelect.value;
+    const participantCode = participantInput.value;
 
     // ---------- VALIDATION ----------
     if (!participantCode) {
