@@ -101,7 +101,7 @@ async function populateParticipants() {
 function renderDropdown(filterText = "") {
     participantDropdown.innerHTML = "";
     const filtered = allParticipants.filter(opt => opt.text.toLowerCase().includes(filterText.toLowerCase()));
-    
+
     if (filtered.length === 0) {
         const div = document.createElement("div");
         div.className = "dropdown-item";

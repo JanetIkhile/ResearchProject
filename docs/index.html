@@ -46,11 +46,18 @@
 
         select, input[type="text"] {
             width: 100%;
-            padding: 12px;
-            font-size: 1.2rem;
-            border-radius: 8px;
-            border: 1px solid #ccc;
+            padding: 18px;
+            font-size: clamp(1.2rem, 2vw, 1.6rem);
+            border-radius: 12px;
+            border: none;
+            background: #f3f4f6;
             box-sizing: border-box;
+            transition: 0.2s;
+        }
+
+        select:focus, input[type="text"]:focus {
+            outline: 2px solid #16a34a;
+            background: #e5e7eb;
         }
 
         .custom-dropdown {
