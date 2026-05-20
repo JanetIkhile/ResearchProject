@@ -38,8 +38,10 @@ create table if not exists trial_results (
   -- task geometry (coordinates in page pixels)
   start_x numeric,
   start_y numeric,
+  start_radius numeric,
   target_x numeric,
   target_y numeric,
+  target_radius numeric,
 
   -- -------- device / context --------
   viewport_width int,
@@ -77,4 +79,9 @@ add column if not exists total_hold_time_ms float,
 add column if not exists release_delay_ms float,
 add column if not exists released_early boolean,
 add column if not exists hold_target_duration_ms float;
+
+-- for Fitts Law and spatial accuracy
+alter table trial_results
+add column if not exists start_radius numeric,
+add column if not exists target_radius numeric;
 

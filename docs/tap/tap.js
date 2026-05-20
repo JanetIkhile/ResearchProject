@@ -52,15 +52,17 @@ function handleTouchStart(e) {
     // If we've already finished the allowed trials, ignore everything
     if (trialNumber >= TRIAL_LIMIT && !taskActive) return;
 
+    const nextBtn = document.getElementById("nextTaskButton");
+    if (nextBtn && nextBtn.contains(e.target)) return;
+
     e.preventDefault();
     const touch = e.changedTouches[0];
     const now = Date.now();
+    const isInside = isTouchInsideTarget(touch);
 
-    // ONLY proceed if touch is inside the circular target
-    if (!isTouchInsideTarget(touch)) return;
-
-    // If we're BETWEEN trials, a touch starts the trial and is recorded as first tap
+    // If we're BETWEEN trials, a touch starts the trial ONLY if it hits the target
     if (!taskActive && isBetweenTrials) {
+        if (!isInside) return; // Must hit target to start
         if (trialNumber >= TRIAL_LIMIT) return;
 
         // prevent race double-starts
@@ -72,13 +74,13 @@ function handleTouchStart(e) {
 
         trialNumber += 1;
         startTapTrial(now);
-        recordTapEvent(touch, now);
+        recordTapEvent(touch, now, isInside);
         return;
     }
 
     // If a trial is active, record taps normally
     if (taskActive) {
-        recordTapEvent(touch, now);
+        recordTapEvent(touch, now, isInside);
     }
 }
 
@@ -139,7 +141,7 @@ function handleTouchStart(e) {
     if (tapInstruction) tapInstruction.innerHTML = 'Tap the blue circle as fast as you can<br>for <span class="timer-badge">10</span> seconds!';
     if (tapTarget) tapTarget.style.backgroundColor = "blue";
 
-    tapTarget.addEventListener("touchstart", handleTouchStart, { passive: false });
+    document.addEventListener("touchstart", handleTouchStart, { passive: false });
 })();
 
 // ---------- Start a trial ----------
@@ -232,9 +234,9 @@ function startTapTrial(startTs) {
 
             // final cleanup
             try {
-                tapTarget.removeEventListener("touchstart", handleTouchStart, { passive: false });
+                document.removeEventListener("touchstart", handleTouchStart, { passive: false });
             } catch (e) {
-                try { tapTarget.removeEventListener("touchstart", handleTouchStart); } catch (er) { }
+                try { document.removeEventListener("touchstart", handleTouchStart); } catch (er) { }
             }
             if (tapTarget) tapTarget.style.pointerEvents = 'none';
             if (nextButton) nextButton.style.display = "block";
@@ -274,15 +276,15 @@ function clearTimers() {
 }
 
 // ---------- record a tap only while a trial is active ----------
-function recordTapEvent(touch, ts) {
+function recordTapEvent(touch, ts, isInside) {
     if (!taskActive) return; // only capture taps during active trial
-    if (!isTouchInsideTarget(touch)) return;
 
     const evt = {
         t: ts || Date.now(),
         x: touch.pageX,
         y: touch.pageY,
-        force: (typeof touch.force === "number") ? touch.force : null
+        force: (typeof touch.force === "number") ? touch.force : null,
+        is_inside_target: isInside
     };
     tapEvents.push(evt);
 
@@ -300,6 +302,15 @@ function recordTapEvent(touch, ts) {
 // ---------- Persist raw taps ----------
 async function saveTapTrial(startTime, endTime) {
     const totalTaps = tapEvents.length;
+    
+    let tX = null, tY = null, tR = null;
+    if (tapTarget) {
+        const rect = tapTarget.getBoundingClientRect();
+        tX = rect.left + rect.width / 2;
+        tY = rect.top + rect.height / 2;
+        tR = rect.width / 2;
+    }
+    
     const payload = {
         participant_id: participantId,
         session_id: sessionId,
@@ -314,6 +325,10 @@ async function saveTapTrial(startTime, endTime) {
         viewport_width: window.innerWidth,
         viewport_height: window.innerHeight,
         device_pixel_ratio: window.devicePixelRatio,
+
+        target_x: tX,
+        target_y: tY,
+        target_radius: tR,
 
         taps: tapEvents
     };

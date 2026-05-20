@@ -165,6 +165,7 @@ def extract_features_from_trial(row):
         t_y = row.get('target_y')
         s_x = row.get('start_x')
         s_y = row.get('start_y')
+        t_r = row.get('target_radius')
         
         # Initial Targeting Error (Where they actually started vs Geometric center)
         if pd.notna(s_x) and pd.notna(s_y) and len(coords) > 0:
@@ -178,6 +179,18 @@ def extract_features_from_trial(row):
             start_pt = coords[0]
             target_pt = np.array([t_x, t_y])
             task_axis_dist = np.linalg.norm(target_pt - start_pt)
+            
+            fitts_law_id = np.nan
+            fitts_law_throughput = np.nan
+            
+            if pd.notna(t_r) and t_r > 0 and task_axis_dist > 0:
+                # Fitts's Law: ID = log2(2 * D / W)
+                w = t_r * 2
+                fitts_law_id = np.log2((2 * task_axis_dist) / w)
+                
+                movement_time_s = row.get('movement_time_ms', 0) / 1000.0
+                if movement_time_s > 0:
+                    fitts_law_throughput = fitts_law_id / movement_time_s
             
             if task_axis_dist > 0:
                 # Calculates perpendicular distance of every tapped pixel from the UNIFIED geometric task line
@@ -211,6 +224,8 @@ def extract_features_from_trial(row):
             k_freq = np.nan
             k_power = np.nan
             k_amp = np.nan
+            fitts_law_id = np.nan
+            fitts_law_throughput = np.nan
             
         # Velocity / Pauses
         mean_speed = np.mean(vel) if len(vel) > 0 else np.nan
@@ -241,8 +256,11 @@ def extract_features_from_trial(row):
             end_pt = coords[-1]
             target_pt = np.array([t_x, t_y])
             start_center = coords[0]  # Clinically updated to use physical touch anchor!
-            
             endpoint_deviation_error = np.linalg.norm(end_pt - target_pt)
+            
+            target_reached = np.nan
+            if pd.notna(t_r) and t_r > 0:
+                target_reached = 1.0 if endpoint_deviation_error <= t_r else 0.0
             
             task_axis = target_pt - start_center
             task_mag = np.linalg.norm(task_axis)
@@ -255,6 +273,7 @@ def extract_features_from_trial(row):
         else:
             endpoint_deviation_error = np.nan
             endpoint_abs_deviation_error = np.nan
+            target_reached = np.nan
 
         return pd.Series({
             'total_distance': total_dist,
@@ -270,6 +289,7 @@ def extract_features_from_trial(row):
             'initial_targeting_error': initial_targeting_error,
             'endpoint_deviation_error': endpoint_deviation_error,
             'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
+            'target_reached': target_reached,
             'mean_speed': mean_speed,
             'median_speed': median_speed,
             'peak_speed_ms': peak_speed,
@@ -278,7 +298,10 @@ def extract_features_from_trial(row):
             'peak_jerk': peak_jerk,
             'pause_count': pause_count,
             'longest_pause_duration': longest_pause_duration,
-            'initiation_delay': row.get('initiation_delay_ms')
+            'initiation_delay': row.get('initiation_delay_ms'),
+            'movement_time_ms': row.get('movement_time_ms'),
+            'fitts_law_id': fitts_law_id,
+            'fitts_law_throughput': fitts_law_throughput
         })
         
     elif task == 'tap':
@@ -298,6 +321,14 @@ def extract_features_from_trial(row):
         mean_intertap = np.mean(intertap) if len(intertap) > 0 else np.nan
         cv_intertap = (np.std(intertap) / mean_intertap) if mean_intertap > 0 else np.nan
         
+        # Accuracy
+        if len(taps) > 0 and 'is_inside_target' not in taps[0]:
+            # Legacy data: misses were filtered out on the frontend
+            tap_accuracy = 1.0
+        else:
+            hits = sum(1 for pt in taps if pt.get('is_inside_target') is True)
+            tap_accuracy = hits / tap_count if tap_count > 0 else np.nan
+        
         # Spatial SD (spread of taps)
         if len(coords) > 2:
             centroid = np.mean(coords, axis=0)
@@ -312,6 +343,7 @@ def extract_features_from_trial(row):
             'mean_intertap_interval_ms': mean_intertap,
             'cv_intertap_interval': cv_intertap,
             'tap_spatial_sd': spatial_sd,
+            'tap_accuracy': tap_accuracy,
             'initiation_delay': row.get('initiation_delay_ms')
         })
         

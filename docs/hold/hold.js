@@ -393,6 +393,14 @@ async function handleEarlyRelease(touch) {
         }
     }
 
+    let tX = null, tY = null, tR = null;
+    if (holdTarget) {
+        const rect = holdTarget.getBoundingClientRect();
+        tX = rect.left + rect.width / 2;
+        tY = rect.top + rect.height / 2;
+        tR = rect.width / 2;
+    }
+
     const trialPayload = {
         participant_id: participantId,
         session_id: sessionId,
@@ -411,6 +419,10 @@ async function handleEarlyRelease(touch) {
         viewport_width: window.innerWidth,
         viewport_height: window.innerHeight,
         device_pixel_ratio: window.devicePixelRatio,
+
+        target_x: tX,
+        target_y: tY,
+        target_radius: tR,
 
         // raw behavior
         hold_events: holdEvents
@@ -479,6 +491,14 @@ async function endHold(touch) {
 
     if (holdTarget) holdTarget.style.transform = "translateX(-50%) scale(1)";
 
+    let tX = null, tY = null, tR = null;
+    if (holdTarget) {
+        const rect = holdTarget.getBoundingClientRect();
+        tX = rect.left + rect.width / 2;
+        tY = rect.top + rect.height / 2;
+        tR = rect.width / 2;
+    }
+
     const trialPayload = {
         participant_id: participantId,
         session_id: sessionId,
@@ -496,6 +516,10 @@ async function endHold(touch) {
         viewport_width: window.innerWidth,
         viewport_height: window.innerHeight,
         device_pixel_ratio: window.devicePixelRatio,
+
+        target_x: tX,
+        target_y: tY,
+        target_radius: tR,
 
         hold_events: holdEvents
     };

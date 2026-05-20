@@ -69,6 +69,7 @@ let trajectoryLog = [];
 let trialStartTime = null;
 let trialEndTime = null;
 let startX, startY, targetX, targetY;
+let startRadius, targetRadius;
 let activeTouchId = null;
 let clearCanvasTimeout = null;
 
@@ -149,8 +150,11 @@ function handleTouchStart(e) {
 
     startX = startRect.left + startRect.width / 2;
     startY = startRect.top + startRect.height / 2;
+    startRadius = startRect.width / 2;
+    
     targetX = targetRect.left + targetRect.width / 2;
     targetY = targetRect.top + targetRect.height / 2;
+    targetRadius = targetRect.width / 2;
 }
 
 function handleTouchMove(e) {
@@ -249,8 +253,10 @@ async function handleTouchEnd(e) {
         // ---- task geometry ----
         start_x: startX,
         start_y: startY,
+        start_radius: startRadius,
         target_x: targetX,
         target_y: targetY,
+        target_radius: targetRadius,
 
         // ---- device context ----
         viewport_width: window.innerWidth,

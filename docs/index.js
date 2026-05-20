@@ -68,7 +68,7 @@ async function populateParticipants() {
             } else if (count === 1) {
                 status = " (In Progress)";
             } else {
-                status = " (Complete ⚠️)";
+                status = " (Complete)";
             }
 
             allParticipants.push({ code, text: `${code}${status}` });
