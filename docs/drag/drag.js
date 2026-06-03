@@ -247,7 +247,7 @@ async function handleTouchEnd(e) {
         trial_end_time: new Date(trialEndTime).toISOString(),
 
         // NEW METRICS
-        initiation_delay_ms: initiationDelay,
+        initiation_delay: initiationDelay,
         movement_time_ms: trialEndTime - trialStartTime,
 
         // ---- task geometry ----

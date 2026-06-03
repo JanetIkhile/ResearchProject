@@ -5,6 +5,9 @@ warnings.filterwarnings('ignore') # Clean up plotting logs
 from scipy.signal import savgol_filter, welch
 from scipy.interpolate import interp1d
 
+# Define a fallback wrapper for NumPy 2.0+ compatibility (trapz was removed in 2.0+)
+np_trapezoid = getattr(np, 'trapezoid', getattr(np, 'trapz', None))
+
 def smooth_coordinates(coords, window_length=5, polyorder=2):
     """Smooth coordinate array using Savitzky-Golay filter."""
     if len(coords) < window_length:
@@ -87,7 +90,7 @@ def extract_tremor(times, coords):
     
     # Clinical amplitude is best estimated as the RMS amplitude in the tremor band.
     # This is calculated as the square root of the total area under the PSD curve (total band power).
-    total_band_power = np.trapz(Pxx_band, f_band)
+    total_band_power = np_trapezoid(Pxx_band, f_band)
     tremor_amp = np.sqrt(total_band_power)
     
     return tremor_freq, tremor_power, tremor_amp
@@ -131,7 +134,7 @@ def extract_kinetic_tremor(times, deviations):
     tremor_power = Pxx_band[peak_idx]
     
     # Clinical amplitude is best estimated as the RMS amplitude in the tremor band.
-    total_band_power = np.trapz(Pxx_band, f_band)
+    total_band_power = np_trapezoid(Pxx_band, f_band)
     tremor_amp = np.sqrt(total_band_power)
     
     return tremor_freq, tremor_power, tremor_amp
@@ -298,7 +301,7 @@ def extract_features_from_trial(row):
             'peak_jerk': peak_jerk,
             'pause_count': pause_count,
             'longest_pause_duration': longest_pause_duration,
-            'initiation_delay': row.get('initiation_delay_ms'),
+            'initiation_delay': row.get('initiation_delay'),
             'movement_time_ms': row.get('movement_time_ms'),
             'fitts_law_id': fitts_law_id,
             'fitts_law_throughput': fitts_law_throughput
@@ -344,7 +347,7 @@ def extract_features_from_trial(row):
             'cv_intertap_interval': cv_intertap,
             'tap_spatial_sd': spatial_sd,
             'tap_accuracy': tap_accuracy,
-            'initiation_delay': row.get('initiation_delay_ms')
+            'initiation_delay': row.get('initiation_delay')
         })
         
     elif task == 'hold':
@@ -391,8 +394,8 @@ def extract_features_from_trial(row):
             'hold_force_range': (np.max(forces) - np.min(forces)) if force_valid else np.nan,
             'hold_force_median': np.median(forces) if force_valid else np.nan,
             'hold_force_valid': force_valid,
-            'akinetic_delay_hold_ms': row.get('akinetic_delay_hold_ms'),
-            'initiation_delay': row.get('initiation_delay_ms')
+            'akinetic_delay_hold': row.get('akinetic_delay_hold'),
+            'initiation_delay': row.get('initiation_delay')
         })
         
     return pd.Series(dtype=float)

@@ -1,20 +1,25 @@
 -- Create participants table
 create table if not exists participants (
-  id uuid primary key references auth.users(id),
-  display_name text not null,
+  id uuid default gen_random_uuid() primary key,
+  participant_code text not null unique,
+  participant_group text,
+  dominant_arm text,
   created_at timestamptz default now()
 );
 
--- Ensure usernames are unique
-create unique index if not exists participants_display_name_unique
-on participants (display_name);
-
 -- Create sessions table
 create table if not exists sessions (
-  id uuid primary key,
-  participant_id uuid not null references auth.users(id),
+  id uuid default gen_random_uuid() primary key,
+  participant_id uuid not null references participants(id) on delete cascade,
+  session_type text,
   started_at timestamptz not null,
-  ended_at timestamptz
+  completed boolean default false,
+  drag_completed boolean default false,
+  tap_completed boolean default false,
+  hold_completed boolean default false,
+  completed_at timestamptz,
+  device_info jsonb,
+  notes text
 );
 
 create index if not exists sessions_participant_id_idx
@@ -24,16 +29,18 @@ on sessions (participant_id);
 create table if not exists trial_results (
   id uuid default gen_random_uuid() primary key,
 
-  -- -------- identity --------
-  participant_id uuid not null references auth.users(id),
-  session_id uuid not null references sessions(id),
+  -- identity & session linkage
+  participant_id uuid not null references participants(id) on delete cascade,
+  session_id uuid not null references sessions(id) on delete cascade,
   task_type text not null,
   trial_number int not null,
   timestamp timestamptz not null,
 
-   -- trial timing
+  -- trial timing
   trial_start_time timestamptz,
   trial_end_time timestamptz,
+  initiation_delay_ms float,
+  movement_time_ms float,
 
   -- task geometry (coordinates in page pixels)
   start_x numeric,
@@ -43,13 +50,26 @@ create table if not exists trial_results (
   target_y numeric,
   target_radius numeric,
 
-  -- -------- device / context --------
+  -- device context
   viewport_width int,
   viewport_height int,
   device_pixel_ratio float, 
 
-  -- -------- raw trajectory --------
-  trajectory jsonb
+  -- drag task data
+  trajectory jsonb,
+
+  -- tap task data
+  taps jsonb,
+  total_taps int,
+  total_tap_time_ms float,
+
+  -- hold task data
+  hold_events jsonb,
+  total_hold_time_ms float,
+  release_delay_ms float,
+  released_early boolean,
+  hold_target_duration_ms float,
+  akinetic_delay_hold_ms float
 );
 
 create index if not exists trial_results_participant_id_idx
@@ -61,27 +81,4 @@ on trial_results (session_id);
 create index if not exists trial_results_task_type_idx
 on trial_results (task_type);
 
-create index if not exists trial_results_participant_trial_created_at_idx
-on trial_results (created_at);
--- for pilot
--- alter table participants disable row level security;
--- alter table sessions disable row level security;
--- alter table trial_results disable row level security;
-
---for tap task
-alter table trial_results
-add column if not exists total_taps int,
-add column if not exists taps_per_second float;
-
---for hold task
-alter table trial_results
-add column if not exists total_hold_time_ms float,
-add column if not exists release_delay_ms float,
-add column if not exists released_early boolean,
-add column if not exists hold_target_duration_ms float;
-
--- for Fitts Law and spatial accuracy
-alter table trial_results
-add column if not exists start_radius numeric,
-add column if not exists target_radius numeric;
 

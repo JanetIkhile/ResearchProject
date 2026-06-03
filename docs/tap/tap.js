@@ -320,7 +320,7 @@ async function saveTapTrial(startTime, endTime) {
 
         total_taps: totalTaps,
         total_tap_time_ms: endTime - startTime,
-        initiation_delay_ms: initiationDelay,
+        initiation_delay: initiationDelay,
 
         viewport_width: window.innerWidth,
         viewport_height: window.innerHeight,

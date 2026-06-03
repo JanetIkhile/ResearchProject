@@ -407,10 +407,10 @@ async function handleEarlyRelease(touch) {
         task_type: TASK_TYPE,
         trial_number: trialNumber,
         timestamp: new Date().toISOString(),
-        initiation_delay_ms: initiationDelay,
+        initiation_delay: initiationDelay,
 
         // minimal metadata
-        akinetic_delay_hold_ms: akinetic,
+        akinetic_delay_hold: akinetic,
         total_hold_time_ms: totalHoldTime,
         release_delay_ms: null,
         released_early: true,
@@ -505,9 +505,9 @@ async function endHold(touch) {
         task_type: TASK_TYPE,
         trial_number: trialNumber,
         timestamp: new Date().toISOString(),
-        initiation_delay_ms: initiationDelay,
+        initiation_delay: initiationDelay,
 
-        akinetic_delay_hold_ms: akinetic,
+        akinetic_delay_hold: akinetic,
         total_hold_time_ms: totalHoldTime,
         release_delay_ms: releaseDelay > 0 ? releaseDelay : 0,
         released_early: false,
