@@ -16,6 +16,7 @@ let isBetweenTrials = true;
 let taskTimer = null;
 let timerInterval = null;
 let tapEvents = [];
+let tapTrajectory = [];
 let taskCompleted = false;
 let savingInProgress = false;
 
@@ -75,12 +76,14 @@ function handleTouchStart(e) {
         trialNumber += 1;
         startTapTrial(now);
         recordTapEvent(touch, now, isInside);
+        recordTrajectoryPoint(touch, now, 'start');
         return;
     }
 
     // If a trial is active, record taps normally
     if (taskActive) {
         recordTapEvent(touch, now, isInside);
+        recordTrajectoryPoint(touch, now, 'start');
     }
 }
 
@@ -142,6 +145,8 @@ function handleTouchStart(e) {
     if (tapTarget) tapTarget.style.backgroundColor = "blue";
 
     document.addEventListener("touchstart", handleTouchStart, { passive: false });
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    document.addEventListener("touchend", handleTouchEnd, { passive: false });
 })();
 
 // ---------- Start a trial ----------
@@ -152,6 +157,7 @@ function startTapTrial(startTs) {
     clearTimers();
 
     tapEvents = [];
+    tapTrajectory = [];
     taskActive = true;
     isBetweenTrials = false;
 
@@ -235,8 +241,14 @@ function startTapTrial(startTs) {
             // final cleanup
             try {
                 document.removeEventListener("touchstart", handleTouchStart, { passive: false });
+                document.removeEventListener("touchmove", handleTouchMove, { passive: false });
+                document.removeEventListener("touchend", handleTouchEnd, { passive: false });
             } catch (e) {
-                try { document.removeEventListener("touchstart", handleTouchStart); } catch (er) { }
+                try {
+                    document.removeEventListener("touchstart", handleTouchStart);
+                    document.removeEventListener("touchmove", handleTouchMove);
+                    document.removeEventListener("touchend", handleTouchEnd);
+                } catch (er) { }
             }
             if (tapTarget) tapTarget.style.pointerEvents = 'none';
             if (nextButton) nextButton.style.display = "block";
@@ -299,6 +311,36 @@ function recordTapEvent(touch, ts, isInside) {
     }
 }
 
+function handleTouchMove(e) {
+    if (!taskActive) return;
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    const now = Date.now();
+    recordTrajectoryPoint(touch, now, 'move');
+}
+
+function handleTouchEnd(e) {
+    if (!taskActive) return;
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    const now = Date.now();
+    recordTrajectoryPoint(touch, now, 'end');
+}
+
+function recordTrajectoryPoint(touch, ts, type) {
+    if (!taskActive) return;
+    const pt = {
+        t: ts || Date.now(),
+        x: touch.pageX,
+        y: touch.pageY,
+        type: type,
+        force: (typeof touch.force === 'number') ? touch.force : null,
+        radiusX: (typeof touch.radiusX === 'number') ? touch.radiusX : null,
+        radiusY: (typeof touch.radiusY === 'number') ? touch.radiusY : null
+    };
+    tapTrajectory.push(pt);
+}
+
 // ---------- Persist raw taps ----------
 async function saveTapTrial(startTime, endTime) {
     const totalTaps = tapEvents.length;
@@ -330,7 +372,8 @@ async function saveTapTrial(startTime, endTime) {
         target_y: tY,
         target_radius: tR,
 
-        taps: tapEvents
+        taps: tapEvents,
+        trajectory: tapTrajectory
     };
 
     try {
