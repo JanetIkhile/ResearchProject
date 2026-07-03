@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import warnings
 warnings.filterwarnings('ignore') # Clean up plotting logs
-from scipy.signal import savgol_filter, welch
+from scipy.signal import savgol_filter, welch, butter, filtfilt, hilbert
 from scipy.interpolate import interp1d
 
 # Define a fallback wrapper for NumPy 2.0+ compatibility (trapz was removed in 2.0+)
@@ -47,10 +47,11 @@ def extract_tremor(times, coords):
     """
     Interpolates touch coordinates into a uniform timestamp geometry and applies Welch's PSD 
     to robustly calculate physiological tremor characteristics inside a 3-8 Hz target band.
+    Also extracts peak-to-peak amplitude (px, cm) and maps to MDS-UPDRS clinical grades.
     """
     # Use 2-3 seconds as minimum duration threshold (2000 ms)
     if len(times) < 10 or (times[-1] - times[0]) < 2000:
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
         
     # Target uniform grid: 100 Hz (10ms steps). 
     # We hardcode 100 Hz because it satisfies the Nyquist theorem for frequencies up to 50 Hz, 
@@ -58,7 +59,16 @@ def extract_tremor(times, coords):
     target_fs = 100.0
     uniform_times = np.arange(times[0], times[-1], 10.0)
     
-    # Calculate euclidean magnitude from center immediately
+    # Interpolate X and Y coordinates separately onto the uniform grid for 2D analysis
+    f_x = interp1d(times, coords[:, 0], kind='linear', fill_value='extrapolate')
+    f_y = interp1d(times, coords[:, 1], kind='linear', fill_value='extrapolate')
+    uniform_x = f_x(uniform_times)
+    uniform_y = f_y(uniform_times)
+    
+    uniform_x_zero = uniform_x - np.mean(uniform_x)
+    uniform_y_zero = uniform_y - np.mean(uniform_y)
+    
+    # Calculate euclidean magnitude from center immediately (legacy compatibility)
     centroid = np.mean(coords, axis=0)
     deviations = np.linalg.norm(coords - centroid, axis=1)
     
@@ -76,7 +86,7 @@ def extract_tremor(times, coords):
     band_mask = (f >= 3.0) & (f <= 8.0)
     
     if not np.any(band_mask):
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
         
     f_band = f[band_mask]
     Pxx_band = Pxx[band_mask]
@@ -91,18 +101,64 @@ def extract_tremor(times, coords):
     # Clinical amplitude is best estimated as the RMS amplitude in the tremor band.
     # This is calculated as the square root of the total area under the PSD curve (total band power).
     total_band_power = np_trapezoid(Pxx_band, f_band)
-    tremor_amp = np.sqrt(total_band_power)
+    tremor_amp_rms = np.sqrt(total_band_power)
     
-    return tremor_freq, tremor_power, tremor_amp
+    # Peak-to-peak amplitude (px) in the 3-8 Hz band via bandpass filtering X and Y coordinate signals
+    try:
+        if len(uniform_x) > 15:
+            nyq = 0.5 * target_fs
+            low = 3.0 / nyq
+            high = 8.0 / nyq
+            b, a = butter(2, [low, high], btype='band')
+            filtered_x = filtfilt(b, a, uniform_x_zero)
+            filtered_y = filtfilt(b, a, uniform_y_zero)
+            
+            # Combine 2D filtered signals to calculate the 2D magnitude of the tremor
+            filtered_mag = np.sqrt(filtered_x**2 + filtered_y**2)
+            
+            # Trim the first and last 0.5s of the filtered signal to eliminate edge transients
+            trim_boundary = int(target_fs * 0.5)
+            if len(filtered_mag) > 2 * trim_boundary:
+                trimmed_mag = filtered_mag[trim_boundary:-trim_boundary]
+            else:
+                trimmed_mag = filtered_mag
+            
+            # The peak-to-peak amplitude is twice the peak magnitude envelope
+            tremor_amp_peak_px = np.max(trimmed_mag) * 2.0
+        else:
+            tremor_amp_peak_px = tremor_amp_rms * 2.828
+    except Exception:
+        tremor_amp_peak_px = tremor_amp_rms * 2.828
+        
+    # Convert pixels to centimeters using standard CSS layout definition: 96 px = 2.54 cm
+    # 1 px = 0.02646 cm
+    tremor_amp_peak_cm = tremor_amp_peak_px * (2.54 / 96.0) if pd.notna(tremor_amp_peak_px) else np.nan
+    
+    # MDS-UPDRS Postural Tremor clinical grade mapping
+    if pd.isna(tremor_amp_peak_cm):
+        tremor_clinical_grade = np.nan
+    elif tremor_amp_peak_cm == 0 or tremor_amp_peak_px < 1.0: # threshold for no tremor
+        tremor_clinical_grade = 0.0
+    elif tremor_amp_peak_cm < 1.0:
+        tremor_clinical_grade = 1.0  # slight (< 1 cm)
+    elif tremor_amp_peak_cm < 3.0:
+        tremor_clinical_grade = 2.0  # mild (1-3 cm)
+    elif tremor_amp_peak_cm < 10.0:
+        tremor_clinical_grade = 3.0  # moderate (3-10 cm)
+    else:
+        tremor_clinical_grade = 4.0  # severe (>= 10 cm)
+    
+    return tremor_freq, tremor_power, tremor_amp_rms, tremor_amp_peak_px, tremor_amp_peak_cm, tremor_clinical_grade
 
 def extract_kinetic_tremor(times, deviations):
     """
     Interpolates orthogonal deviations into a uniform timestamp geometry and applies Welch's PSD 
     to robustly calculate physiological kinetic tremor characteristics inside a 3-8 Hz target band.
+    Also extracts peak-to-peak amplitude (px, cm) and maps to MDS-UPDRS clinical severity grades.
     """
     # Use 1 second as minimum duration threshold (1000 ms) for drag movements
     if len(times) < 10 or (times[-1] - times[0]) < 1000:
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
         
     target_fs = 100.0
     uniform_times = np.arange(times[0], times[-1], 10.0)
@@ -112,16 +168,16 @@ def extract_kinetic_tremor(times, deviations):
     uniform_deviations = f_interp(uniform_times)
     
     # Remove DC offset (zero mean)
-    uniform_deviations -= np.mean(uniform_deviations)
+    uniform_deviations_zero = uniform_deviations - np.mean(uniform_deviations)
     
     # Calculate PSD using Welch's method
-    f, Pxx = welch(uniform_deviations, fs=target_fs, nperseg=min(len(uniform_deviations), int(target_fs * 1.5)))
+    f, Pxx = welch(uniform_deviations_zero, fs=target_fs, nperseg=min(len(uniform_deviations_zero), int(target_fs * 1.5)))
     
     # Isolate clinical Tremor Band (Postural + Resting Action typically 3-8 Hz)
     band_mask = (f >= 3.0) & (f <= 8.0)
     
     if not np.any(band_mask):
-        return np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
         
     f_band = f[band_mask]
     Pxx_band = Pxx[band_mask]
@@ -135,9 +191,52 @@ def extract_kinetic_tremor(times, deviations):
     
     # Clinical amplitude is best estimated as the RMS amplitude in the tremor band.
     total_band_power = np_trapezoid(Pxx_band, f_band)
-    tremor_amp = np.sqrt(total_band_power)
+    tremor_amp_rms = np.sqrt(total_band_power)
     
-    return tremor_freq, tremor_power, tremor_amp
+    # Peak-to-peak amplitude (px) in the 3-8 Hz band via bandpass filtering and Hilbert envelope
+    try:
+        if len(uniform_deviations_zero) > 15:
+            nyq = 0.5 * target_fs
+            low = 3.0 / nyq
+            high = 8.0 / nyq
+            b, a = butter(2, [low, high], btype='band')
+            filtered_dev = filtfilt(b, a, uniform_deviations_zero)
+            
+            # Trim the first and last 0.5s of the filtered signal to eliminate edge transients
+            trim_boundary = int(target_fs * 0.5)
+            if len(filtered_dev) > 2 * trim_boundary:
+                trimmed_dev = filtered_dev[trim_boundary:-trim_boundary]
+            else:
+                trimmed_dev = filtered_dev
+                
+            # Hilbert envelope peak
+            analytic_sig = hilbert(trimmed_dev)
+            env = np.abs(analytic_sig)
+            tremor_amp_peak_px = np.max(env) * 2.0
+        else:
+            tremor_amp_peak_px = tremor_amp_rms * 2.828
+    except Exception:
+        tremor_amp_peak_px = tremor_amp_rms * 2.828
+        
+    # Convert pixels to centimeters using standard CSS layout definition: 96 px = 2.54 cm
+    # 1 px = 0.02646 cm
+    tremor_amp_peak_cm = tremor_amp_peak_px * (2.54 / 96.0) if pd.notna(tremor_amp_peak_px) else np.nan
+    
+    # MDS-UPDRS Kinetic Tremor clinical grade mapping
+    if pd.isna(tremor_amp_peak_cm):
+        tremor_clinical_grade = np.nan
+    elif tremor_amp_peak_cm == 0 or tremor_amp_peak_px < 1.0: # threshold for no tremor
+        tremor_clinical_grade = 0.0
+    elif tremor_amp_peak_cm < 1.0:
+        tremor_clinical_grade = 1.0  # slight (< 1 cm)
+    elif tremor_amp_peak_cm < 3.0:
+        tremor_clinical_grade = 2.0  # mild (1-3 cm)
+    elif tremor_amp_peak_cm < 10.0:
+        tremor_clinical_grade = 3.0  # moderate (3-10 cm)
+    else:
+        tremor_clinical_grade = 4.0  # severe (>= 10 cm)
+        
+    return tremor_freq, tremor_power, tremor_amp_rms, tremor_amp_peak_px, tremor_amp_peak_cm, tremor_clinical_grade
 
 def extract_features_from_trial(row):
     """
@@ -210,7 +309,22 @@ def extract_features_from_trial(row):
                 
                 # Extract kinetic tremor from signed orthogonal deviations
                 signed_dists = signed_cross / task_axis_dist
-                k_freq, k_power, k_amp = extract_kinetic_tremor(times, signed_dists)
+                k_freq, k_power, k_amp, k_amp_peak_px, k_amp_peak_cm, k_clinical_grade = extract_kinetic_tremor(times, signed_dists)
+                
+                # Amplitude Decrement of deviations along the task path
+                abs_dists = np.abs(signed_dists)
+                if len(abs_dists) > 1:
+                    drag_amplitude_slope = np.polyfit(np.arange(len(abs_dists)), abs_dists, 1)[0]
+                else:
+                    drag_amplitude_slope = 0.0
+                
+                half_len = len(abs_dists) // 2
+                if half_len > 0:
+                    first_half_mean = np.mean(abs_dists[:half_len])
+                    second_half_mean = np.mean(abs_dists[half_len:])
+                    drag_amplitude_decrement_ratio = second_half_mean / first_half_mean if first_half_mean > 0 else np.nan
+                else:
+                    drag_amplitude_decrement_ratio = np.nan
             else:
                 movement_variability = np.nan
                 max_deviation = np.nan
@@ -219,6 +333,11 @@ def extract_features_from_trial(row):
                 k_freq = np.nan
                 k_power = np.nan
                 k_amp = np.nan
+                k_amp_peak_px = np.nan
+                k_amp_peak_cm = np.nan
+                k_clinical_grade = np.nan
+                drag_amplitude_slope = np.nan
+                drag_amplitude_decrement_ratio = np.nan
         else:
             movement_variability = np.nan
             max_deviation = np.nan
@@ -227,14 +346,51 @@ def extract_features_from_trial(row):
             k_freq = np.nan
             k_power = np.nan
             k_amp = np.nan
+            k_amp_peak_px = np.nan
+            k_amp_peak_cm = np.nan
+            k_clinical_grade = np.nan
             fitts_law_id = np.nan
             fitts_law_throughput = np.nan
+            drag_amplitude_slope = np.nan
+            drag_amplitude_decrement_ratio = np.nan
             
-        # Velocity / Pauses
+        # Velocity / Pauses / Hesitations / Halts
         mean_speed = np.mean(vel) if len(vel) > 0 else np.nan
         median_speed = np.median(vel) if len(vel) > 0 else np.nan
         peak_speed = np.max(vel) if len(vel) > 0 else np.nan
         
+        # Hesitations (velocity drops below 30% of mean speed for >= 100ms)
+        hesitations_count = 0
+        hesitations_duration = 0.0
+        if len(vel) > 0 and pd.notna(mean_speed) and mean_speed > 0:
+            hes_threshold = 0.3 * mean_speed
+            hes_mask = vel < hes_threshold
+            padded_hes = np.concatenate(([False], hes_mask, [False]))
+            diffs_hes = np.diff(padded_hes.astype(int))
+            starts_hes = np.where(diffs_hes == 1)[0]
+            ends_hes = np.where(diffs_hes == -1)[0]
+            for s, e in zip(starts_hes, ends_hes):
+                duration = times[e] - times[s]
+                if duration >= 100:
+                    hesitations_count += 1
+                    hesitations_duration += duration
+                    
+        # Halts (movement stops: velocity < 10 px/s for >= 250ms)
+        halts_count = 0
+        halts_duration = 0.0
+        if len(vel) > 0:
+            halt_threshold = 10.0
+            halt_mask = vel < halt_threshold
+            padded_halt = np.concatenate(([False], halt_mask, [False]))
+            diffs_halt = np.diff(padded_halt.astype(int))
+            starts_halt = np.where(diffs_halt == 1)[0]
+            ends_halt = np.where(diffs_halt == -1)[0]
+            for s, e in zip(starts_halt, ends_halt):
+                duration = times[e] - times[s]
+                if duration >= 250:
+                    halts_count += 1
+                    halts_duration += duration
+
         pause_threshold = 10.0 # arbitrary px/s threshold for halt
         pauses = vel < pause_threshold
         pause_count = np.sum(np.diff(pauses.astype(int)) == 1)
@@ -289,6 +445,11 @@ def extract_features_from_trial(row):
             'kinetic_tremor_frequency_hz': k_freq,
             'kinetic_tremor_power': k_power,
             'kinetic_tremor_amplitude': k_amp,
+            'drag_tremor_amplitude_peak_px': k_amp_peak_px,
+            'drag_tremor_amplitude_peak_cm': k_amp_peak_cm,
+            'drag_tremor_clinical_grade': k_clinical_grade,
+            'drag_amplitude_slope': drag_amplitude_slope,
+            'drag_amplitude_decrement_ratio': drag_amplitude_decrement_ratio,
             'initial_targeting_error': initial_targeting_error,
             'endpoint_deviation_error': endpoint_deviation_error,
             'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
@@ -296,6 +457,10 @@ def extract_features_from_trial(row):
             'mean_speed': mean_speed,
             'median_speed': median_speed,
             'peak_speed_ms': peak_speed,
+            'drag_hesitations_count': hesitations_count,
+            'drag_hesitations_duration_ms': hesitations_duration,
+            'drag_halts_count': halts_count,
+            'drag_halts_duration_ms': halts_duration,
             'mean_acceleration': mean_accel,
             'mean_abs_jerk': mean_abs_jerk,
             'peak_jerk': peak_jerk,
@@ -339,6 +504,71 @@ def extract_features_from_trial(row):
             spatial_sd = np.std(dists)
         else:
             spatial_sd = np.nan
+
+        # 1. Amplitude (vertical coordinates difference between successive taps)
+        amplitudes = []
+        for i in range(1, len(taps)):
+            t_curr = taps[i]
+            t_prev = taps[i-1]
+            if 'amplitude' in t_curr and t_curr['amplitude'] is not None:
+                amplitudes.append(t_curr['amplitude'])
+            elif 'y' in t_curr and 'y' in t_prev:
+                amplitudes.append(abs(t_curr['y'] - t_prev['y']))
+            else:
+                amplitudes.append(np.linalg.norm(np.array([t_curr.get('x', 0), t_curr.get('y', 0)]) - 
+                                                np.array([t_prev.get('x', 0), t_prev.get('y', 0)])))
+        
+        amplitudes = np.array(amplitudes)
+        mean_amplitude = np.mean(amplitudes) if len(amplitudes) > 0 else np.nan
+
+        # 2. Decrementing Amplitude
+        # Amplitude slope (change in amplitude per tap index)
+        if len(amplitudes) > 1:
+            amplitude_slope = np.polyfit(np.arange(len(amplitudes)), amplitudes, 1)[0]
+        else:
+            amplitude_slope = 0.0
+
+        # Amplitude decrement ratio (ratio of mean of last 3 taps to mean of first 3 taps)
+        if len(amplitudes) >= 6:
+            first_3 = np.mean(amplitudes[:3])
+            last_3 = np.mean(amplitudes[-3:])
+            amplitude_decrement_ratio = last_3 / first_3 if first_3 > 0 else np.nan
+        elif len(amplitudes) >= 2:
+            amplitude_decrement_ratio = amplitudes[-1] / amplitudes[0] if amplitudes[0] > 0 else np.nan
+        else:
+            amplitude_decrement_ratio = np.nan
+
+        # 3. Hesitations & Halts
+        hesitations = 0
+        hesitations_duration = 0.0
+        halts = 0
+        halts_duration = 0.0
+        if len(intertap) > 0 and pd.notna(mean_intertap):
+            for iti in intertap:
+                if iti > 2.0 * mean_intertap or iti > 1000.0:
+                    halts += 1
+                    halts_duration += iti
+                elif iti > 1.5 * mean_intertap or iti > 500.0:
+                    hesitations += 1
+                    hesitations_duration += iti
+
+        # 4. Double Taps (Sequence violations)
+        double_taps = 0
+        y_coords = [t['y'] for t in taps if 'y' in t]
+        if y_coords:
+            y_min, y_max = min(y_coords), max(y_coords)
+            y_mid = (y_min + y_max) / 2
+            if (y_max - y_min) > 100:
+                for i in range(1, len(taps)):
+                    y1 = taps[i-1]['y']
+                    y2 = taps[i]['y']
+                    is_top1 = y1 < y_mid
+                    is_top2 = y2 < y_mid
+                    if is_top1 == is_top2:
+                        double_taps += 1
+
+        # 5. Interruptions
+        interruptions = halts + double_taps
             
         return pd.Series({
             'tap_count': tap_count,
@@ -347,9 +577,17 @@ def extract_features_from_trial(row):
             'cv_intertap_interval': cv_intertap,
             'tap_spatial_sd': spatial_sd,
             'tap_accuracy': tap_accuracy,
-            'initiation_delay': row.get('initiation_delay')
+            'initiation_delay': row.get('initiation_delay'),
+            'mean_amplitude_px': mean_amplitude,
+            'amplitude_slope': amplitude_slope,
+            'amplitude_decrement_ratio': amplitude_decrement_ratio,
+            'hesitations_count': hesitations,
+            'hesitations_duration_ms': hesitations_duration,
+            'halts_count': halts,
+            'halts_duration_ms': halts_duration,
+            'double_taps_count': double_taps,
+            'interruptions_count': interruptions
         })
-        
     elif task == 'hold':
         events = row.get('hold_events', [])
         if not isinstance(events, list) or len(events) < 2:
@@ -371,7 +609,7 @@ def extract_features_from_trial(row):
         spatial_sd = np.std(np.linalg.norm(coords - centroid, axis=1))
         
         # Spectral Extraction
-        tremor_freq, tremor_power, tremor_amp = extract_tremor(times, coords)
+        tremor_freq, tremor_power, tremor_amp, tremor_amp_peak_px, tremor_amp_peak_cm, tremor_clinical_grade = extract_tremor(times, coords)
         
         # Pressure (Force) Extraction
         forces = [pt.get('force') for pt in events if 'force' in pt and pt.get('force') is not None]
@@ -388,6 +626,9 @@ def extract_features_from_trial(row):
             'hold_tremor_frequency_hz': tremor_freq,
             'hold_tremor_power': tremor_power,
             'hold_tremor_amplitude': tremor_amp,
+            'hold_tremor_amplitude_peak_px': tremor_amp_peak_px,
+            'hold_tremor_amplitude_peak_cm': tremor_amp_peak_cm,
+            'hold_tremor_clinical_grade': tremor_clinical_grade,
             'hold_mean_force': np.mean(forces) if force_valid else np.nan,
             'hold_max_force': np.max(forces) if force_valid else np.nan,
             'hold_force_variability': np.std(forces) if force_valid else np.nan,

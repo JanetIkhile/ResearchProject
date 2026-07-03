@@ -22,7 +22,9 @@ let savingInProgress = false;
 
 let trialStartTime = null;
 
-let tapTarget = null;
+let topTarget = null;
+let bottomTarget = null;
+let expectedTarget = "top"; // Alternates: "top" or "bottom"
 let nextButton = null;
 let tapInstruction = null;
 let countdown = null;
@@ -31,15 +33,39 @@ let pageLoadTime = Date.now();
 let lastTrialEndTime = pageLoadTime;
 let initiationDelay = null;
 
-function isTouchInsideTarget(touch) {
-    if (!tapTarget) return false;
-    const rect = tapTarget.getBoundingClientRect();
+function isTouchInsideTarget(touch, targetEl) {
+    if (!targetEl) return false;
+    const rect = targetEl.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     const dx = touch.pageX - centerX;
     const dy = touch.pageY - centerY;
     const radius = Math.min(rect.width, rect.height) / 2;
     return (dx * dx + dy * dy) <= (radius * radius);
+}
+
+function toggleExpectedTarget() {
+    if (expectedTarget === "top") {
+        expectedTarget = "bottom";
+        if (topTarget) {
+            topTarget.classList.remove("active");
+            topTarget.classList.add("inactive");
+        }
+        if (bottomTarget) {
+            bottomTarget.classList.remove("inactive");
+            bottomTarget.classList.add("active");
+        }
+    } else {
+        expectedTarget = "top";
+        if (bottomTarget) {
+            bottomTarget.classList.remove("active");
+            bottomTarget.classList.add("inactive");
+        }
+        if (topTarget) {
+            topTarget.classList.remove("inactive");
+            topTarget.classList.add("active");
+        }
+    }
 }
 
 // attach handler reference so we can remove it later
@@ -59,31 +85,49 @@ function handleTouchStart(e) {
     e.preventDefault();
     const touch = e.changedTouches[0];
     const now = Date.now();
-    const isInside = isTouchInsideTarget(touch);
 
-    // If we're BETWEEN trials, a touch starts the trial ONLY if it hits the target
+    const isInsideTop = isTouchInsideTarget(touch, topTarget);
+    const isInsideBottom = isTouchInsideTarget(touch, bottomTarget);
+
+    // If we're BETWEEN trials, a touch starts the trial ONLY if it hits one of the targets
     if (!taskActive && isBetweenTrials) {
-        if (!isInside) return; // Must hit target to start
+        if (!isInsideTop && !isInsideBottom) return; // Must hit target to start
         if (trialNumber >= TRIAL_LIMIT) return;
 
         // prevent race double-starts
         if (taskActive) return;
 
-        const now = Date.now();
-
         initiationDelay = now - lastTrialEndTime;
-
         trialNumber += 1;
+
+        // Set initial expected target to whichever they hit
+        if (isInsideTop) {
+            expectedTarget = "top";
+        } else {
+            expectedTarget = "bottom";
+        }
+
         startTapTrial(now);
-        recordTapEvent(touch, now, isInside);
+        recordTapEvent(touch, now, expectedTarget, true);
         recordTrajectoryPoint(touch, now, 'start');
+        
+        toggleExpectedTarget();
         return;
     }
 
-    // If a trial is active, record taps normally
+    // If a trial is active, record taps based on expected alternation
     if (taskActive) {
-        recordTapEvent(touch, now, isInside);
+        let isHit = false;
+        if (expectedTarget === "top" && isInsideTop) {
+            isHit = true;
+        } else if (expectedTarget === "bottom" && isInsideBottom) {
+            isHit = true;
+        }
+
+        recordTapEvent(touch, now, expectedTarget, isHit);
         recordTrajectoryPoint(touch, now, 'start');
+        
+        toggleExpectedTarget();
     }
 }
 
@@ -130,19 +174,31 @@ function handleTouchStart(e) {
     }
 
     // DOM elements
-    tapTarget = document.getElementById("tapTarget");
+    topTarget = document.getElementById("topTarget");
+    bottomTarget = document.getElementById("bottomTarget");
     nextButton = document.getElementById("nextTaskButton");
     tapInstruction = document.getElementById("tapInstruction");
     countdown = document.getElementById("countdownTimer");
 
-    if (!tapTarget) {
-        console.error("tapTarget element not found in DOM.");
+    if (!topTarget || !bottomTarget) {
+        console.error("Target elements topTarget/bottomTarget not found in DOM.");
         return;
     }
 
-    tapTarget.style.touchAction = 'none';
-    if (tapInstruction) tapInstruction.innerHTML = 'Tap the blue circle as fast as you can<br>for <span class="timer-badge">10</span> seconds!';
-    if (tapTarget) tapTarget.style.backgroundColor = "blue";
+    topTarget.style.touchAction = 'none';
+    bottomTarget.style.touchAction = 'none';
+    
+    if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast and as big as you can!';
+    
+    expectedTarget = "top";
+    if (topTarget) {
+        topTarget.classList.remove("inactive");
+        topTarget.classList.add("active");
+    }
+    if (bottomTarget) {
+        bottomTarget.classList.remove("active");
+        bottomTarget.classList.add("inactive");
+    }
 
     document.addEventListener("touchstart", handleTouchStart, { passive: false });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
@@ -164,10 +220,11 @@ function startTapTrial(startTs) {
     const startTime = startTs || Date.now();
     trialStartTime = startTime;
 
-    // Do NOT change instruction text or color to prevent distraction
-    if (tapTarget) {
-        tapTarget.style.backgroundColor = "blue";
-        tapTarget.style.pointerEvents = 'auto'; // ensure pointer enabled during trial
+    if (topTarget && bottomTarget) {
+        topTarget.style.pointerEvents = 'auto';
+        bottomTarget.style.pointerEvents = 'auto';
+        topTarget.style.backgroundColor = "";
+        bottomTarget.style.backgroundColor = "";
     }
 
     // countdown UI
@@ -178,7 +235,7 @@ function startTapTrial(startTs) {
     timerInterval = setInterval(() => {
         timeLeft--;
         if (tapInstruction && timeLeft > 0) {
-            tapInstruction.innerHTML = `Tap the blue circle as fast as you can<br>for <span class="timer-badge">${timeLeft}</span> seconds!`;
+            tapInstruction.innerHTML = `Tap the highlighted circles alternatively!<br>Remaining: <span class="timer-badge">${timeLeft}</span> seconds!`;
         }
         if (timeLeft <= 0 && timerInterval) {
             clearInterval(timerInterval);
@@ -199,9 +256,8 @@ function startTapTrial(startTs) {
             tapInstruction.innerText = "Stop tapping";
         }
 
-        if (tapTarget) {
-            tapTarget.style.backgroundColor = "green";
-        }
+        if (topTarget) topTarget.style.backgroundColor = "green";
+        if (bottomTarget) bottomTarget.style.backgroundColor = "green";
 
         if (timerInterval) {
             clearInterval(timerInterval);
@@ -210,19 +266,16 @@ function startTapTrial(startTs) {
         if (countdown) countdown.innerText = "";
 
         // Block any touch-based starts now (immediate)
-        if (tapTarget) {
-            tapTarget.style.pointerEvents = 'none';
-        }
+        if (topTarget) topTarget.style.pointerEvents = 'none';
+        if (bottomTarget) bottomTarget.style.pointerEvents = 'none';
+        
         // mark save in progress
         savingInProgress = true;
 
-        // Save raw behavior only (use trialStartTime as start)
+        // Save raw behavior only
         try {
             const endTime = Date.now();
-
-            // 🔥 update last trial end time
             lastTrialEndTime = endTime;
-
             await saveTapTrial(trialStartTime, endTime);
         } finally {
             savingInProgress = false;
@@ -248,25 +301,35 @@ function startTapTrial(startTs) {
                     document.removeEventListener("touchstart", handleTouchStart);
                     document.removeEventListener("touchmove", handleTouchMove);
                     document.removeEventListener("touchend", handleTouchEnd);
-                } catch (er) { }
+                } catch (er) {}
             }
-            if (tapTarget) tapTarget.style.pointerEvents = 'none';
+            if (topTarget) topTarget.style.pointerEvents = 'none';
+            if (bottomTarget) bottomTarget.style.pointerEvents = 'none';
             if (nextButton) nextButton.style.display = "block";
             document.getElementById("completionBox").style.display = "flex";
             nextButton.style.display = "block";
-            tapInstruction.style.display = "none"; if (countdown) countdown.style.display = "none";
+            tapInstruction.style.display = "none"; 
+            if (countdown) countdown.style.display = "none";
         } else {
             // non-final: wait cooldown then re-enable start
             if (tapInstruction) tapInstruction.innerText = "Stop tapping";
-            if (tapTarget) tapTarget.style.backgroundColor = "green";
-
+            
             setTimeout(() => {
                 isBetweenTrials = true;
-                if (tapTarget) {
-                    tapTarget.style.pointerEvents = 'auto'; // re-enable touches
-                    tapTarget.style.backgroundColor = "blue";
+                if (topTarget) {
+                    topTarget.style.pointerEvents = 'auto';
+                    topTarget.style.backgroundColor = "";
+                    topTarget.classList.remove("inactive");
+                    topTarget.classList.add("active");
                 }
-                if (tapInstruction) tapInstruction.innerHTML = 'Tap the blue circle as fast as you can<br>for <span class="timer-badge">10</span> seconds!';
+                if (bottomTarget) {
+                    bottomTarget.style.pointerEvents = 'auto';
+                    bottomTarget.style.backgroundColor = "";
+                    bottomTarget.classList.remove("active");
+                    bottomTarget.classList.add("inactive");
+                }
+                expectedTarget = "top";
+                if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast and as big as you can!';
                 if (countdown) countdown.style.display = "none";
             }, INTER_TRIAL_COOLDOWN);
         }
@@ -288,26 +351,50 @@ function clearTimers() {
 }
 
 // ---------- record a tap only while a trial is active ----------
-function recordTapEvent(touch, ts, isInside) {
-    if (!taskActive) return; // only capture taps during active trial
+function recordTapEvent(touch, ts, expectedTarget, isHit) {
+    if (!taskActive) return;
+
+    // Calculate vertical amplitude if there's a previous tap
+    let amplitude = null;
+    if (tapEvents.length > 0) {
+        const lastTap = tapEvents[tapEvents.length - 1];
+        amplitude = Math.abs(touch.pageY - lastTap.y);
+    }
+
+    const targetEl = (expectedTarget === "top") ? topTarget : bottomTarget;
+    let expectedX = null;
+    let expectedY = null;
+    let expectedR = null;
+    if (targetEl) {
+        const rect = targetEl.getBoundingClientRect();
+        expectedX = rect.left + rect.width / 2;
+        expectedY = rect.top + rect.height / 2;
+        expectedR = rect.width / 2;
+    }
 
     const evt = {
         t: ts || Date.now(),
         x: touch.pageX,
         y: touch.pageY,
-        force: (typeof touch.force === "number") ? touch.force : null,
-        is_inside_target: isInside
+        expected_target: expectedTarget,
+        target_x: expectedX,
+        target_y: expectedY,
+        target_radius: expectedR,
+        amplitude: amplitude,
+        is_inside_target: isHit,
+        force: (typeof touch.force === "number") ? touch.force : null
     };
     tapEvents.push(evt);
 
-    // small visual feedback
-    if (tapTarget) {
-        tapTarget.style.transform = "translateX(-50%) scale(0.95)";
+    // visual feedback on touched target (top or bottom)
+    const touchedEl = isTouchInsideTarget(touch, topTarget) ? topTarget : (isTouchInsideTarget(touch, bottomTarget) ? bottomTarget : null);
+    if (touchedEl) {
+        touchedEl.style.transform = "translateX(-50%) scale(0.9)";
         setTimeout(() => {
-            if (tapTarget) {
-                tapTarget.style.transform = "translateX(-50%) scale(1)";
+            if (touchedEl) {
+                touchedEl.style.transform = "translateX(-50%) scale(1)";
             }
-        }, 100);
+        }, 80);
     }
 }
 
@@ -345,9 +432,10 @@ function recordTrajectoryPoint(touch, ts, type) {
 async function saveTapTrial(startTime, endTime) {
     const totalTaps = tapEvents.length;
     
+    // Store top target in target_x, target_y, target_radius for backward schema compatibility
     let tX = null, tY = null, tR = null;
-    if (tapTarget) {
-        const rect = tapTarget.getBoundingClientRect();
+    if (topTarget) {
+        const rect = topTarget.getBoundingClientRect();
         tX = rect.left + rect.width / 2;
         tY = rect.top + rect.height / 2;
         tR = rect.width / 2;
@@ -379,7 +467,7 @@ async function saveTapTrial(startTime, endTime) {
     try {
         const { error } = await supabase.from("trial_results").insert(payload);
         if (error) {
-            console.error("Failed to save tap trial:", error);
+            print("Failed to save tap trial to DB:", error);
         } else {
             console.log(`Tap trial saved: ${trialNumber} events:`, totalTaps);
         }

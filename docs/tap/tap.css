@@ -61,19 +61,36 @@ body {
     margin-bottom: 1rem;
 }
 
-#tapTarget {
+.tap-target {
     position: fixed;
-    top: clamp(180px, 28vh, 320px);
     left: 50%;
     transform: translateX(-50%);
 
-    width: clamp(150px, 25vw, 250px);
-    height: clamp(150px, 25vw, 250px);
+    width: 120px; /* Radius 60px */
+    height: 120px; /* Radius 60px */
 
-    background-color: blue;
     border-radius: 50%;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
     touch-action: none;
+    transition: background-color 0.1s ease, opacity 0.1s ease, transform 0.05s ease;
+}
+
+#topTarget {
+    top: 200px;
+}
+
+#bottomTarget {
+    top: 420px;
+}
+
+.tap-target.active {
+    background-color: blue;
+    opacity: 1.0;
+}
+
+.tap-target.inactive {
+    background-color: #94a3b8; /* Slate gray */
+    opacity: 0.5;
 }
 
 .modal {
