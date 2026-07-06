@@ -669,7 +669,7 @@ def extract_features_from_trial(row):
                                                 np.array([t_prev.get('x', 0), t_prev.get('y', 0)])))
         
         amplitudes = np.array(amplitudes)
-        mean_amplitude = np.mean(amplitudes) if len(amplitudes) > 0 else np.nan
+        median_amplitude = np.median(amplitudes) if len(amplitudes) > 0 else np.nan
 
         # 2. Decrementing Amplitude
         # Amplitude slope (change in amplitude per tap index)
@@ -743,8 +743,8 @@ def extract_features_from_trial(row):
             'tap_spatial_sd': spatial_sd,
             'tap_accuracy': tap_accuracy,
             'initiation_delay': row.get('initiation_delay'),
-            'mean_amplitude_px': mean_amplitude,
-            'mean_amplitude_mm': mean_amplitude * (25.4 / 96.0) if pd.notna(mean_amplitude) else np.nan,
+            'median_amplitude_px': median_amplitude,
+            'median_amplitude_mm': median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan,
             'amplitude_slope': amplitude_slope,
             'amplitude_slope_mm': amplitude_slope * (25.4 / 96.0) if pd.notna(amplitude_slope) else np.nan,
             'amplitude_decrement_ratio': amplitude_decrement_ratio,
@@ -760,7 +760,7 @@ def extract_features_from_trial(row):
             'tap_tremor_amplitude_peak_px': k_amp_peak_px,
             'tap_tremor_amplitude_peak_mm': k_amp_peak_px * (25.4 / 96.0) if pd.notna(k_amp_peak_px) else np.nan,
             'tap_tremor_clinical_grade': k_clinical_grade,
-            'tap_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, double_taps, hesitations, mean_amplitude * (25.4 / 96.0) if pd.notna(mean_amplitude) else np.nan)
+            'tap_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, double_taps, hesitations, median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan)
         })
     elif task == 'hold':
         events = row.get('hold_events', [])
@@ -862,7 +862,7 @@ def extract_features_from_trial(row):
         
         mean_interval = np.mean(cycle_intervals) if len(cycle_intervals) > 0 else np.nan
         cv_interval = (np.std(cycle_intervals) / mean_interval) if mean_interval > 0 else np.nan
-        mean_amplitude = np.mean(cycle_amplitudes) if len(cycle_amplitudes) > 0 else np.nan
+        median_amplitude = np.median(cycle_amplitudes) if len(cycle_amplitudes) > 0 else np.nan
         
         # Decrement
         if len(cycle_amplitudes) > 1:
@@ -899,8 +899,8 @@ def extract_features_from_trial(row):
             'pinch_frequency': freq,
             'mean_pinch_interval_ms': mean_interval,
             'cv_pinch_interval': cv_interval,
-            'mean_pinch_amplitude_px': mean_amplitude,
-            'mean_pinch_amplitude_mm': mean_amplitude * (25.4 / 96.0) if pd.notna(mean_amplitude) else np.nan,
+            'median_pinch_amplitude_px': median_amplitude,
+            'median_pinch_amplitude_mm': median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan,
             'pinch_amplitude_slope': amplitude_slope,
             'pinch_amplitude_slope_mm': amplitude_slope * (25.4 / 96.0) if pd.notna(amplitude_slope) else np.nan,
             'pinch_amplitude_decrement_ratio': amplitude_decrement_ratio,
@@ -909,7 +909,7 @@ def extract_features_from_trial(row):
             'pinch_halts_count': halts,
             'pinch_halts_duration_ms': halts_duration,
             'initiation_delay': row.get('initiation_delay', 0),
-            'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, 0, hesitations, mean_amplitude * (25.4 / 96.0) if pd.notna(mean_amplitude) else np.nan, is_pinch=True)
+            'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, 0, hesitations, median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan, is_pinch=True)
         })
         
     return pd.Series(dtype=float)

@@ -916,6 +916,9 @@ def plot_key_biomarkers_comparison(
     If participant_codes is None, all participants in the dataset are plotted.
     """
     import clinical_metrics
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
     if master_df is None:
         tdf, sdf, pdf = resolve_data(
             trials_df=trials_df,
@@ -933,83 +936,96 @@ def plot_key_biomarkers_comparison(
         print("No participants found to compare.")
         return
 
-    # Select the key metrics for comparison
-    key_cols = {
-        'tap_Overall_tap_frequency_median': 'Tapping Speed (Hz)',
-        'tap_Overall_cv_intertap_interval_median': 'Tapping Rhythm CV (Var)',
-        'tap_Overall_tap_spatial_sd_median': 'Tap Spatial SD (px)',
-        'hold_Overall_hold_drift_distance_median': 'Hold Drift Distance (px)',
-        'drag_Overall_path_efficiency_median': 'Drag Path Efficiency (0-1)',
-        'drag_Overall_kinetic_tremor_amplitude_median': 'Drag Tremor Amp (px)',
-        'drag_Overall_kinetic_tremor_frequency_hz_median': 'Drag Tremor Freq (Hz)'
+    # Define the custom metrics grouped by task type as requested
+    comparison_metrics = {
+        'Tap Task (Legacy Tapping)': {
+            'tap_Overall_tap_frequency_median': ('Speed (Hz)', 'Higher is faster'),
+            'tap_Overall_median_amplitude_mm_median': ('Median Amplitude (mm)', 'Lower is more precise (less spatial drift)'),
+            'tap_Overall_hesitations_count_median': ('Hesitations Count', 'Lower is more stable'),
+            'tap_Overall_halts_count_median': ('Halts (Freezes) Count', 'Lower is healthier'),
+            'tap_Overall_amplitude_decrement_ratio_median': ('Amplitude Decrement Ratio', 'Near 1.0 is stable, lower shows fatiguing')
+        },
+        'Drag Task (Kinematic)': {
+            'drag_Overall_mean_speed_median': ('Speed (px/s)', 'Higher is faster'),
+            'drag_Overall_kinetic_tremor_amplitude_median': ('Tremor Amplitude (px)', 'Lower is smoother'),
+            'drag_Overall_drag_hesitations_count_median': ('Hesitations Count', 'Lower is more stable'),
+            'drag_Overall_drag_halts_count_median': ('Halts (Freezes) Count', 'Lower is healthier'),
+            'drag_Overall_drag_amplitude_decrement_ratio_median': ('Amplitude Decrement Ratio', 'Near 1.0 is stable, lower shows fatiguing')
+        },
+        'Hold Task (Postural)': {
+            'hold_Overall_hold_drift_distance_median': ('Postural Drift (px)', 'Lower is more stable'),
+            'hold_Overall_hold_tremor_amplitude_median': ('Postural Tremor (px)', 'Lower is more stable')
+        }
     }
 
-    # Filter columns to only those present in master_df
-    available_keys = {k: v for k, v in key_cols.items() if k in master_df.columns}
-    if not available_keys:
-        print("None of the key comparison columns found in master_df.")
+    # Build the multi-index summary table grouped by Task and Metric
+    rows = []
+    for task_name, metrics_dict in comparison_metrics.items():
+        for col, (label, _) in metrics_dict.items():
+            if col in master_df.columns:
+                row_data = {'Task': task_name, 'Metric': label}
+                for p in participant_codes:
+                    p_row = master_df[master_df['participant_code'] == p]
+                    val = p_row[col].values[0] if not p_row.empty else np.nan
+                    row_data[p] = val
+                rows.append(row_data)
+                
+    comp_df = pd.DataFrame(rows)
+    if not comp_df.empty:
+        comp_df = comp_df.set_index(['Task', 'Metric'])
+        print("=== Summary Table: Participant Key Metrics ===")
+        from IPython.display import display
+        display(comp_df)
+    else:
+        print("None of the specified comparison columns found in master_df.")
         return
 
-    comp_df = master_df[master_df['participant_code'].isin(participant_codes)][['participant_code'] + list(available_keys.keys())].copy()
-    comp_df = comp_df.rename(columns=available_keys).set_index('participant_code').T
-
-    print("=== Summary Table: Participant Key Metrics ===")
-    from IPython.display import display
-    display(comp_df)
-
-    metrics_to_plot = [
-        ('Tapping Speed (Hz)', 'Speed (Hz)', 'Higher is faster'),
-        ('Tapping Rhythm CV (Var)', 'Coefficient of Var', 'Lower is more regular'),
-        ('Hold Drift Distance (px)', 'Distance (px)', 'Lower is more stable'),
-        ('Drag Tremor Amp (px)', 'Tremor Amplitude (px)', 'Lower is smoother')
-    ]
-
-    # Filter metrics to plot based on availability in the index
-    metrics_to_plot = [m for m in metrics_to_plot if m[0] in comp_df.index]
-
-    if not metrics_to_plot:
-        print("None of the metrics to plot are available in the data.")
-        return
-
-    num_metrics = len(metrics_to_plot)
-    cols = min(num_metrics, 2)
-    rows = (num_metrics + cols - 1) // cols
-
-    fig, axes = plt.subplots(rows, cols, figsize=(14, 5 * rows), squeeze=False)
-    axes_flat = axes.ravel()
-
-    for idx, (metric, ylabel, desc) in enumerate(metrics_to_plot):
-        ax = axes_flat[idx]
+    # Plot barcharts segmented by task type in separate figures
+    task_groups = list(comparison_metrics.keys())
+    colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B'] # blue, red, green, orange
+    width = 0.5
+    
+    for task_name in task_groups:
+        metrics_dict = comparison_metrics[task_name]
+        metric_keys = list(metrics_dict.keys())
+        n_metrics = len(metric_keys)
         
-        # Get values dynamically for all available participant codes
-        vals = [comp_df.loc[metric, p] if p in comp_df.columns else 0 for p in participant_codes]
-        colors = [get_participant_color(i, p) for i, p in enumerate(participant_codes)]
+        # Dynamically scale width based on the number of metrics
+        fig, axes = plt.subplots(1, n_metrics, figsize=(3.8 * n_metrics, 4), squeeze=False)
+        axes_flat = axes.ravel()
         
-        bars = ax.bar(participant_codes, vals, color=colors, width=0.5)
-        ax.set_title(f"{metric}\n({desc})", fontsize=14, fontweight='bold', pad=10)
-        ax.set_ylabel(ylabel, fontsize=12)
-        
-        # Add text labels on top of bars
-        for bar in bars:
-            height = bar.get_height()
-            ax.annotate(f'{height:.3f}' if height < 1 else f'{height:.1f}',
-                        xy=(bar.get_x() + bar.get_width() / 2, height),
-                        xytext=(0, 3),
-                        textcoords="offset points",
-                        ha='center', va='bottom', fontsize=11, fontweight='bold')
-                        
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.yaxis.grid(True, linestyle='--', alpha=0.3)
-
-    # Hide unused axes
-    for idx in range(num_metrics, rows * cols):
-        fig.delaxes(axes_flat[idx])
-
-    title_suffix = " vs ".join(participant_codes) if len(participant_codes) <= 4 else f"{len(participant_codes)} Participants"
-    plt.suptitle(f"Visual Comparison of Key Digital Biomarkers: {title_suffix}", fontsize=16, fontweight='bold', y=0.98)
-    plt.tight_layout()
-    plt.show()
+        for col_idx, col in enumerate(metric_keys):
+            ax = axes_flat[col_idx]
+            label, desc = metrics_dict[col]
+            
+            if col not in master_df.columns:
+                ax.text(0.5, 0.5, "Metric missing", ha='center', va='center')
+                continue
+                
+            # Extract values for plotting
+            vals = []
+            for p in participant_codes:
+                p_row = master_df[master_df['participant_code'] == p]
+                val = p_row[col].values[0] if not p_row.empty else 0.0
+                vals.append(val)
+                
+            x_pos = np.arange(len(participant_codes))
+            ax.bar(x_pos, vals, width, color=colors[:len(participant_codes)], edgecolor='black', alpha=0.8)
+            ax.set_title(f"{label}\n({desc})", fontsize=10, fontweight='bold', pad=8)
+            ax.set_xticks(x_pos)
+            ax.set_xticklabels(participant_codes, fontsize=9)
+            ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            
+            # Add value labels on top of the bars
+            for i, val in enumerate(vals):
+                if pd.notna(val):
+                    ax.text(i, val + (max(vals)*0.015 if max(vals) > 0 else 0.05), f"{val:.3f}", ha='center', va='bottom', fontsize=8.5, fontweight='bold')
+                    
+        plt.suptitle(f"{task_name}: Comparison of Key Digital Biomarkers (P01 vs P02)", fontsize=13, fontweight='bold', y=1.05)
+        plt.tight_layout()
+        plt.show()
 
 
 def plot_tap_dot_size_analysis(
@@ -1293,12 +1309,12 @@ def plot_clinical_metrics_dashboard(master_df, trials_df=None, participants_df=N
         if pd.notna(val):
             ax_speed.text(i, val + 0.1, f"{val:.2f} Hz", ha='center', va='bottom', fontweight='bold')
 
-    # Subplot 2: Amplitude (Mean Amplitude in mm)
-    amps_px = [master_df[master_df['participant_code'] == p]['tap_Overall_mean_amplitude_px_median'].values[0] for p in participant_codes]
+    # Subplot 2: Amplitude (Median Amplitude in mm)
+    amps_px = [master_df[master_df['participant_code'] == p]['tap_Overall_median_amplitude_px_median'].values[0] for p in participant_codes]
     amps_mm = [val * (25.4 / 96.0) for val in amps_px] # Convert px to mm
     ax_amp.bar(x, amps_mm, width, color=colors[:n_participants], edgecolor='black', alpha=0.8)
     ax_amp.set_title("Tapping Movement Amplitude", fontsize=12, fontweight='bold', pad=10)
-    ax_amp.set_ylabel("Mean Amplitude (mm)", fontsize=11)
+    ax_amp.set_ylabel("Median Amplitude (mm)", fontsize=11)
     ax_amp.set_xticks(x)
     ax_amp.set_xticklabels(participant_codes)
     ax_amp.set_ylim(0, max(amps_mm) * 1.25 if amps_mm else 60)
@@ -1707,12 +1723,12 @@ def plot_clinical_metrics_dashboard(master_df, trials_df=None, participants_df=N
             if pd.notna(val):
                 ax_speed.text(i, val + 0.05, f"{val:.2f} Hz", ha='center', va='bottom', fontweight='bold')
                 
-        # Subplot 2: Pinch Amplitude (Mean Amplitude in mm)
-        amps_px = [master_df[master_df['participant_code'] == p]['pinch_Overall_mean_pinch_amplitude_px_median'].values[0] for p in participant_codes]
+        # Subplot 2: Pinch Amplitude (Median Amplitude in mm)
+        amps_px = [master_df[master_df['participant_code'] == p]['pinch_Overall_median_pinch_amplitude_px_median'].values[0] for p in participant_codes]
         amps_mm = [val * (25.4 / 96.0) for val in amps_px]
         ax_amp.bar(x, amps_mm, width, color=colors[:n_participants], edgecolor='black', alpha=0.8)
         ax_amp.set_title("Pinch Movement Amplitude", fontsize=12, fontweight='bold', pad=10)
-        ax_amp.set_ylabel("Mean Amplitude (mm)", fontsize=11)
+        ax_amp.set_ylabel("Median Amplitude (mm)", fontsize=11)
         ax_amp.set_xticks(x)
         ax_amp.set_xticklabels(participant_codes)
         ax_amp.set_ylim(0, max(amps_mm) * 1.25 if any(pd.notna(a) for a in amps_mm) else 100)
@@ -1878,3 +1894,158 @@ def plot_clinical_metrics_dashboard(master_df, trials_df=None, participants_df=N
             plt.close()
         else:
             plt.show()
+
+
+def plot_known_groups_validity_boxplots(
+    trials_df=None,
+    participants_df=None,
+    csv_dir=None,
+    supabase_url=None,
+    supabase_key=None,
+    save_path=None
+):
+    """
+    Generates known-groups validity boxplots comparing the two participants (P01 vs P02)
+    in the pilot study across trial-level tapping metrics: Speed, Amplitude, Hesitations,
+    Halts, and Amplitude Decrement.
+    """
+    import pandas as pd
+    import numpy as np
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import os
+    import json
+    import clinical_metrics
+    
+    tdf, sdf, pdf = resolve_data(
+        trials_df=trials_df,
+        participants_df=participants_df,
+        csv_dir=csv_dir,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key
+    )
+    
+    # Map participant ID to code and diagnosis
+    p_map = pdf.set_index('id')[['participant_code', 'participant_group']].rename(columns={'participant_group': 'diagnosis'}).to_dict('index')
+    
+    # Filter to tapping trials
+    tap_trials = tdf[tdf['task_type'] == 'tap'].copy()
+    if tap_trials.empty:
+        print("No tap trials found in the dataset.")
+        return
+        
+    # Extract trial-level features
+    trial_features = tap_trials.apply(clinical_metrics.extract_features_from_trial, axis=1)
+    trial_features['participant_code'] = tap_trials['participant_id'].map(lambda x: p_map.get(x, {}).get('participant_code', 'Unknown'))
+    trial_features['diagnosis'] = tap_trials['participant_id'].map(lambda x: p_map.get(x, {}).get('diagnosis', 'Unknown'))
+    
+    # Standardize diagnosis strings
+    trial_features['diagnosis'] = trial_features['diagnosis'].replace({
+        'caregiver': 'Healthy Control', 'Caregiver': 'Healthy Control',
+        'other': 'Healthy Control', 'Other': 'Healthy Control',
+        'control': 'Healthy Control', 'Control': 'Healthy Control',
+        'parkinsons': "Parkinson's", 'Parkinsons': "Parkinson's"
+    })
+    
+    # Sort by participant code to ensure consistent plotting order
+    trial_features = trial_features.sort_values(by='participant_code')
+    
+    # Metrics to compare
+    metrics = [
+        ('tap_frequency', 'Speed (Frequency in Hz)', 'Speed (Hz)', 'Higher is faster'),
+        ('median_amplitude_mm', 'Tapping Amplitude (mm)', 'Median Amplitude (mm)', 'Lower is more precise (less spatial drift)'),
+        ('hesitations_count', 'Hesitations Count', 'Count', 'Lower is more stable'),
+        ('halts_count', 'Halts (Freezes) Count', 'Count', 'Lower is healthier'),
+        ('amplitude_decrement_ratio', 'Amplitude Decrement Ratio', 'Ratio (Last 3 / First 3)', 'Near 1.0 is stable, lower shows fatiguing')
+    ]
+    
+    fig, axes = plt.subplots(2, 3, figsize=(16, 10))
+    axes = axes.flatten()
+    
+    # Participant mapping for coloring and labeling
+    colors = ['#3B82F6', '#EF4444'] # Blue vs Red
+    
+    for i, (col, title, ylabel, desc) in enumerate(metrics):
+        ax = axes[i]
+        
+        # Check if the column is present
+        if col not in trial_features.columns:
+            ax.text(0.5, 0.5, f"Metric {col} not found", ha='center', va='center')
+            continue
+            
+        # Plot Boxplot
+        sns.boxplot(
+            x='participant_code', 
+            y=col, 
+            data=trial_features, 
+            ax=ax, 
+            palette=colors, 
+            width=0.4, 
+            showfliers=False,
+            boxprops=dict(alpha=0.7, edgecolor='black', linewidth=1.5),
+            whiskerprops=dict(linewidth=1.5),
+            capprops=dict(linewidth=1.5),
+            medianprops=dict(color='black', linewidth=2)
+        )
+        
+        # Overlay trial points
+        sns.stripplot(
+            x='participant_code', 
+            y=col, 
+            data=trial_features, 
+            ax=ax, 
+            color='#1F2937', 
+            size=8, 
+            jitter=0.08, 
+            alpha=0.9, 
+            linewidth=1, 
+            edgecolor='white'
+        )
+        
+        ax.set_title(title, fontsize=12, fontweight='bold', pad=10)
+        ax.set_xlabel('Participant Code', fontsize=10)
+        ax.set_ylabel(ylabel, fontsize=10)
+        ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+        # Add descriptive helper subtitle/text inside axis
+        ax.text(0.5, 0.95, desc, transform=ax.transAxes, fontsize=9, style='italic', ha='center', color='#555')
+        
+    # Subplot 6: Text summary box
+    ax_text = axes[5]
+    ax_text.axis('off')
+    
+    summary_lines = [
+        "Known-Groups Pilot Comparison Summary\n",
+        "Participant Codes: P01 vs P02",
+        "(Both diagnosed with Parkinson's Disease)\n",
+        "Key Differences observed across trials:",
+        "----------------------------------------"
+    ]
+    
+    for col, title, _, _ in metrics:
+        if col in trial_features.columns:
+            medians = trial_features.groupby('participant_code')[col].median()
+            val_p01 = medians.get('P01', np.nan)
+            val_p02 = medians.get('P02', np.nan)
+            summary_lines.append(f"• {title}:")
+            summary_lines.append(f"  - P01 Median: {val_p01:.3f}")
+            summary_lines.append(f"  - P02 Median: {val_p02:.3f}")
+            
+    summary_text = "\n".join(summary_lines)
+    ax_text.text(0.05, 0.95, summary_text, transform=ax_text.transAxes, fontsize=9.5,
+                 verticalalignment='top', bbox=dict(boxstyle='round,pad=0.8', facecolor='#F3F4F6', edgecolor='#E5E7EB'))
+                 
+    plt.suptitle("Known-Groups Validity Tapping Metrics: Pilot Study P01 vs P02", fontsize=15, fontweight='bold', y=0.96)
+    plt.subplots_adjust(hspace=0.35, wspace=0.3)
+    
+    if save_path is not None:
+        dir_name = os.path.dirname(save_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Saved validity comparison plot to: {save_path}")
+    else:
+        plt.show()
