@@ -248,12 +248,16 @@ async function stopPinchTrial() {
         instructionEl.textContent = "Stop pinching";
         instructionEl.style.display = "block";
         
+        // Hide tracking overlays immediately
+        fingerLine.style.display = "none";
+        liveDistanceLabel.style.display = "none";
+        
         setTimeout(() => {
             isBetweenTrials = false;
-            instructionEl.textContent = `Trial ${trialNumber} Complete! Place fingers on the screen again to start Trial ${trialNumber + 1}.`;
+            instructionEl.textContent = "Place fingers on the screen again";
             firstTouchTime = null;
             sessionStorage.setItem("pinch_page_load", String(Date.now()));
-        }, 3000); // 3 seconds transition/cooldown
+        }, 2000); // 2 seconds transition/cooldown, then enable touch
     }
 }
 
