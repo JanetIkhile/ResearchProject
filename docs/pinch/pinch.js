@@ -19,7 +19,7 @@ let initiationDelay = null;
 let firstTouchTime = null;
 let isBetweenTrials = false;
 
-const ORIGINAL_INSTRUCTION = 'Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
+const ORIGINAL_INSTRUCTION = "Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can";
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -27,6 +27,7 @@ const bottomTarget = document.getElementById("bottomTarget");
 const fingerLine = document.getElementById("fingerLine");
 const liveDistanceLabel = document.getElementById("liveDistanceLabel");
 const instructionEl = document.getElementById("pinchInstruction");
+const timerEl = document.getElementById("countdownTimer");
 const completionBox = document.getElementById("completionBox");
 
 // Standard CSS baseline PPI conversions
@@ -106,9 +107,10 @@ function handleTouch(e) {
     if (touches.length === 2) {
         e.preventDefault(); // Prevent scrolling/scaling gestures
         
-        // Hide warning instruction if it was displayed during touch loss
+        // Restore normal instruction text if it was displaying a warning
         if (taskActive) {
-            instructionEl.style.display = "none";
+            instructionEl.textContent = ORIGINAL_INSTRUCTION;
+            instructionEl.style.display = "block";
         }
 
         // Distinguish between Index (higher up, lower Y) and Thumb (lower down, higher Y)
@@ -142,7 +144,8 @@ function handleTouch(e) {
         } else {
             // Hide vertical warning if active
             if (taskActive) {
-                instructionEl.style.display = "none";
+                instructionEl.textContent = ORIGINAL_INSTRUCTION;
+                instructionEl.style.display = "block";
             }
             
             // Visual connection line
@@ -210,9 +213,12 @@ function startPinchTrial(now) {
     trajectory = [];
     timeRemaining = 10;
     
-    // Update inline instructions and timer countdown
-    instructionEl.innerHTML = `Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can<br><span class="timer-line">Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds</span>`;
+    // Keep instruction text visible, show countdown timer separately
+    instructionEl.textContent = ORIGINAL_INSTRUCTION;
     instructionEl.style.display = "block";
+    
+    timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
+    timerEl.style.display = "block";
     
     // Countdown Timer
     countdownTimer = setInterval(() => {
@@ -220,7 +226,7 @@ function startPinchTrial(now) {
         if (timeRemaining <= 0) {
             stopPinchTrial();
         } else {
-            instructionEl.innerHTML = `Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can<br><span class="timer-line">Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds</span>`;
+            timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
         }
     }, 1000);
     
@@ -232,33 +238,40 @@ async function stopPinchTrial() {
     taskActive = false;
     clearInterval(countdownTimer);
     
+    // Hide tracking overlays immediately
+    fingerLine.style.display = "none";
+    liveDistanceLabel.style.display = "none";
+    
+    // Synchronously update screen to disabled transition state at start of stopPinchTrial
+    isBetweenTrials = true;
+    instructionEl.textContent = "Stop pinching";
+    instructionEl.style.display = "block";
+    timerEl.style.display = "none";
+    
     console.log(`Pinch trial ${trialNumber} ended. Recorded frames:`, trajectory.length);
     
-    // Save to database
+    // Save to database asynchronously
     savingTrial = true;
-    await savePinchTrial(trialStartTime, Date.now());
-    savingTrial = false;
+    const savePromise = savePinchTrial(trialStartTime, Date.now()).then(() => {
+        savingTrial = false;
+    });
     
-    // Check if reached limit
-    if (trialNumber >= TRIAL_LIMIT) {
-        endPinchTask();
-    } else {
-        // Cooldown transition
-        isBetweenTrials = true;
-        instructionEl.textContent = "Stop pinching";
-        instructionEl.style.display = "block";
+    // 2 seconds transition/cooldown
+    setTimeout(async () => {
+        // Wait for save operation to finish before advancing, if it takes longer than 2 seconds
+        await savePromise;
         
-        // Hide tracking overlays immediately
-        fingerLine.style.display = "none";
-        liveDistanceLabel.style.display = "none";
-        
-        setTimeout(() => {
+        if (trialNumber >= TRIAL_LIMIT) {
+            endPinchTask();
+        } else {
             isBetweenTrials = false;
-            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+            instructionEl.textContent = ORIGINAL_INSTRUCTION;
+            timerEl.innerHTML = `Time remaining: <span class="timer-badge">10</span> seconds`;
+            timerEl.style.display = "block";
             firstTouchTime = null;
             sessionStorage.setItem("pinch_page_load", String(Date.now()));
-        }, 2000); // 2 seconds transition/cooldown, then enable touch
-    }
+        }
+    }, 2000);
 }
 
 // Save to Supabase
