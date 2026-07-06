@@ -2,10 +2,7 @@ console.log("dashboard.js running");
 
 import { supabase } from "../client/supabaseClient.js";
 
-const dragBtn = document.getElementById("dragBtn");
-const tapBtn = document.getElementById("tapBtn");
-const pinchBtn = document.getElementById("pinchBtn");
-const holdBtn = document.getElementById("holdBtn");
+const startBtn = document.getElementById("startBtn");
 
 (async function initDashboard() {
 
@@ -89,78 +86,56 @@ const holdBtn = document.getElementById("holdBtn");
             "Please use your index finger (or thumb/index fingers for pinch) to perform the following tasks.";
     }
     // -----------------------------
-    // 3. Default button state
+    // 3. Dynamic Task Routing on startBtn Click
     // -----------------------------
-    dragBtn.disabled = false;
-    tapBtn.disabled = true;
-    pinchBtn.disabled = true;
-    holdBtn.disabled = true;
-
-    tapBtn.style.display = "none";
-    pinchBtn.style.display = "none";
-    holdBtn.style.display = "none";
-
-    // -----------------------------
-    // 4. TASK HANDLER (CORE FIX)
-    // -----------------------------
-    function startTask(taskPath) {
-        window.location.href = taskPath;
-    }
-
-    // -----------------------------
-    // 5. Attach handlers
-    // -----------------------------
-    dragBtn.onclick = () => startTask("../drag/drag.html");
-    tapBtn.onclick = () => startTask("../tap/tap.html");
-    pinchBtn.onclick = () => startTask("../pinch/pinch.html");
-    holdBtn.onclick = () => startTask("../hold/hold.html");
-
-    // -----------------------------
-    // 6. Enable based on progress
-    // -----------------------------
-    if (sessionId) {
-        try {
-            const { data: sessionRow } = await supabase
-                .from("sessions")
-                .select("drag_completed, tap_completed, hold_completed")
-                .eq("id", sessionId)
-                .single();
-
-            // Check if pinch task is completed
-            let pinchCompleted = sessionStorage.getItem("pinch_completed") === "true";
-            if (!pinchCompleted) {
-                const { data: pinchTrials } = await supabase
-                    .from("trial_results")
-                    .select("id")
-                    .eq("session_id", sessionId)
-                    .eq("task_type", "pinch");
-                if (pinchTrials && pinchTrials.length > 0) {
-                    pinchCompleted = true;
-                    sessionStorage.setItem("pinch_completed", "true");
+    if (startBtn) {
+        startBtn.onclick = async () => {
+            startBtn.disabled = true;
+            let nextPath = "../drag/drag.html"; // Default start path
+            
+            if (sessionId) {
+                try {
+                    // Check task status from sessions table
+                    const { data: sessionRow } = await supabase
+                        .from("sessions")
+                        .select("drag_completed, tap_completed, hold_completed")
+                        .eq("id", sessionId)
+                        .single();
+                        
+                    if (sessionRow) {
+                        // Check pinch task completion state from sessionStorage or database
+                        let pinchCompleted = sessionStorage.getItem("pinch_completed") === "true";
+                        if (!pinchCompleted) {
+                            const { data: pinchTrials } = await supabase
+                                .from("trial_results")
+                                .select("id")
+                                .eq("session_id", sessionId)
+                                .eq("task_type", "pinch");
+                            if (pinchTrials && pinchTrials.length > 0) {
+                                pinchCompleted = true;
+                                sessionStorage.setItem("pinch_completed", "true");
+                            }
+                        }
+                        
+                        // Route dynamically to the first incomplete task
+                        if (!sessionRow.drag_completed) {
+                            nextPath = "../drag/drag.html";
+                        } else if (!sessionRow.tap_completed) {
+                            nextPath = "../tap/tap.html";
+                        } else if (!pinchCompleted) {
+                            nextPath = "../pinch/pinch.html";
+                        } else if (!sessionRow.hold_completed) {
+                            nextPath = "../hold/hold.html";
+                        } else {
+                            nextPath = "../thank-you.html";
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error determining next task:", err);
                 }
             }
-
-            if (sessionRow.drag_completed) {
-                dragBtn.style.display = "none";
-                tapBtn.disabled = false;
-                tapBtn.style.display = "block";
-            }
-
-            if (sessionRow.tap_completed) {
-                tapBtn.style.display = "none";
-                pinchBtn.disabled = false;
-                pinchBtn.style.display = "block";
-            }
-
-            if (pinchCompleted) {
-                pinchBtn.style.display = "none";
-                holdBtn.disabled = false;
-                holdBtn.style.display = "block";
-            }
-
-        } catch (err) {
-            console.error("Error loading session flags:", err);
-        }
+            window.location.href = nextPath;
+        };
     }
 
 })();

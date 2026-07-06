@@ -127,7 +127,9 @@ function handleTouchStart(e) {
         recordTapEvent(touch, now, expectedTarget, isHit);
         recordTrajectoryPoint(touch, now, 'start');
         
-        toggleExpectedTarget();
+        if (isHit) {
+            toggleExpectedTarget();
+        }
     }
 }
 
@@ -188,7 +190,7 @@ function handleTouchStart(e) {
     topTarget.style.touchAction = 'none';
     bottomTarget.style.touchAction = 'none';
     
-    if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast and as big as you can!';
+    if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast as you can!';
     
     expectedTarget = "top";
     if (topTarget) {
@@ -235,7 +237,7 @@ function startTapTrial(startTs) {
     timerInterval = setInterval(() => {
         timeLeft--;
         if (tapInstruction && timeLeft > 0) {
-            tapInstruction.innerHTML = `Tap the highlighted circles alternatively!<br>Remaining: <span class="timer-badge">${timeLeft}</span> seconds!`;
+            tapInstruction.innerHTML = `Tap the highlighted circles alternatively as fast as you can! (Remaining: <span class="timer-badge">${timeLeft}</span> seconds)`;
         }
         if (timeLeft <= 0 && timerInterval) {
             clearInterval(timerInterval);
@@ -329,7 +331,7 @@ function startTapTrial(startTs) {
                     bottomTarget.classList.add("inactive");
                 }
                 expectedTarget = "top";
-                if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast and as big as you can!';
+                if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast as you can!';
                 if (countdown) countdown.style.display = "none";
             }, INTER_TRIAL_COOLDOWN);
         }

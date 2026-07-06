@@ -162,45 +162,48 @@ body.modal-open #holdInstruction {
     background-color: #005fcc;
 }
 
-#nextTaskButton:hover {
-    background-color: #15803d;
-}
-
 #completionBox {
     position: fixed;
-    top: calc(clamp(180px, 28vh, 320px) - clamp(60px, 10vh, 100px));
+    top: 22%;
     left: 50%;
     transform: translateX(-50%);
-
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-
+    gap: 20px;
     text-align: center;
     z-index: 2000;
 }
 
 #completionText {
-    font-size: clamp(1.2rem, 2.2vw, 1.8rem);
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
     white-space: nowrap;
     font-weight: bold;
+    color: #111;
+    margin-bottom: 8px;
 }
 
 #nextTaskButton {
     position: static;
     white-space: nowrap;
-
-    font-size: clamp(1rem, 2.5vw, 1.8rem);
-    padding: clamp(14px, 3vw, 28px) clamp(20px, 5vw, 48px);
-
     background-color: #16a34a;
     color: white;
-    border-radius: 12px;
     border: none;
-
+    border-radius: 12px;
     font-weight: bold;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+    padding: clamp(16px, 3vw, 28px) clamp(28px, 5vw, 48px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+#nextTaskButton:hover {
+    background-color: #15803d;
+}
+
+#nextTaskButton:active {
+    transform: scale(0.97);
 }
 
 .session-label {

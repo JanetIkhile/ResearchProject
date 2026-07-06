@@ -18,16 +18,23 @@
 
     <!-- Pinch Area -->
     <div id="pinchArea">
-        <p id="pinchInstruction">Place index finger on Top Dot & thumb on Bottom Dot. Move them as far apart and close together as fast as possible!</p>
+        <p id="pinchInstruction">Place your thumb and index finger comfortably on the screen. Open them as far apart as possible and bring them back together as quickly and as widely as possible for 10 repetitions.</p>
         <p id="countdownTimer" style="display:none;"></p>
+        
+        <!-- Vertical Guidelines (Visual Top-Down cue) -->
+        <div class="vertical-guideline">
+            <div class="arrow-up">▲</div>
+            <div class="guideline-line"></div>
+            <div class="arrow-down">▼</div>
+        </div>
         
         <!-- SVG overlay for drawing line between fingers -->
         <svg id="svgOverlay">
             <line id="fingerLine" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255,255,255,0.7)" stroke-width="4" stroke-dasharray="8 4" style="display:none;" />
         </svg>
 
-        <div id="topTarget" class="pinch-target">Top Dot</div>
-        <div id="bottomTarget" class="pinch-target">Bottom Dot</div>
+        <div id="topTarget" class="pinch-target" style="display:none !important;">Top Dot</div>
+        <div id="bottomTarget" class="pinch-target" style="display:none !important;">Bottom Dot</div>
         
         <!-- Live distance floating label -->
         <div id="liveDistanceLabel" style="display:none;">0 mm</div>
@@ -49,7 +56,7 @@
 
     <!-- Completion routing -->
     <div id="completionBox" style="display:none;">
-        <p id="completionText">✅ Task complete</p>
+        <p id="completionText">✅ Task Complete</p>
         <button id="nextTaskButton" onclick="window.location.href='../hold/hold.html'">
             Next: Hold Task
         </button>

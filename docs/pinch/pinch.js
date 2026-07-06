@@ -136,18 +136,8 @@ function handleTouch(e) {
         liveDistanceLabel.textContent = `${distMm.toFixed(1)} mm`;
         liveDistanceLabel.style.display = "block";
         
-        // Active visual state for targets
-        const insideTop = isTouchInsideElement(indexTouch, topTarget);
-        const insideBottom = isTouchInsideElement(thumbTouch, bottomTarget);
-        
-        if (insideTop) topTarget.classList.add("active");
-        else topTarget.classList.remove("active");
-        
-        if (insideBottom) bottomTarget.classList.add("active");
-        else bottomTarget.classList.remove("active");
-        
-        // Automatic start trigger if both targets are pressed
-        if (!taskActive && !savingTrial && insideTop && insideBottom) {
+        // Automatic start trigger if two fingers are placed on the screen
+        if (!taskActive && !savingTrial) {
             startPinchTrial(now);
         }
         
@@ -184,11 +174,6 @@ function startPinchTrial(now) {
     instructionEl.style.display = "none";
     timerEl.textContent = `Time remaining: ${timeRemaining}s`;
     timerEl.style.display = "block";
-    
-    // Visual indicators
-    topTarget.textContent = "";
-    bottomTarget.textContent = "";
-    
     // Countdown Timer
     countdownTimer = setInterval(() => {
         timeRemaining -= 1;
@@ -220,10 +205,8 @@ async function stopPinchTrial() {
         endPinchTask();
     } else {
         // Cooldown and prep next trial
-        instructionEl.textContent = `Trial ${trialNumber} Complete! Place fingers on the dots again to start Trial ${trialNumber + 1}.`;
+        instructionEl.textContent = `Trial ${trialNumber} Complete! Place fingers on the screen again to start Trial ${trialNumber + 1}.`;
         instructionEl.style.display = "block";
-        topTarget.textContent = "Top Dot";
-        bottomTarget.textContent = "Bottom Dot";
         firstTouchTime = null;
         sessionStorage.setItem("pinch_page_load", String(Date.now()));
     }
