@@ -202,8 +202,12 @@ def plot_tap_distribution(
         ax.set_aspect('equal', 'box')
         
         margin = tr * 1.5
-        ax.set_xlim(tx - margin, tx + margin)
-        ax.set_ylim(ty - margin, ty + margin)
+        x_min = min(tx - margin, min(xs) - 50 if xs else tx - margin)
+        x_max = max(tx + margin, max(xs) + 50 if xs else tx + margin)
+        y_min = min(ty - margin, min(ys) - 50 if ys else ty - margin)
+        y_max = max(ty + margin, max(ys) + 50 if ys else ty + margin)
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
         
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -641,12 +645,16 @@ def plot_aggregate_tap_distribution(
         
         colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4']
         
+        all_xs = []
+        all_ys = []
         for t_idx, (_, trial_row) in enumerate(trials.iterrows()):
             taps = trial_row.get('taps', [])
             if not taps or not isinstance(taps, list):
                 continue
             xs = [t['x'] for t in taps if 'x' in t]
             ys = [t['y'] for t in taps if 'y' in t]
+            all_xs.extend(xs)
+            all_ys.extend(ys)
             hits = [t.get('is_inside_target', True) for t in taps]
             
             xs_hit = [x for x, h in zip(xs, hits) if h]
@@ -666,8 +674,12 @@ def plot_aggregate_tap_distribution(
         ax.set_ylabel("Y Coordinate (pixels)", fontsize=11)
         ax.set_aspect('equal', 'box')
         margin = tr * 1.5
-        ax.set_xlim(tx - margin, tx + margin)
-        ax.set_ylim(ty - margin, ty + margin)
+        x_min = min(tx - margin, min(all_xs) - 50 if all_xs else tx - margin)
+        x_max = max(tx + margin, max(all_xs) + 50 if all_xs else tx + margin)
+        y_min = min(ty - margin, min(all_ys) - 50 if all_ys else ty - margin)
+        y_max = max(ty + margin, max(all_ys) + 50 if all_ys else ty + margin)
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(True, linestyle='--', alpha=0.3)
@@ -863,11 +875,11 @@ def plot_motor_profile_fingerprints(
     for idx, row in profile_data.reset_index().iterrows():
         p_code = row.get('participant_code', f'P{idx+1:02d}')
         
-        speed = row.get('tap_Overall_tap_frequency_mean', 0)
-        cv = row.get('tap_Overall_cv_intertap_interval_mean', 0)
-        acc = row.get('tap_Overall_tap_accuracy_mean', 0)
+        speed = row.get('tap_Overall_tap_frequency_median', 0)
+        cv = row.get('tap_Overall_cv_intertap_interval_median', 0)
+        acc = row.get('tap_Overall_tap_accuracy_median', 0)
         drift = row.get('hold_Overall_hold_drift_distance_median', 0)
-        drag_eff = row.get('drag_Overall_path_efficiency_mean', 0)
+        drag_eff = row.get('drag_Overall_path_efficiency_median', 0)
         
         n_speed = min(1.0, speed / 8.0) if pd.notna(speed) else 0
         n_regularity = max(0.0, 1.0 - cv) if pd.notna(cv) else 0
@@ -923,13 +935,13 @@ def plot_key_biomarkers_comparison(
 
     # Select the key metrics for comparison
     key_cols = {
-        'tap_Overall_tap_frequency_mean': 'Tapping Speed (Hz)',
-        'tap_Overall_cv_intertap_interval_mean': 'Tapping Rhythm CV (Var)',
-        'tap_Overall_tap_spatial_sd_mean': 'Tap Spatial SD (px)',
+        'tap_Overall_tap_frequency_median': 'Tapping Speed (Hz)',
+        'tap_Overall_cv_intertap_interval_median': 'Tapping Rhythm CV (Var)',
+        'tap_Overall_tap_spatial_sd_median': 'Tap Spatial SD (px)',
         'hold_Overall_hold_drift_distance_median': 'Hold Drift Distance (px)',
-        'drag_Overall_path_efficiency_mean': 'Drag Path Efficiency (0-1)',
-        'drag_Overall_kinetic_tremor_amplitude_mean': 'Drag Tremor Amp (px)',
-        'drag_Overall_kinetic_tremor_frequency_hz_mean': 'Drag Tremor Freq (Hz)'
+        'drag_Overall_path_efficiency_median': 'Drag Path Efficiency (0-1)',
+        'drag_Overall_kinetic_tremor_amplitude_median': 'Drag Tremor Amp (px)',
+        'drag_Overall_kinetic_tremor_frequency_hz_median': 'Drag Tremor Freq (Hz)'
     }
 
     # Filter columns to only those present in master_df
@@ -1102,3 +1114,767 @@ def plot_tap_dot_size_analysis(
     ax.legend(loc='upper left', fontsize=11)
     plt.tight_layout()
     plt.show()
+
+
+def simulate_tap_target_diameters(
+    trials_df=None,
+    participants_df=None,
+    sessions_df=None,
+    session_type='main',
+    csv_dir=None,
+    supabase_url=None,
+    supabase_key=None
+):
+    """
+    Simulates tap containment rates for 12mm, 16mm, optimized 120px, and original 300px target diameters
+    for each participant and displays hits, misses, and success rates.
+    """
+    tdf, sdf, pdf = resolve_data(
+        trials_df=trials_df,
+        sessions_df=sessions_df,
+        participants_df=participants_df,
+        csv_dir=csv_dir,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key
+    )
+
+    if session_type and sdf is not None:
+        main_session_ids = sdf[sdf['session_type'] == session_type]['id']
+        tap_trials = tdf[(tdf['task_type'] == 'tap') & (tdf['session_id'].isin(main_session_ids))]
+    else:
+        tap_trials = tdf[tdf['task_type'] == 'tap']
+    
+    configs = [
+        {"name": "12.0mm Diameter", "radius_px": 6.0 * 96.0 / 25.4, "diameter_mm": 12.0},
+        {"name": "16.0mm Diameter", "radius_px": 8.0 * 96.0 / 25.4, "diameter_mm": 16.0},
+        {"name": "31.8mm Diameter", "radius_px": 60.0, "diameter_mm": 60.0 * 2.0 * 25.4 / 96.0},
+        {"name": "79.4mm Diameter", "radius_px": 150.0, "diameter_mm": 150.0 * 2.0 * 25.4 / 96.0}
+    ]
+    
+    participants = sorted(pdf['participant_code'].unique().tolist()) if 'participant_code' in pdf.columns else []
+    
+    rows = []
+    plot_data = {}
+    
+    for p_code in participants:
+        p_ids = pdf[pdf['participant_code'] == p_code]['id'].values if 'participant_code' in pdf.columns else []
+        p_trials = tap_trials[tap_trials['participant_id'].isin(p_ids)]
+        
+        plot_data[p_code] = []
+        
+        for cfg in configs:
+            hits = 0
+            misses = 0
+            total = 0
+            
+            for _, row in p_trials.iterrows():
+                taps = row.get('taps', [])
+                if not taps or not isinstance(taps, list):
+                    continue
+                for t in taps:
+                    if 'x' in t and 'y' in t:
+                        tx_curr = t.get('target_x')
+                        ty_curr = t.get('target_y')
+                        if pd.isna(tx_curr) or pd.isna(ty_curr):
+                            tx_curr = row.get('target_x')
+                            ty_curr = row.get('target_y')
+                            
+                        if pd.isna(tx_curr) or pd.isna(ty_curr):
+                            continue
+                            
+                        dist = np.sqrt((t['x'] - tx_curr)**2 + (t['y'] - ty_curr)**2)
+                        total += 1
+                        if dist <= cfg['radius_px']:
+                            hits += 1
+                        else:
+                            misses += 1
+            
+            rate = (hits / total * 100) if total > 0 else 0
+            plot_data[p_code].append(rate)
+            
+            rows.append({
+                "Participant": p_code,
+                "Target Size": cfg['name'],
+                "Radius (px)": round(cfg['radius_px'], 1),
+                "Diameter (mm)": round(cfg['diameter_mm'], 1),
+                "Total Taps": total,
+                "Hits": hits,
+                "Misses": misses,
+                "Success Rate (%)": f"{rate:.1f}%"
+            })
+            
+    df_res = pd.DataFrame(rows)
+    
+    # Generate the bar chart
+    fig, ax = plt.subplots(figsize=(10, 6))
+    x = np.arange(len(configs))
+    width = 0.35
+    colors = ['#2563EB', '#0D9488']
+    
+    for idx, p_code in enumerate(participants):
+        rates = plot_data[p_code]
+        ax.bar(x + (idx - 0.5) * width, rates, width, label=f"Participant {p_code}", color=colors[idx % len(colors)])
+        
+        for i, val in enumerate(rates):
+            ax.text(i + (idx - 0.5) * width, val + 1, f"{val:.1f}%", ha='center', va='bottom', fontsize=9, fontweight='bold')
+            
+    ax.set_title("Tapping Target Containment Rate vs. Target Size", fontsize=14, weight='bold', pad=15)
+    ax.set_xlabel("Target Configuration", fontsize=12)
+    ax.set_ylabel("Percentage of Taps Contained (%)", fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels([cfg['name'] for cfg in configs])
+    ax.set_ylim(0, 110)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax.legend(loc='lower right', fontsize=11)
+    plt.tight_layout()
+    plt.show()
+    
+    return df_res
+
+
+def plot_clinical_metrics_dashboard(master_df, trials_df=None, participants_df=None, sessions_df=None, save_dir=None):
+    """
+    Generates a series of clinical dashboards for Finger Tapping, Drag, and Hold tasks
+    to visualize speed, amplitude, freezes (hesitations/halts), and tremors as assessed by clinicians.
+    """
+    import numpy as np
+    import os
+    import pandas as pd
+
+    # Try resolving/loading raw data if missing (needed for raw tap amplitude decrement slopes)
+    if trials_df is None or participants_df is None or sessions_df is None:
+        try:
+            import data_loader
+            tdf_loc, sdf_loc, pdf_loc = data_loader.load_from_csv("/Users/janetikhile/Documents/ResearchProject/analysis/data")
+            if trials_df is None: trials_df = tdf_loc
+            if sessions_df is None: sessions_df = sdf_loc
+            if participants_df is None: participants_df = pdf_loc
+        except Exception as e:
+            print(f"Clinician dashboard automatic raw data loading failed: {e}")
+
+    participant_codes = sorted(master_df['participant_code'].unique().tolist())
+    n_participants = len(participant_codes)
+    
+    # -------------------------------------------------------------
+    # 1. Finger Tapping Dashboard
+    # -------------------------------------------------------------
+    fig = plt.figure(figsize=(14, 12))
+    fig.suptitle("Finger Tapping Task - Clinician Assessment Dashboard", fontsize=16, weight='bold', y=0.98)
+    
+    # Colors
+    colors = ['#2563EB', '#0D9488', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4']
+    x = np.arange(n_participants)
+    width = 0.35
+    
+    # Define Subplots using GridSpec to prevent overlap and accommodate large bottom plot
+    gs = fig.add_gridspec(3, 2, hspace=0.4, wspace=0.3)
+    
+    ax_speed = fig.add_subplot(gs[0, 0])
+    ax_amp = fig.add_subplot(gs[0, 1])
+    ax_hes = fig.add_subplot(gs[1, 0])
+    ax_halt = fig.add_subplot(gs[1, 1])
+    ax_trend = fig.add_subplot(gs[2, 0])
+    ax_grade = fig.add_subplot(gs[2, 1])
+    
+    # Subplot 1: Speed (Frequency)
+    freqs = [master_df[master_df['participant_code'] == p]['tap_Overall_tap_frequency_median'].values[0] for p in participant_codes]
+    ax_speed.bar(x, freqs, width, color=colors[:n_participants], edgecolor='black', alpha=0.8)
+    ax_speed.set_title("Tapping Speed (Frequency)", fontsize=12, fontweight='bold', pad=10)
+    ax_speed.set_ylabel("Frequency (Hz)", fontsize=11)
+    ax_speed.set_xticks(x)
+    ax_speed.set_xticklabels(participant_codes)
+    ax_speed.set_ylim(0, max(freqs) * 1.25 if freqs else 10)
+    ax_speed.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax_speed.spines['top'].set_visible(False)
+    ax_speed.spines['right'].set_visible(False)
+    for i, val in enumerate(freqs):
+        if pd.notna(val):
+            ax_speed.text(i, val + 0.1, f"{val:.2f} Hz", ha='center', va='bottom', fontweight='bold')
+
+    # Subplot 2: Amplitude (Mean Amplitude in mm)
+    amps_px = [master_df[master_df['participant_code'] == p]['tap_Overall_mean_amplitude_px_median'].values[0] for p in participant_codes]
+    amps_mm = [val * (25.4 / 96.0) for val in amps_px] # Convert px to mm
+    ax_amp.bar(x, amps_mm, width, color=colors[:n_participants], edgecolor='black', alpha=0.8)
+    ax_amp.set_title("Tapping Movement Amplitude", fontsize=12, fontweight='bold', pad=10)
+    ax_amp.set_ylabel("Mean Amplitude (mm)", fontsize=11)
+    ax_amp.set_xticks(x)
+    ax_amp.set_xticklabels(participant_codes)
+    ax_amp.set_ylim(0, max(amps_mm) * 1.25 if amps_mm else 60)
+    ax_amp.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax_amp.spines['top'].set_visible(False)
+    ax_amp.spines['right'].set_visible(False)
+    for i, val in enumerate(amps_mm):
+        if pd.notna(val):
+            ax_amp.text(i, val + 0.5, f"{val:.1f} mm", ha='center', va='bottom', fontweight='bold')
+
+    # Subplot 3: Hesitations
+    counts = [master_df[master_df['participant_code'] == p]['tap_Overall_hesitations_count_median'].values[0] for p in participant_codes]
+    durs = [master_df[master_df['participant_code'] == p]['tap_Overall_hesitations_duration_ms_median'].values[0] / 1000.0 for p in participant_codes]
+    
+    ax_hes.bar(x - width/2, counts, width, label='Count', color='#2563EB', edgecolor='black', alpha=0.8)
+    ax_hes2 = ax_hes.twinx()
+    ax_hes2.bar(x + width/2, durs, width, label='Duration (s)', color='#F59E0B', edgecolor='black', alpha=0.8)
+    
+    ax_hes.set_title("Tapping Hesitations (Slowdowns)", fontsize=12, fontweight='bold', pad=10)
+    ax_hes.set_ylabel("Hesitations Count", color='#2563EB', fontsize=11)
+    ax_hes2.set_ylabel("Total Duration (seconds)", color='#F59E0B', fontsize=11)
+    ax_hes.set_xticks(x)
+    ax_hes.set_xticklabels(participant_codes)
+    ax_hes.set_ylim(0, max(counts) * 1.4 if max(counts) > 0 else 5)
+    ax_hes2.set_ylim(0, max(durs) * 1.4 if max(durs) > 0 else 5)
+    ax_hes.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax_hes.spines['top'].set_visible(False)
+    ax_hes2.spines['top'].set_visible(False)
+    
+    lines, labels = ax_hes.get_legend_handles_labels()
+    lines2, labels2 = ax_hes2.get_legend_handles_labels()
+    ax_hes.legend(lines + lines2, labels + labels2, loc='upper left', frameon=True, facecolor='white', framealpha=0.9)
+    
+    for i, val in enumerate(counts):
+        if pd.notna(val):
+            ax_hes.text(i - width/2, val + 0.1, f"{int(val)}", ha='center', va='bottom', fontweight='bold', color='#2563EB')
+    for i, val in enumerate(durs):
+        if pd.notna(val):
+            ax_hes2.text(i + width/2, val + 0.1, f"{val:.1f}s", ha='center', va='bottom', fontweight='bold', color='#F59E0B')
+
+    # Subplot 4: Halts
+    counts_h = [master_df[master_df['participant_code'] == p]['tap_Overall_halts_count_median'].values[0] for p in participant_codes]
+    durs_h = [master_df[master_df['participant_code'] == p]['tap_Overall_halts_duration_ms_median'].values[0] / 1000.0 for p in participant_codes]
+    
+    ax_halt.bar(x - width/2, counts_h, width, label='Count', color='#0D9488', edgecolor='black', alpha=0.8)
+    ax_halt2 = ax_halt.twinx()
+    ax_halt2.bar(x + width/2, durs_h, width, label='Duration (s)', color='#EC4899', edgecolor='black', alpha=0.8)
+    
+    ax_halt.set_title("Tapping Halts (Complete Freezes)", fontsize=12, fontweight='bold', pad=10)
+    ax_halt.set_ylabel("Halts Count", color='#0D9488', fontsize=11)
+    ax_halt2.set_ylabel("Total Duration (seconds)", color='#EC4899', fontsize=11)
+    ax_halt.set_xticks(x)
+    ax_halt.set_xticklabels(participant_codes)
+    ax_halt.set_ylim(0, max(counts_h) * 1.4 if max(counts_h) > 0 else 5)
+    ax_halt2.set_ylim(0, max(durs_h) * 1.4 if max(durs_h) > 0 else 5)
+    ax_halt.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax_halt.spines['top'].set_visible(False)
+    ax_halt2.spines['top'].set_visible(False)
+    
+    lines, labels = ax_halt.get_legend_handles_labels()
+    lines2, labels2 = ax_halt2.get_legend_handles_labels()
+    ax_halt.legend(lines + lines2, labels + labels2, loc='upper left', frameon=True, facecolor='white', framealpha=0.9)
+    
+    for i, val in enumerate(counts_h):
+        if pd.notna(val):
+            ax_halt.text(i - width/2, val + 0.1, f"{int(val)}", ha='center', va='bottom', fontweight='bold', color='#0D9488')
+    for i, val in enumerate(durs_h):
+        if pd.notna(val):
+            ax_halt2.text(i + width/2, val + 0.1, f"{val:.1f}s", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+
+    # Subplot 5: Amplitude Decrement Slope (Tap-by-Tap Profile)
+    if trials_df is not None and participants_df is not None and sessions_df is not None:
+        main_session_ids = sessions_df[sessions_df['session_type'] == 'main']['id']
+        tap_trials = trials_df[(trials_df['task_type'] == 'tap') & (trials_df['session_id'].isin(main_session_ids))]
+        
+        for idx, p_code in enumerate(participant_codes):
+            p_ids = participants_df[participants_df['participant_code'] == p_code]['id'].values
+            if len(p_ids) > 0:
+                p_id = p_ids[0]
+                p_trials = tap_trials[tap_trials['participant_id'] == p_id]
+                
+                all_indices = []
+                all_amplitudes_mm = []
+                
+                for _, trial_row in p_trials.iterrows():
+                    taps = trial_row.get('taps', [])
+                    amplitudes = []
+                    for i in range(1, len(taps)):
+                        t_curr = taps[i]
+                        t_prev = taps[i-1]
+                        if 'amplitude' in t_curr and t_curr['amplitude'] is not None:
+                            amplitudes.append(t_curr['amplitude'])
+                        elif 'y' in t_curr and 'y' in t_prev:
+                            amplitudes.append(abs(t_curr['y'] - t_prev['y']))
+                        else:
+                            x_diff = t_curr.get('x', 0) - t_prev.get('x', 0)
+                            y_diff = t_curr.get('y', 0) - t_prev.get('y', 0)
+                            amplitudes.append(np.sqrt(x_diff**2 + y_diff**2))
+                    
+                    for tap_idx, amp_px in enumerate(amplitudes):
+                        amp_mm = amp_px * (25.4 / 96.0)
+                        all_indices.append(tap_idx)
+                        all_amplitudes_mm.append(amp_mm)
+                        
+                if all_indices:
+                    color = colors[idx % len(colors)]
+                    ax_trend.scatter(all_indices, all_amplitudes_mm, alpha=0.15, color=color, s=25, label=f"{p_code} Raw Taps")
+                    
+                    # Fit linear regression
+                    slope, intercept = np.polyfit(all_indices, all_amplitudes_mm, 1)
+                    x_fit = np.unique(all_indices)
+                    y_fit = slope * x_fit + intercept
+                    ax_trend.plot(x_fit, y_fit, color=color, linewidth=2.5, label=f"{p_code} Trend (Slope: {slope:.3f} mm/tap)")
+                    
+        ax_trend.set_title("Amplitude Decrement Profile (Tapping Fatigue)", fontsize=12, fontweight='bold', pad=10)
+        ax_trend.set_xlabel("Tap Index", fontsize=11)
+        ax_trend.set_ylabel("Tap Amplitude (mm)", fontsize=11)
+        ax_trend.spines['top'].set_visible(False)
+        ax_trend.spines['right'].set_visible(False)
+        ax_trend.yaxis.grid(True, linestyle='--', alpha=0.3)
+        ax_trend.xaxis.grid(True, linestyle='--', alpha=0.3)
+        ax_trend.legend(loc='lower left', frameon=True, facecolor='white', framealpha=0.9)
+    else:
+        ax_trend.text(0.5, 0.5, "Raw trials data missing - cannot plot decrement slope", ha='center', va='center')
+        
+    # Subplot 6: MDS-UPDRS Estimated Impairment Grade
+    if 'tap_Overall_tap_clinical_impairment_grade_median' in master_df.columns:
+        grades = [master_df[master_df['participant_code'] == p]['tap_Overall_tap_clinical_impairment_grade_median'].values[0] for p in participant_codes]
+    else:
+        grades = [0.0] * n_participants
+        
+    ax_grade.bar(x, grades, width, color='#EC4899', edgecolor='black', alpha=0.8)
+    ax_grade.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.4 Finger Tapping)", fontsize=11, fontweight='bold', pad=10)
+    ax_grade.set_ylabel("Estimated Severity Grade (0-4)", fontsize=11)
+    ax_grade.set_xticks(x)
+    ax_grade.set_xticklabels(participant_codes)
+    ax_grade.set_ylim(0, 4.5)
+    ax_grade.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax_grade.spines['top'].set_visible(False)
+    ax_grade.spines['right'].set_visible(False)
+    for i, val in enumerate(grades):
+        if pd.notna(val):
+            ax_grade.text(i, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+            
+    plt.subplots_adjust(hspace=0.4, wspace=0.3)
+    if save_dir is not None:
+        plt.savefig(os.path.join(save_dir, "finger_tapping_dashboard.png"), dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
+    # -------------------------------------------------------------
+    # 2. Drag Task Dashboard
+    # -------------------------------------------------------------
+    fig, axes = plt.subplots(4, 2, figsize=(14, 18))
+    fig.suptitle("Drag Task - Clinician Assessment Dashboard", fontsize=16, weight='bold', y=0.98)
+    
+    # Subplot 1: Speed
+    ax = axes[0, 0]
+    drag_speeds = [master_df[master_df['participant_code'] == p]['drag_Overall_mean_speed_median'].values[0] for p in participant_codes]
+    ax.bar(x, drag_speeds, width, color=colors[:n_participants])
+    ax.set_title("Drag Movement Speed", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Mean Speed (px/s)", fontsize=11)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    for i, val in enumerate(drag_speeds):
+        if pd.notna(val):
+            ax.text(i, val + 10, f"{val:.1f} px/s", ha='center', va='bottom', fontweight='bold')
+
+    # Subplot 2: Amplitude Decrement
+    ax = axes[0, 1]
+    drag_dec = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_amplitude_decrement_ratio_median'].values[0] for p in participant_codes]
+    ax.bar(x, drag_dec, width, color=colors[:n_participants])
+    ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, label='No Decrement')
+    ax.set_title("Path Deviation Amplitude Decrement Ratio\n(2nd Half Deviation / 1st Half Deviation)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Ratio (< 1.0 indicates decrement)", fontsize=11)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.set_ylim(0, 1.5)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax.legend(loc='lower left')
+    for i, val in enumerate(drag_dec):
+        if pd.notna(val):
+            ax.text(i, val + 0.02, f"{val:.2f}", ha='center', va='bottom', fontweight='bold')
+
+    # Subplot 3: Hesitations
+    ax = axes[1, 0]
+    drag_hes_c = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_hesitations_count_median'].values[0] for p in participant_codes]
+    drag_hes_d = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_hesitations_duration_ms_median'].values[0] / 1000.0 for p in participant_codes]
+    
+    ax.bar(x - width/2, drag_hes_c, width, label='Count', color='#2563EB')
+    ax2 = ax.twinx()
+    ax2.bar(x + width/2, drag_hes_d, width, label='Duration (s)', color='#F59E0B')
+    
+    ax.set_title("Drag Hesitations (Slowdowns)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Hesitations Count", color='#2563EB', fontsize=11)
+    ax2.set_ylabel("Total Duration (seconds)", color='#F59E0B', fontsize=11)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc='upper right')
+    for i, val in enumerate(drag_hes_c):
+        if pd.notna(val):
+            ax.text(i - width/2, val + 0.1, f"{int(val)}", ha='center', va='bottom', fontweight='bold', color='#2563EB')
+    for i, val in enumerate(drag_hes_d):
+        if pd.notna(val):
+            ax2.text(i + width/2, val + 0.02, f"{val:.1f}s", ha='center', va='bottom', fontweight='bold', color='#F59E0B')
+
+    # Subplot 4: Halts
+    ax = axes[1, 1]
+    drag_hlt_c = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_halts_count_median'].values[0] for p in participant_codes]
+    drag_hlt_d = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_halts_duration_ms_median'].values[0] / 1000.0 for p in participant_codes]
+    
+    ax.bar(x - width/2, drag_hlt_c, width, label='Count', color='#0D9488')
+    ax2 = ax.twinx()
+    ax2.bar(x + width/2, drag_hlt_d, width, label='Duration (s)', color='#EC4899')
+    
+    ax.set_title("Drag Halts (Complete Stops)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Halts Count", color='#0D9488', fontsize=11)
+    ax2.set_ylabel("Total Duration (seconds)", color='#EC4899', fontsize=11)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc='upper right')
+    for i, val in enumerate(drag_hlt_c):
+        if pd.notna(val):
+            ax.text(i - width/2, val + 0.1, f"{int(val)}", ha='center', va='bottom', fontweight='bold', color='#0D9488')
+    for i, val in enumerate(drag_hlt_d):
+        if pd.notna(val):
+            ax2.text(i + width/2, val + 0.02, f"{val:.1f}s", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+
+    # Subplot 5: Kinetic Tremor Amplitude & Clinical Grade
+    ax = axes[2, 0]
+    trem_amp = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_tremor_amplitude_peak_cm_median'].values[0] for p in participant_codes]
+    trem_grade = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_tremor_clinical_grade_median'].values[0] for p in participant_codes]
+    
+    ax.bar(x - width/2, trem_amp, width, label='Amp (cm)', color='#8B5CF6')
+    ax2 = ax.twinx()
+    ax2.bar(x + width/2, trem_grade, width, label='Estimated Clinical Severity', color='#EC4899')
+    
+    ax.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.16 Kinetic Tremor)", fontsize=11, fontweight='bold')
+    ax.set_ylabel("Peak-to-Peak Amplitude (cm)", color='#8B5CF6', fontsize=11)
+    ax2.set_ylabel("Estimated Severity Grade (0-4)", color='#EC4899', fontsize=11)
+    ax2.set_ylim(0, 4.2)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, loc='upper left')
+    for i, val in enumerate(trem_amp):
+        if pd.notna(val):
+            ax.text(i - width/2, val + 0.02, f"{val:.2f} cm", ha='center', va='bottom', fontweight='bold', color='#8B5CF6')
+    for i, val in enumerate(trem_grade):
+        if pd.notna(val):
+            ax2.text(i + width/2, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+
+    # Subplot 6: Kinetic Tremor Frequency
+    ax = axes[2, 1]
+    trem_freq = [master_df[master_df['participant_code'] == p]['drag_Overall_kinetic_tremor_frequency_hz_median'].values[0] for p in participant_codes]
+    ax.bar(x, trem_freq, width, color='#06B6D4')
+    ax.set_title("Kinetic Tremor Frequency", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Frequency (Hz)", fontsize=11)
+    ax.set_ylim(0, 10.0)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    for i, val in enumerate(trem_freq):
+        if pd.notna(val):
+            ax.text(i, val + 0.2, f"{val:.2f} Hz", ha='center', va='bottom', fontweight='bold')
+            
+    # Subplot 7: MDS-UPDRS Item 3.5 Hand Movements Grade
+    ax = axes[3, 0]
+    if 'drag_Overall_drag_clinical_impairment_grade_median' in master_df.columns:
+        grades = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_clinical_impairment_grade_median'].values[0] for p in participant_codes]
+    else:
+        grades = [0.0] * n_participants
+        
+    ax.bar(x, grades, width, color='#EC4899', edgecolor='black', alpha=0.8)
+    ax.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.5 Hand Movements)", fontsize=11, fontweight='bold')
+    ax.set_ylabel("Estimated Severity Grade (0-4)", fontsize=11)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.set_ylim(0, 4.5)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    for i, val in enumerate(grades):
+        if pd.notna(val):
+            ax.text(i, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+
+    # Subplot 8: Fitts' Law Throughput
+    ax = axes[3, 1]
+    if 'drag_Overall_fitts_law_throughput_median' in master_df.columns:
+        throughput = [master_df[master_df['participant_code'] == p]['drag_Overall_fitts_law_throughput_median'].values[0] for p in participant_codes]
+    else:
+        throughput = [0.0] * n_participants
+    ax.bar(x, throughput, width, color='#F59E0B', edgecolor='black', alpha=0.8)
+    ax.set_title("Fitts' Law Throughput (Precision Bandwidth)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Throughput (bits/s)", fontsize=11)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    for i, val in enumerate(throughput):
+        if pd.notna(val):
+            ax.text(i, val + 0.05, f"{val:.2f} bps", ha='center', va='bottom', fontweight='bold', color='#F59E0B')
+            
+    plt.tight_layout()
+    if save_dir is not None:
+        plt.savefig(os.path.join(save_dir, "drag_task_dashboard.png"), dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
+    # -------------------------------------------------------------
+    # 3. Hold Task Postural Tremor Dashboard
+    # -------------------------------------------------------------
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle("Hold Task - MDS-UPDRS Item 3.15 Postural Tremor Dashboard", fontsize=16, weight='bold', y=1.02)
+    
+    # Subplot 1: Postural Tremor Amplitude
+    ax = axes[0]
+    hold_amp = [master_df[master_df['participant_code'] == p]['hold_Overall_hold_tremor_amplitude_peak_cm_median'].values[0] for p in participant_codes]
+    ax.bar(x, hold_amp, width, color='#8B5CF6')
+    ax.set_title("Postural Tremor Peak-to-Peak Amplitude", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Amplitude (cm)", fontsize=11)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    for i, val in enumerate(hold_amp):
+        if pd.notna(val):
+            ax.text(i, val + 0.05, f"{val:.3f} cm", ha='center', va='bottom', fontweight='bold')
+
+    # Subplot 2: Postural Tremor Frequency
+    ax = axes[1]
+    hold_freq = [master_df[master_df['participant_code'] == p]['hold_Overall_hold_tremor_frequency_hz_median'].values[0] for p in participant_codes]
+    ax.bar(x, hold_freq, width, color='#06B6D4')
+    ax.set_title("Postural Tremor Peak Frequency", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Frequency (Hz)", fontsize=11)
+    ax.set_ylim(0, 10.0)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    for i, val in enumerate(hold_freq):
+        if pd.notna(val):
+            ax.text(i, val + 0.2, f"{val:.2f} Hz", ha='center', va='bottom', fontweight='bold')
+
+    # Subplot 3: MDS-UPDRS Item 3.15 Postural Tremor Grade
+    ax = axes[2]
+    hold_grade = [master_df[master_df['participant_code'] == p]['hold_Overall_hold_tremor_clinical_grade_median'].values[0] for p in participant_codes]
+    ax.bar(x, hold_grade, width, color='#EC4899')
+    ax.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.15 Postural Tremor)", fontsize=11, fontweight='bold')
+    ax.set_ylabel("Estimated Severity Grade (0-4)", fontsize=11)
+    ax.set_ylim(0, 4.2)
+    ax.set_xticks(x)
+    ax.set_xticklabels(participant_codes)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    for i, val in enumerate(hold_grade):
+        if pd.notna(val):
+            ax.text(i, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold')
+            
+    plt.tight_layout()
+    if save_dir is not None:
+        plt.savefig(os.path.join(save_dir, "hold_task_dashboard.png"), dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
+    # -------------------------------------------------------------
+    # 4. Pinch Task Clinician Dashboard
+    # -------------------------------------------------------------
+    has_pinch = any(col.startswith('pinch_Overall_') for col in master_df.columns)
+    if has_pinch:
+        fig = plt.figure(figsize=(14, 12))
+        fig.suptitle("Pinch Tapping Task - Clinician Assessment Dashboard", fontsize=16, weight='bold', y=0.98)
+        
+        # GridSpec for clean, non-overlapping layouts
+        gs = fig.add_gridspec(3, 2, hspace=0.4, wspace=0.3)
+        
+        ax_speed = fig.add_subplot(gs[0, 0])
+        ax_amp = fig.add_subplot(gs[0, 1])
+        ax_hes = fig.add_subplot(gs[1, 0])
+        ax_halt = fig.add_subplot(gs[1, 1])
+        ax_trend = fig.add_subplot(gs[2, 0])
+        ax_grade = fig.add_subplot(gs[2, 1])
+        
+        # Subplot 1: Pinch Speed (Frequency)
+        freqs = [master_df[master_df['participant_code'] == p]['pinch_Overall_pinch_frequency_median'].values[0] for p in participant_codes]
+        ax_speed.bar(x, freqs, width, color=colors[:n_participants], edgecolor='black', alpha=0.8)
+        ax_speed.set_title("Pinch Speed (Frequency)", fontsize=12, fontweight='bold', pad=10)
+        ax_speed.set_ylabel("Frequency (Hz)", fontsize=11)
+        ax_speed.set_xticks(x)
+        ax_speed.set_xticklabels(participant_codes)
+        ax_speed.set_ylim(0, max(freqs) * 1.25 if any(pd.notna(f) for f in freqs) else 5)
+        ax_speed.yaxis.grid(True, linestyle='--', alpha=0.3)
+        ax_speed.spines['top'].set_visible(False)
+        ax_speed.spines['right'].set_visible(False)
+        for i, val in enumerate(freqs):
+            if pd.notna(val):
+                ax_speed.text(i, val + 0.05, f"{val:.2f} Hz", ha='center', va='bottom', fontweight='bold')
+                
+        # Subplot 2: Pinch Amplitude (Mean Amplitude in mm)
+        amps_px = [master_df[master_df['participant_code'] == p]['pinch_Overall_mean_pinch_amplitude_px_median'].values[0] for p in participant_codes]
+        amps_mm = [val * (25.4 / 96.0) for val in amps_px]
+        ax_amp.bar(x, amps_mm, width, color=colors[:n_participants], edgecolor='black', alpha=0.8)
+        ax_amp.set_title("Pinch Movement Amplitude", fontsize=12, fontweight='bold', pad=10)
+        ax_amp.set_ylabel("Mean Amplitude (mm)", fontsize=11)
+        ax_amp.set_xticks(x)
+        ax_amp.set_xticklabels(participant_codes)
+        ax_amp.set_ylim(0, max(amps_mm) * 1.25 if any(pd.notna(a) for a in amps_mm) else 100)
+        ax_amp.yaxis.grid(True, linestyle='--', alpha=0.3)
+        ax_amp.spines['top'].set_visible(False)
+        ax_amp.spines['right'].set_visible(False)
+        for i, val in enumerate(amps_mm):
+            if pd.notna(val):
+                ax_amp.text(i, val + 1.0, f"{val:.1f} mm", ha='center', va='bottom', fontweight='bold')
+                
+        # Subplot 3: Pinch Hesitations
+        counts = [master_df[master_df['participant_code'] == p]['pinch_Overall_pinch_hesitations_count_median'].values[0] for p in participant_codes]
+        durs = [master_df[master_df['participant_code'] == p]['pinch_Overall_pinch_hesitations_duration_ms_median'].values[0] / 1000.0 for p in participant_codes]
+        
+        ax_hes.bar(x - width/2, counts, width, label='Count', color='#2563EB', edgecolor='black', alpha=0.8)
+        ax_hes2 = ax_hes.twinx()
+        ax_hes2.bar(x + width/2, durs, width, label='Duration (s)', color='#F59E0B', edgecolor='black', alpha=0.8)
+        
+        ax_hes.set_title("Pinch Hesitations (Slowdowns)", fontsize=12, fontweight='bold', pad=10)
+        ax_hes.set_ylabel("Hesitations Count", color='#2563EB', fontsize=11)
+        ax_hes2.set_ylabel("Total Duration (seconds)", color='#F59E0B', fontsize=11)
+        ax_hes.set_xticks(x)
+        ax_hes.set_xticklabels(participant_codes)
+        ax_hes.set_ylim(0, max(counts) * 1.4 if max(counts) > 0 else 5)
+        ax_hes2.set_ylim(0, max(durs) * 1.4 if max(durs) > 0 else 5)
+        ax_hes.yaxis.grid(True, linestyle='--', alpha=0.3)
+        ax_hes.spines['top'].set_visible(False)
+        ax_hes2.spines['top'].set_visible(False)
+        
+        lines, labels = ax_hes.get_legend_handles_labels()
+        lines2, labels2 = ax_hes2.get_legend_handles_labels()
+        ax_hes.legend(lines + lines2, labels + labels2, loc='upper left', frameon=True, facecolor='white', framealpha=0.9)
+        
+        for i, val in enumerate(counts):
+            if pd.notna(val):
+                ax_hes.text(i - width/2, val + 0.1, f"{int(val)}", ha='center', va='bottom', fontweight='bold', color='#2563EB')
+        for i, val in enumerate(durs):
+            if pd.notna(val):
+                ax_hes2.text(i + width/2, val + 0.1, f"{val:.1f}s", ha='center', va='bottom', fontweight='bold', color='#F59E0B')
+                
+        # Subplot 4: Pinch Halts
+        counts_h = [master_df[master_df['participant_code'] == p]['pinch_Overall_pinch_halts_count_median'].values[0] for p in participant_codes]
+        durs_h = [master_df[master_df['participant_code'] == p]['pinch_Overall_pinch_halts_duration_ms_median'].values[0] / 1000.0 for p in participant_codes]
+        
+        ax_halt.bar(x - width/2, counts_h, width, label='Count', color='#0D9488', edgecolor='black', alpha=0.8)
+        ax_halt2 = ax_halt.twinx()
+        ax_halt2.bar(x + width/2, durs_h, width, label='Duration (s)', color='#EC4899', edgecolor='black', alpha=0.8)
+        
+        ax_halt.set_title("Pinch Halts (Complete Freezes)", fontsize=12, fontweight='bold', pad=10)
+        ax_halt.set_ylabel("Halts Count", color='#0D9488', fontsize=11)
+        ax_halt2.set_ylabel("Total Duration (seconds)", color='#EC4899', fontsize=11)
+        ax_halt.set_xticks(x)
+        ax_halt.set_xticklabels(participant_codes)
+        ax_halt.set_ylim(0, max(counts_h) * 1.4 if max(counts_h) > 0 else 5)
+        ax_halt2.set_ylim(0, max(durs_h) * 1.4 if max(durs_h) > 0 else 5)
+        ax_halt.yaxis.grid(True, linestyle='--', alpha=0.3)
+        ax_halt.spines['top'].set_visible(False)
+        ax_halt2.spines['top'].set_visible(False)
+        
+        lines, labels = ax_halt.get_legend_handles_labels()
+        lines2, labels2 = ax_halt2.get_legend_handles_labels()
+        ax_halt.legend(lines + lines2, labels + labels2, loc='upper left', frameon=True, facecolor='white', framealpha=0.9)
+        
+        for i, val in enumerate(counts_h):
+            if pd.notna(val):
+                ax_halt.text(i - width/2, val + 0.1, f"{int(val)}", ha='center', va='bottom', fontweight='bold', color='#0D9488')
+        for i, val in enumerate(durs_h):
+            if pd.notna(val):
+                ax_halt2.text(i + width/2, val + 0.1, f"{val:.1f}s", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+                
+        # Subplot 5: Pinch Amplitude Decrement Slope (Pinch-by-Pinch Profile)
+        if trials_df is not None and participants_df is not None and sessions_df is not None:
+            from scipy.signal import find_peaks, savgol_filter
+            main_session_ids = sessions_df[sessions_df['session_type'] == 'main']['id']
+            pinch_trials = trials_df[(trials_df['task_type'] == 'pinch') & (trials_df['session_id'].isin(main_session_ids))]
+            
+            for idx, p_code in enumerate(participant_codes):
+                p_ids = participants_df[participants_df['participant_code'] == p_code]['id'].values
+                if len(p_ids) > 0:
+                    p_id = p_ids[0]
+                    p_trials = pinch_trials[pinch_trials['participant_id'] == p_id]
+                    
+                    all_indices = []
+                    all_amplitudes_mm = []
+                    
+                    for _, trial_row in p_trials.iterrows():
+                        traj_list = trial_row.get('trajectory', [])
+                        if not isinstance(traj_list, list) or len(traj_list) < 2:
+                            continue
+                        
+                        times_t = np.array([pt['t'] for pt in traj_list if 't' in pt])
+                        dists_t = np.array([pt.get('distance', 0) for pt in traj_list if 't' in pt])
+                        if len(dists_t) < 5:
+                            continue
+                        dists_smooth = savgol_filter(dists_t, 5, 2)
+                        
+                        # Find cycles
+                        sig_range_t = np.max(dists_smooth) - np.min(dists_smooth)
+                        prominence_t = max(10.0, 0.1 * sig_range_t) if sig_range_t > 0 else 10.0
+                        
+                        peaks_t, _ = find_peaks(dists_smooth, prominence=prominence_t, distance=10)
+                        valleys_t, _ = find_peaks(-dists_smooth, prominence=prominence_t, distance=10)
+                        
+                        events_t = []
+                        for p in peaks_t: events_t.append((times_t[p], 'peak', dists_smooth[p]))
+                        for v in valleys_t: events_t.append((times_t[v], 'valley', dists_smooth[v]))
+                        events_t.sort(key=lambda x: x[0])
+                        
+                        trial_amps = []
+                        for i in range(len(events_t) - 1):
+                            e_curr = events_t[i]
+                            e_next = events_t[i+1]
+                            if (e_curr[1] == 'peak' and e_next[1] == 'valley') or (e_curr[1] == 'valley' and e_next[1] == 'peak'):
+                                trial_amps.append(abs(e_curr[2] - e_next[2]))
+                                
+                        for cycle_idx, amp_px in enumerate(trial_amps):
+                            all_indices.append(cycle_idx)
+                            all_amplitudes_mm.append(amp_px * (25.4 / 96.0))
+                            
+                    if all_indices:
+                        color = colors[idx % len(colors)]
+                        ax_trend.scatter(all_indices, all_amplitudes_mm, alpha=0.15, color=color, s=25, label=f"{p_code} Raw Pinches")
+                        
+                        # Fit linear regression
+                        slope, intercept = np.polyfit(all_indices, all_amplitudes_mm, 1)
+                        x_fit = np.unique(all_indices)
+                        y_fit = slope * x_fit + intercept
+                        ax_trend.plot(x_fit, y_fit, color=color, linewidth=2.5, label=f"{p_code} Trend (Slope: {slope:.3f} mm/pinch)")
+                        
+            ax_trend.set_title("Amplitude Decrement Profile (Pinch Fatigue)", fontsize=12, fontweight='bold', pad=10)
+            ax_trend.set_xlabel("Pinch Cycle Index", fontsize=11)
+            ax_trend.set_ylabel("Pinch Amplitude (mm)", fontsize=11)
+            ax_trend.spines['top'].set_visible(False)
+            ax_trend.spines['right'].set_visible(False)
+            ax_trend.yaxis.grid(True, linestyle='--', alpha=0.3)
+            ax_trend.xaxis.grid(True, linestyle='--', alpha=0.3)
+            ax_trend.legend(loc='lower left', frameon=True, facecolor='white', framealpha=0.9)
+        else:
+            ax_trend.text(0.5, 0.5, "Raw trials data missing - cannot plot decrement slope", ha='center', va='center')
+            
+        # Subplot 6: MDS-UPDRS Estimated Impairment Grade
+        if 'pinch_Overall_pinch_clinical_impairment_grade_median' in master_df.columns:
+            grades = [master_df[master_df['participant_code'] == p]['pinch_Overall_pinch_clinical_impairment_grade_median'].values[0] for p in participant_codes]
+        else:
+            grades = [0.0] * n_participants
+            
+        ax_grade.bar(x, grades, width, color='#EC4899', edgecolor='black', alpha=0.8)
+        ax_grade.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.4 Pinch Variant)", fontsize=10, fontweight='bold', pad=10)
+        ax_grade.set_ylabel("Estimated Severity Grade (0-4)", fontsize=11)
+        ax_grade.set_xticks(x)
+        ax_grade.set_xticklabels(participant_codes)
+        ax_grade.set_ylim(0, 4.5)
+        ax_grade.yaxis.grid(True, linestyle='--', alpha=0.3)
+        ax_grade.spines['top'].set_visible(False)
+        ax_grade.spines['right'].set_visible(False)
+        for i, val in enumerate(grades):
+            if pd.notna(val):
+                ax_grade.text(i, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+                
+        plt.subplots_adjust(hspace=0.4, wspace=0.3)
+        if save_dir is not None:
+            plt.savefig(os.path.join(save_dir, "pinch_task_dashboard.png"), dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()

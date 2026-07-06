@@ -4,6 +4,7 @@ import { supabase } from "../client/supabaseClient.js";
 
 const dragBtn = document.getElementById("dragBtn");
 const tapBtn = document.getElementById("tapBtn");
+const pinchBtn = document.getElementById("pinchBtn");
 const holdBtn = document.getElementById("holdBtn");
 
 (async function initDashboard() {
@@ -82,19 +83,21 @@ const holdBtn = document.getElementById("holdBtn");
     // Set instruction
     if (dominantArm) {
         instructionEl.innerHTML =
-            `Please use the <span class="highlight">index finger</span> of your <span class="highlight">${dominantArm} hand</span> to perform the following tasks.`;;
+            `Please use the <span class="highlight">index finger</span> (or thumb/index fingers for pinch) of your <span class="highlight">${dominantArm} hand</span> to perform the following tasks.`;;
     } else {
         instructionEl.innerHTML =
-            "Please use your index finger to perform the following tasks.";
+            "Please use your index finger (or thumb/index fingers for pinch) to perform the following tasks.";
     }
     // -----------------------------
     // 3. Default button state
     // -----------------------------
     dragBtn.disabled = false;
     tapBtn.disabled = true;
+    pinchBtn.disabled = true;
     holdBtn.disabled = true;
 
     tapBtn.style.display = "none";
+    pinchBtn.style.display = "none";
     holdBtn.style.display = "none";
 
     // -----------------------------
@@ -109,6 +112,7 @@ const holdBtn = document.getElementById("holdBtn");
     // -----------------------------
     dragBtn.onclick = () => startTask("../drag/drag.html");
     tapBtn.onclick = () => startTask("../tap/tap.html");
+    pinchBtn.onclick = () => startTask("../pinch/pinch.html");
     holdBtn.onclick = () => startTask("../hold/hold.html");
 
     // -----------------------------
@@ -118,9 +122,23 @@ const holdBtn = document.getElementById("holdBtn");
         try {
             const { data: sessionRow } = await supabase
                 .from("sessions")
-                .select("drag_completed, tap_completed")
+                .select("drag_completed, tap_completed, hold_completed")
                 .eq("id", sessionId)
                 .single();
+
+            // Check if pinch task is completed
+            let pinchCompleted = sessionStorage.getItem("pinch_completed") === "true";
+            if (!pinchCompleted) {
+                const { data: pinchTrials } = await supabase
+                    .from("trial_results")
+                    .select("id")
+                    .eq("session_id", sessionId)
+                    .eq("task_type", "pinch");
+                if (pinchTrials && pinchTrials.length > 0) {
+                    pinchCompleted = true;
+                    sessionStorage.setItem("pinch_completed", "true");
+                }
+            }
 
             if (sessionRow.drag_completed) {
                 dragBtn.style.display = "none";
@@ -130,6 +148,12 @@ const holdBtn = document.getElementById("holdBtn");
 
             if (sessionRow.tap_completed) {
                 tapBtn.style.display = "none";
+                pinchBtn.disabled = false;
+                pinchBtn.style.display = "block";
+            }
+
+            if (pinchCompleted) {
+                pinchBtn.style.display = "none";
                 holdBtn.disabled = false;
                 holdBtn.style.display = "block";
             }

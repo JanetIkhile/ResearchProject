@@ -4,30 +4,40 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tap Task</title>
-    <link rel="stylesheet" href="tap.css">
-    <script type="module" src="tap.js" defer></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pinch Task</title>
+    <link rel="stylesheet" href="pinch.css?v=8">
+    <script type="module" src="pinch.js?v=6" defer></script>
 </head>
 
 <body>
     <!-- Header -->
     <header id="taskHeader">
-        <h2>👆 Tap Task</h2>
+        <h2>🤏 Pinch Task</h2>
     </header>
-    <!-- Tap Area -->
-    <div id="tapArea">
-        <p id="tapInstruction">Tap the highlighted circles alternatively as fast and as big as you can!</p>
+
+    <!-- Pinch Area -->
+    <div id="pinchArea">
+        <p id="pinchInstruction">Place index finger on Top Dot & thumb on Bottom Dot. Move them as far apart and close together as fast as possible!</p>
         <p id="countdownTimer" style="display:none;"></p>
-        <div id="topTarget" class="tap-target active"></div>
-        <div id="bottomTarget" class="tap-target inactive"></div>
+        
+        <!-- SVG overlay for drawing line between fingers -->
+        <svg id="svgOverlay">
+            <line id="fingerLine" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255,255,255,0.7)" stroke-width="4" stroke-dasharray="8 4" style="display:none;" />
+        </svg>
+
+        <div id="topTarget" class="pinch-target">Top Dot</div>
+        <div id="bottomTarget" class="pinch-target">Bottom Dot</div>
+        
+        <!-- Live distance floating label -->
+        <div id="liveDistanceLabel" style="display:none;">0 mm</div>
     </div>
 
-    <!-- Modal -->
+    <!-- Modal for feedback -->
     <div id="resultsModal" class="modal" style="display:none;">
         <div class="modal-content" id="modalContentArea">
             <div class="modal-header">
-                <span class="modal-title">Tap Results</span>
+                <span class="modal-title">Pinch Results</span>
                 <span id="modalCloseX" class="modal-close">&times;</span>
             </div>
             <div class="modal-body" id="modalBodyContent"></div>
@@ -36,22 +46,21 @@
             </div>
         </div>
     </div>
+
+    <!-- Completion routing -->
     <div id="completionBox" style="display:none;">
         <p id="completionText">✅ Task complete</p>
-
-        <button id="nextTaskButton" onclick="window.location.href='../pinch/pinch.html'">
-            Next: Pinch Task
+        <button id="nextTaskButton" onclick="window.location.href='../hold/hold.html'">
+            Next: Hold Task
         </button>
     </div>
 
-    <!-- Modal logic -->
     <script>
         const modal = document.getElementById("resultsModal");
         const closeBtn = document.getElementById("modalCloseButton");
         const closeX = document.getElementById("modalCloseX");
         window.isModalOpen = false;
 
-        // --- Show Modal ---
         window.showModal = function () {
             modal.classList.add("show");
             modal.style.display = "block";
@@ -59,7 +68,6 @@
             window.isModalOpen = true;
         };
 
-        // --- Close Modal ---
         window.closeModal = function () {
             modal.classList.remove("show");
             modal.style.display = "none";
@@ -67,7 +75,6 @@
             window.isModalOpen = false;
         };
 
-        // --- Event listeners ---
         if (closeBtn) {
             closeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -82,7 +89,6 @@
             });
         }
 
-        // Prevent accidental background closing
         modal.addEventListener('touchstart', e => e.stopPropagation(), true);
         modal.addEventListener('touchmove', e => e.stopPropagation(), true);
         modal.addEventListener('touchend', e => e.stopPropagation(), true);
