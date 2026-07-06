@@ -19,12 +19,13 @@ let initiationDelay = null;
 let firstTouchTime = null;
 let isBetweenTrials = false;
 
+const ORIGINAL_INSTRUCTION = 'Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
+
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
 const bottomTarget = document.getElementById("bottomTarget");
 const fingerLine = document.getElementById("fingerLine");
 const liveDistanceLabel = document.getElementById("liveDistanceLabel");
-const timerEl = document.getElementById("countdownTimer");
 const instructionEl = document.getElementById("pinchInstruction");
 const completionBox = document.getElementById("completionBox");
 
@@ -209,17 +210,17 @@ function startPinchTrial(now) {
     trajectory = [];
     timeRemaining = 10;
     
-    // Hide instructions, show countdown
-    instructionEl.style.display = "none";
-    timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
-    timerEl.style.display = "block";
+    // Update inline instructions and timer countdown
+    instructionEl.innerHTML = `Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can<br><span class="timer-line">Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds</span>`;
+    instructionEl.style.display = "block";
+    
     // Countdown Timer
     countdownTimer = setInterval(() => {
         timeRemaining -= 1;
         if (timeRemaining <= 0) {
             stopPinchTrial();
         } else {
-            timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
+            instructionEl.innerHTML = `Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can<br><span class="timer-line">Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds</span>`;
         }
     }, 1000);
     
@@ -230,7 +231,6 @@ function startPinchTrial(now) {
 async function stopPinchTrial() {
     taskActive = false;
     clearInterval(countdownTimer);
-    timerEl.innerHTML = "Time remaining: <span class=\"timer-badge\">10</span> seconds";
     
     console.log(`Pinch trial ${trialNumber} ended. Recorded frames:`, trajectory.length);
     
@@ -254,7 +254,7 @@ async function stopPinchTrial() {
         
         setTimeout(() => {
             isBetweenTrials = false;
-            instructionEl.textContent = "Place fingers on the screen again";
+            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             firstTouchTime = null;
             sessionStorage.setItem("pinch_page_load", String(Date.now()));
         }, 2000); // 2 seconds transition/cooldown, then enable touch
@@ -313,7 +313,6 @@ function endPinchTask() {
     fingerLine.style.display = "none";
     liveDistanceLabel.style.display = "none";
     instructionEl.style.display = "none";
-    timerEl.style.display = "none";
     
     completionBox.style.display = "flex";
 }
