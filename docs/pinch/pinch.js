@@ -17,6 +17,7 @@ let timeRemaining = 10; // 10 seconds
 let trajectory = []; // list of { t, x_index, y_index, x_thumb, y_thumb, distance }
 let initiationDelay = null;
 let firstTouchTime = null;
+let isBetweenTrials = false;
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -87,7 +88,7 @@ function isTouchInsideElement(touch, element) {
 // Multi-Touch Handler
 function handleTouch(e) {
     // If modal is open or task is completed, do nothing
-    if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive)) {
+    if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive) || isBetweenTrials) {
         return;
     }
     
@@ -104,6 +105,11 @@ function handleTouch(e) {
     if (touches.length === 2) {
         e.preventDefault(); // Prevent scrolling/scaling gestures
         
+        // Hide warning instruction if it was displayed during touch loss
+        if (taskActive) {
+            instructionEl.style.display = "none";
+        }
+
         // Distinguish between Index (higher up, lower Y) and Thumb (lower down, higher Y)
         let t1 = touches[0];
         let t2 = touches[1];
@@ -115,36 +121,55 @@ function handleTouch(e) {
         const x2 = thumbTouch.clientX;
         const y2 = thumbTouch.clientY;
         
-        // Visual connection line
-        fingerLine.setAttribute("x1", x1);
-        fingerLine.setAttribute("y1", y1);
-        fingerLine.setAttribute("x2", x2);
-        fingerLine.setAttribute("y2", y2);
-        fingerLine.style.display = "block";
-        
-        // Midpoint and distance
         const dx = x1 - x2;
         const dy = y1 - y2;
         const distPx = Math.sqrt(dx * dx + dy * dy);
         const distMm = distPx * PX_TO_MM;
-        
-        // Floating MM label
-        const xMid = (x1 + x2) / 2;
-        const yMid = (y1 + y2) / 2;
-        liveDistanceLabel.style.left = `${xMid}px`;
-        liveDistanceLabel.style.top = `${yMid}px`;
-        liveDistanceLabel.textContent = `${distMm.toFixed(1)} mm`;
-        liveDistanceLabel.style.display = "block";
-        
-        // Automatic start trigger if two fingers are placed on the screen
-        if (!taskActive && !savingTrial) {
-            startPinchTrial(now);
+
+        // Logic check: Must be vertical (dy > dx)
+        const isVertical = Math.abs(dy) > Math.abs(dx);
+        if (!isVertical) {
+            instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please place and move your fingers vertically!</span>`;
+            instructionEl.style.display = "block";
+            
+            fingerLine.style.display = "none";
+            liveDistanceLabel.style.display = "none";
+            
+            if (!taskActive) {
+                return;
+            }
+        } else {
+            // Hide vertical warning if active
+            if (taskActive) {
+                instructionEl.style.display = "none";
+            }
+            
+            // Visual connection line
+            fingerLine.setAttribute("x1", x1);
+            fingerLine.setAttribute("y1", y1);
+            fingerLine.setAttribute("x2", x2);
+            fingerLine.setAttribute("y2", y2);
+            fingerLine.style.display = "block";
+            
+            // Floating MM label
+            const xMid = (x1 + x2) / 2;
+            const yMid = (y1 + y2) / 2;
+            liveDistanceLabel.style.left = `${xMid}px`;
+            liveDistanceLabel.style.top = `${yMid}px`;
+            liveDistanceLabel.textContent = `${distMm.toFixed(1)} mm`;
+            liveDistanceLabel.style.display = "block";
+            
+            // Automatic start trigger if two fingers are placed on the screen vertically
+            if (!taskActive && !savingTrial) {
+                startPinchTrial(now);
+            }
         }
         
         // Record trajectory frame
         if (taskActive) {
             trajectory.push({
                 t: now - trialStartTime,
+                touches_count: 2,
                 x_index: x1,
                 y_index: y1,
                 x_thumb: x2,
@@ -157,8 +182,22 @@ function handleTouch(e) {
         // Less than 2 touches -> hide tracking overlay
         fingerLine.style.display = "none";
         liveDistanceLabel.style.display = "none";
-        topTarget.classList.remove("active");
-        bottomTarget.classList.remove("active");
+        
+        // If the trial is active, log touch loss state in trajectory and alert the user
+        if (taskActive) {
+            trajectory.push({
+                t: now - trialStartTime,
+                touches_count: touches.length,
+                x_index: null,
+                y_index: null,
+                x_thumb: null,
+                y_thumb: null,
+                distance: null
+            });
+            
+            instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please keep both fingers on the screen!</span>`;
+            instructionEl.style.display = "block";
+        }
     }
 }
 
@@ -172,7 +211,7 @@ function startPinchTrial(now) {
     
     // Hide instructions, show countdown
     instructionEl.style.display = "none";
-    timerEl.textContent = `Time remaining: ${timeRemaining}s`;
+    timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
     timerEl.style.display = "block";
     // Countdown Timer
     countdownTimer = setInterval(() => {
@@ -180,7 +219,7 @@ function startPinchTrial(now) {
         if (timeRemaining <= 0) {
             stopPinchTrial();
         } else {
-            timerEl.textContent = `Time remaining: ${timeRemaining}s`;
+            timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
         }
     }, 1000);
     
@@ -191,7 +230,7 @@ function startPinchTrial(now) {
 async function stopPinchTrial() {
     taskActive = false;
     clearInterval(countdownTimer);
-    timerEl.style.display = "none";
+    timerEl.innerHTML = "Time remaining: <span class=\"timer-badge\">10</span> seconds";
     
     console.log(`Pinch trial ${trialNumber} ended. Recorded frames:`, trajectory.length);
     
@@ -204,11 +243,17 @@ async function stopPinchTrial() {
     if (trialNumber >= TRIAL_LIMIT) {
         endPinchTask();
     } else {
-        // Cooldown and prep next trial
-        instructionEl.textContent = `Trial ${trialNumber} Complete! Place fingers on the screen again to start Trial ${trialNumber + 1}.`;
+        // Cooldown transition
+        isBetweenTrials = true;
+        instructionEl.textContent = "Stop pinching";
         instructionEl.style.display = "block";
-        firstTouchTime = null;
-        sessionStorage.setItem("pinch_page_load", String(Date.now()));
+        
+        setTimeout(() => {
+            isBetweenTrials = false;
+            instructionEl.textContent = `Trial ${trialNumber} Complete! Place fingers on the screen again to start Trial ${trialNumber + 1}.`;
+            firstTouchTime = null;
+            sessionStorage.setItem("pinch_page_load", String(Date.now()));
+        }, 3000); // 3 seconds transition/cooldown
     }
 }
 
@@ -263,6 +308,8 @@ function endPinchTask() {
     bottomTarget.style.display = "none";
     fingerLine.style.display = "none";
     liveDistanceLabel.style.display = "none";
+    instructionEl.style.display = "none";
+    timerEl.style.display = "none";
     
     completionBox.style.display = "flex";
 }
