@@ -19,7 +19,7 @@ let initiationDelay = null;
 let firstTouchTime = null;
 let isBetweenTrials = false;
 
-const ORIGINAL_INSTRUCTION = "Place your thumb and index finger on the screen vertically. Open and close your fingers as quickly and as widely as you can";
+const ORIGINAL_INSTRUCTION = "Place your thumb and index finger on the screen vertically. Open and close your fingers <strong class=\"highlight-instruction\">as quickly</strong> and <strong class=\"highlight-instruction\">as widely</strong> as possible!";
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -109,7 +109,7 @@ function handleTouch(e) {
         
         // Restore normal instruction text if it was displaying a warning
         if (taskActive) {
-            instructionEl.textContent = ORIGINAL_INSTRUCTION;
+            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             instructionEl.style.display = "block";
         }
 
@@ -144,7 +144,7 @@ function handleTouch(e) {
         } else {
             // Hide vertical warning if active
             if (taskActive) {
-                instructionEl.textContent = ORIGINAL_INSTRUCTION;
+                instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
                 instructionEl.style.display = "block";
             }
             
@@ -214,7 +214,7 @@ function startPinchTrial(now) {
     timeRemaining = 10;
     
     // Keep instruction text visible, show countdown timer separately
-    instructionEl.textContent = ORIGINAL_INSTRUCTION;
+    instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
     instructionEl.style.display = "block";
     
     timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
@@ -265,7 +265,7 @@ async function stopPinchTrial() {
             endPinchTask();
         } else {
             isBetweenTrials = false;
-            instructionEl.textContent = ORIGINAL_INSTRUCTION;
+            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             timerEl.innerHTML = `Time remaining: <span class="timer-badge">10</span> seconds`;
             timerEl.style.display = "block";
             firstTouchTime = null;

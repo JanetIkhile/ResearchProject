@@ -190,7 +190,7 @@ function handleTouchStart(e) {
     topTarget.style.touchAction = 'none';
     bottomTarget.style.touchAction = 'none';
     
-    if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast as you can!<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
+    if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternately <strong class="highlight-instruction">as fast as possible</strong>!<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
     
     expectedTarget = "top";
     if (topTarget) {
@@ -237,7 +237,7 @@ function startTapTrial(startTs) {
     timerInterval = setInterval(() => {
         timeLeft--;
         if (tapInstruction && timeLeft > 0) {
-            tapInstruction.innerHTML = `Tap the highlighted circles alternatively as fast as you can!<br><span class="timer-line">Time remaining: <span class="timer-badge">${timeLeft}</span> seconds</span>`;
+            tapInstruction.innerHTML = `Tap the highlighted circles alternately <strong class="highlight-instruction">as fast as possible</strong>!<br><span class="timer-line">Time remaining: <span class="timer-badge">${timeLeft}</span> seconds</span>`;
         }
         if (timeLeft <= 0 && timerInterval) {
             clearInterval(timerInterval);
@@ -331,7 +331,7 @@ function startTapTrial(startTs) {
                     bottomTarget.classList.add("inactive");
                 }
                 expectedTarget = "top";
-                if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternatively as fast as you can!<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
+                if (tapInstruction) tapInstruction.innerHTML = 'Tap the highlighted circles alternately <strong class="highlight-instruction">as fast as possible</strong>!<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
                 if (countdown) countdown.style.display = "none";
             }, INTER_TRIAL_COOLDOWN);
         }

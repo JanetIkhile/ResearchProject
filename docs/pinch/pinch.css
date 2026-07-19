@@ -306,3 +306,11 @@ body {
     color: #000;
     margin-top: 5px;
 }
+
+.highlight-instruction {
+    background-color: #fef08a; /* Yellow highlight marker */
+    font-weight: bold;         /* Bold text */
+    color: inherit;            /* Inherit normal text color */
+    padding: 0 4px;
+    border-radius: 4px;
+}

@@ -49,7 +49,7 @@ const instructionSub = document.getElementById("instructionSub");
         } else {
             TRIAL_LIMIT = 10;  // real session
         }
-        instructionMain.innerHTML = "Drag from Start to Target as fast and<br>accurately as possible.";
+        instructionMain.innerHTML = "Drag from Start to Target <strong class=\"highlight-instruction\">as fast</strong> and<br>accurately as possible.";
         instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
 
         console.log("Drag task started");
