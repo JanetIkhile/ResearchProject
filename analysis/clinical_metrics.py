@@ -49,6 +49,25 @@ def extract_tremor(times, coords):
     to robustly calculate physiological tremor characteristics inside a 3-8 Hz target band.
     Also extracts peak-to-peak amplitude (px, cm) and maps to MDS-UPDRS clinical grades.
     """
+    # Clean input data (remove NaNs, infs, None)
+    if times is None or coords is None or len(times) == 0 or len(coords) == 0:
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        
+    times = np.asarray(times)
+    coords = np.asarray(coords)
+    
+    if len(coords.shape) != 2 or coords.shape[0] != len(times):
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        
+    valid_mask = np.isfinite(times) & np.all(np.isfinite(coords), axis=1)
+    times = times[valid_mask]
+    coords = coords[valid_mask]
+    
+    # Remove duplicate timestamps
+    if len(times) > 0:
+        times, unique_indices = np.unique(times, return_index=True)
+        coords = coords[unique_indices]
+
     # Use 2-3 seconds as minimum duration threshold (2000 ms)
     if len(times) < 10 or (times[-1] - times[0]) < 2000:
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
@@ -65,6 +84,10 @@ def extract_tremor(times, coords):
     uniform_x = f_x(uniform_times)
     uniform_y = f_y(uniform_times)
     
+    # Check that interpolated coordinates contain no NaNs/infs
+    if not np.all(np.isfinite(uniform_x)) or not np.all(np.isfinite(uniform_y)):
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        
     uniform_x_zero = uniform_x - np.mean(uniform_x)
     uniform_y_zero = uniform_y - np.mean(uniform_y)
     
@@ -172,6 +195,25 @@ def extract_kinetic_tremor(times, deviations):
     to robustly calculate physiological kinetic tremor characteristics inside a 3-8 Hz target band.
     Also extracts peak-to-peak amplitude (px, cm) and maps to MDS-UPDRS clinical severity grades.
     """
+    # Clean input data (remove NaNs, infs, None)
+    if times is None or deviations is None or len(times) == 0 or len(deviations) == 0:
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        
+    times = np.asarray(times)
+    deviations = np.asarray(deviations)
+    
+    if len(deviations) != len(times):
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        
+    valid_mask = np.isfinite(times) & np.isfinite(deviations)
+    times = times[valid_mask]
+    deviations = deviations[valid_mask]
+    
+    # Remove duplicate timestamps
+    if len(times) > 0:
+        times, unique_indices = np.unique(times, return_index=True)
+        deviations = deviations[unique_indices]
+
     # Use 300 ms as minimum duration threshold for drag movements
     if len(times) < 6 or (times[-1] - times[0]) < 300:
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
@@ -183,6 +225,10 @@ def extract_kinetic_tremor(times, deviations):
     f_interp = interp1d(times, deviations, kind='linear', fill_value='extrapolate')
     uniform_deviations = f_interp(uniform_times)
     
+    # Check that interpolated deviations contain no NaNs/infs
+    if not np.all(np.isfinite(uniform_deviations)):
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        
     # Remove DC offset (zero mean)
     uniform_deviations_zero = uniform_deviations - np.mean(uniform_deviations)
     
@@ -388,8 +434,17 @@ def extract_features_from_trial(row):
         if not isinstance(traj, list) or len(traj) < 2:
             return pd.Series(dtype=float)
             
-        times = np.array([pt['t'] for pt in traj])
-        coords = np.array([[pt['x'], pt['y']] for pt in traj])
+        valid_pts = [
+            pt for pt in traj 
+            if 't' in pt and pt.get('t') is not None and
+               'x' in pt and pt.get('x') is not None and
+               'y' in pt and pt.get('y') is not None
+        ]
+        if len(valid_pts) < 2:
+            return pd.Series(dtype=float)
+            
+        times = np.array([pt['t'] for pt in valid_pts], dtype=float)
+        coords = np.array([[pt['x'], pt['y']] for pt in valid_pts], dtype=float)
         coords = smooth_coordinates(coords)
         
         vel, acc, jerk = calculate_derivatives(times, coords)
@@ -449,21 +504,45 @@ def extract_features_from_trial(row):
                 signed_dists = signed_cross / task_axis_dist
                 k_freq, k_power, k_amp, k_amp_peak_px, k_amp_peak_cm, k_clinical_grade = extract_kinetic_tremor(times, signed_dists)
                 
-                # Amplitude Decrement of deviations along the task path
+                # Deviation Decrement of deviations along the task path (using median)
                 abs_dists = np.abs(signed_dists)
                 if len(abs_dists) > 1:
-                    drag_amplitude_slope = np.polyfit(np.arange(len(abs_dists)), abs_dists, 1)[0]
+                    drag_deviation_slope = np.polyfit(np.arange(len(abs_dists)), abs_dists, 1)[0]
                 else:
-                    drag_amplitude_slope = 0.0
+                    drag_deviation_slope = 0.0
                 
+                drag_median_deviation = np.median(abs_dists) if len(abs_dists) > 0 else np.nan
+
+                # Achieved drag amplitude along the ideal target axis
+                if len(coords) > 0 and pd.notna(t_x) and pd.notna(t_y) and task_axis_dist > 0:
+                    unit_axis = (target_pt - start_pt) / task_axis_dist
+                    projections = [np.dot(pt - start_pt, unit_axis) for pt in coords]
+                    drag_amplitude = max(projections) if len(projections) > 0 else np.nan
+                else:
+                    drag_amplitude = np.nan
+
                 half_len = len(abs_dists) // 2
                 if half_len > 0:
-                    first_half_mean = np.mean(abs_dists[:half_len])
-                    second_half_mean = np.mean(abs_dists[half_len:])
-                    drag_amplitude_decrement_ratio = second_half_mean / first_half_mean if first_half_mean > 0 else np.nan
+                    first_half_med = np.median(abs_dists[:half_len])
+                    second_half_med = np.median(abs_dists[half_len:])
+                    drag_deviation_decrement_ratio = second_half_med / first_half_med if first_half_med > 0 else np.nan
                 else:
-                    drag_amplitude_decrement_ratio = np.nan
+                    drag_deviation_decrement_ratio = np.nan
+
+                # Speed Decrement along the task path
+                drag_speed_slope = 0.0
+                drag_speed_decrement_ratio = np.nan
+                if len(vel) > 0:
+                    if len(vel) > 1:
+                        drag_speed_slope = np.polyfit(np.arange(len(vel)), vel, 1)[0]
+                    half_vel = len(vel) // 2
+                    if half_vel > 0:
+                        first_half_med_v = np.median(vel[:half_vel])
+                        second_half_med_v = np.median(vel[half_vel:])
+                        drag_speed_decrement_ratio = second_half_med_v / first_half_med_v if first_half_med_v > 0 else np.nan
             else:
+                drag_median_deviation = np.nan
+                drag_amplitude = np.nan
                 movement_variability = np.nan
                 max_deviation = np.nan
                 movement_error = np.nan
@@ -474,8 +553,8 @@ def extract_features_from_trial(row):
                 k_amp_peak_px = np.nan
                 k_amp_peak_cm = np.nan
                 k_clinical_grade = np.nan
-                drag_amplitude_slope = np.nan
-                drag_amplitude_decrement_ratio = np.nan
+                drag_deviation_slope = np.nan
+                drag_deviation_decrement_ratio = np.nan
         else:
             movement_variability = np.nan
             max_deviation = np.nan
@@ -489,19 +568,20 @@ def extract_features_from_trial(row):
             k_clinical_grade = np.nan
             fitts_law_id = np.nan
             fitts_law_throughput = np.nan
-            drag_amplitude_slope = np.nan
-            drag_amplitude_decrement_ratio = np.nan
+            drag_deviation_slope = np.nan
+            drag_deviation_decrement_ratio = np.nan
+            drag_amplitude = np.nan
             
         # Velocity / Pauses / Hesitations / Halts
         mean_speed = np.mean(vel) if len(vel) > 0 else np.nan
         median_speed = np.median(vel) if len(vel) > 0 else np.nan
         peak_speed = np.max(vel) if len(vel) > 0 else np.nan
         
-        # Hesitations (velocity drops below 30% of mean speed for >= 100ms)
+        # Hesitations (velocity drops below 30% of median speed for >= 100ms)
         hesitations_count = 0
         hesitations_duration = 0.0
-        if len(vel) > 0 and pd.notna(mean_speed) and mean_speed > 0:
-            hes_threshold = 0.3 * mean_speed
+        if len(vel) > 0 and pd.notna(median_speed) and median_speed > 0:
+            hes_threshold = 0.3 * median_speed
             hes_mask = vel < hes_threshold
             padded_hes = np.concatenate(([False], hes_mask, [False]))
             diffs_hes = np.diff(padded_hes.astype(int))
@@ -513,11 +593,11 @@ def extract_features_from_trial(row):
                     hesitations_count += 1
                     hesitations_duration += duration
                     
-        # Halts (movement stops: velocity < 10 px/s for >= 250ms)
+        # Halts (movement stops: velocity drops below 5% of median speed for >= 250ms)
         halts_count = 0
         halts_duration = 0.0
-        if len(vel) > 0:
-            halt_threshold = 10.0
+        if len(vel) > 0 and pd.notna(median_speed) and median_speed > 0:
+            halt_threshold = 0.05 * median_speed
             halt_mask = vel < halt_threshold
             padded_halt = np.concatenate(([False], halt_mask, [False]))
             diffs_halt = np.diff(padded_halt.astype(int))
@@ -594,8 +674,12 @@ def extract_features_from_trial(row):
                     3.0 if path_eff >= 0.80 else 4.0
                 )
             ),
-            'drag_amplitude_slope': drag_amplitude_slope,
-            'drag_amplitude_decrement_ratio': drag_amplitude_decrement_ratio,
+            'drag_deviation_slope': drag_deviation_slope,
+            'drag_deviation_decrement_ratio': drag_deviation_decrement_ratio,
+            'drag_speed_slope': drag_speed_slope,
+            'drag_speed_decrement_ratio': drag_speed_decrement_ratio,
+            'drag_median_deviation': drag_median_deviation,
+            'drag_amplitude': drag_amplitude,
             'initial_targeting_error': initial_targeting_error,
             'endpoint_deviation_error': endpoint_deviation_error,
             'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
@@ -617,7 +701,7 @@ def extract_features_from_trial(row):
             'movement_time_ms': row.get('movement_time_ms'),
             'fitts_law_id': fitts_law_id,
             'fitts_law_throughput': fitts_law_throughput,
-            'drag_clinical_impairment_grade': calculate_drag_impairment_grade(mean_speed, drag_amplitude_decrement_ratio, halts_count, hesitations_count, row.get('movement_time_ms'))
+            'drag_clinical_impairment_grade': calculate_drag_impairment_grade(mean_speed, drag_deviation_decrement_ratio, halts_count, hesitations_count, row.get('movement_time_ms'))
         })
         
     elif task == 'tap':
@@ -678,27 +762,44 @@ def extract_features_from_trial(row):
         else:
             amplitude_slope = 0.0
 
-        # Amplitude decrement ratio (ratio of mean of last 3 taps to mean of first 3 taps)
+        # Amplitude decrement ratio (ratio of median of last 3 taps to median of first 3 taps)
         if len(amplitudes) >= 6:
-            first_3 = np.mean(amplitudes[:3])
-            last_3 = np.mean(amplitudes[-3:])
+            first_3 = np.median(amplitudes[:3])
+            last_3 = np.median(amplitudes[-3:])
             amplitude_decrement_ratio = last_3 / first_3 if first_3 > 0 else np.nan
         elif len(amplitudes) >= 2:
             amplitude_decrement_ratio = amplitudes[-1] / amplitudes[0] if amplitudes[0] > 0 else np.nan
         else:
             amplitude_decrement_ratio = np.nan
 
+        # Speed Decrement (progressive intertap slowing)
+        if len(intertap) > 1:
+            tap_speed_slope = np.polyfit(np.arange(len(intertap)), intertap, 1)[0]
+        else:
+            tap_speed_slope = 0.0
+
+        if len(intertap) >= 6:
+            first_3_it = np.median(intertap[:3])
+            last_3_it = np.median(intertap[-3:])
+            tap_speed_decrement_ratio = last_3_it / first_3_it if first_3_it > 0 else np.nan
+        elif len(intertap) >= 2:
+            tap_speed_decrement_ratio = intertap[-1] / intertap[0] if intertap[0] > 0 else np.nan
+        else:
+            tap_speed_decrement_ratio = np.nan
+
         # 3. Hesitations & Halts
         hesitations = 0
         hesitations_duration = 0.0
         halts = 0
         halts_duration = 0.0
-        if len(intertap) > 0 and pd.notna(mean_intertap):
+        # 3. Hesitations & Halts (Dynamic rhythm-based, relative to subject's own median)
+        med_intertap = np.median(intertap) if len(intertap) > 0 else np.nan
+        if len(intertap) > 0 and pd.notna(med_intertap) and med_intertap > 0:
             for iti in intertap:
-                if iti > 2.0 * mean_intertap or iti > 1000.0:
+                if iti > 2.0 * med_intertap:
                     halts += 1
                     halts_duration += iti
-                elif iti > 1.5 * mean_intertap or iti > 500.0:
+                elif iti > 1.5 * med_intertap:
                     hesitations += 1
                     hesitations_duration += iti
 
@@ -748,6 +849,8 @@ def extract_features_from_trial(row):
             'amplitude_slope': amplitude_slope,
             'amplitude_slope_mm': amplitude_slope * (25.4 / 96.0) if pd.notna(amplitude_slope) else np.nan,
             'amplitude_decrement_ratio': amplitude_decrement_ratio,
+            'tap_speed_slope': tap_speed_slope,
+            'tap_speed_decrement_ratio': tap_speed_decrement_ratio,
             'hesitations_count': hesitations,
             'hesitations_duration_ms': hesitations_duration,
             'halts_count': halts,
@@ -814,13 +917,25 @@ def extract_features_from_trial(row):
         })
     elif task == 'pinch':
         traj = row.get('trajectory', [])
-        if not isinstance(traj, list) or len(traj) < 2:
+        if not isinstance(traj, list) or len(traj) < 5:
             return pd.Series(dtype=float)
             
-        times = np.array([pt['t'] for pt in traj if 't' in pt])
-        distances = np.array([pt.get('distance', 0) for pt in traj if 't' in pt])
+        valid_points = [
+            pt for pt in traj 
+            if 't' in pt and pt.get('t') is not None and 
+               'distance' in pt and pt.get('distance') is not None
+        ]
+        if len(valid_points) < 5:
+            return pd.Series(dtype=float)
+            
+        times = np.array([pt['t'] for pt in valid_points], dtype=float)
+        distances = np.array([pt['distance'] for pt in valid_points], dtype=float)
         
-        if len(times) < 2:
+        valid_mask = np.isfinite(times) & np.isfinite(distances)
+        times = times[valid_mask]
+        distances = distances[valid_mask]
+        
+        if len(times) < 5:
             return pd.Series(dtype=float)
             
         # Smooth distances
@@ -871,27 +986,57 @@ def extract_features_from_trial(row):
             amplitude_slope = 0.0
             
         if len(cycle_amplitudes) >= 6:
-            first_3 = np.mean(cycle_amplitudes[:3])
-            last_3 = np.mean(cycle_amplitudes[-3:])
+            first_3 = np.median(cycle_amplitudes[:3])
+            last_3 = np.median(cycle_amplitudes[-3:])
             amplitude_decrement_ratio = last_3 / first_3 if first_3 > 0 else np.nan
         elif len(cycle_amplitudes) >= 2:
             amplitude_decrement_ratio = cycle_amplitudes[-1] / cycle_amplitudes[0] if cycle_amplitudes[0] > 0 else np.nan
         else:
             amplitude_decrement_ratio = np.nan
+
+        # Speed Decrement (progressive inter-cycle slowing)
+        if len(cycle_intervals) > 1:
+            pinch_speed_slope = np.polyfit(np.arange(len(cycle_intervals)), cycle_intervals, 1)[0]
+        else:
+            pinch_speed_slope = 0.0
+
+        if len(cycle_intervals) >= 6:
+            first_3_pi = np.median(cycle_intervals[:3])
+            last_3_pi = np.median(cycle_intervals[-3:])
+            pinch_speed_decrement_ratio = last_3_pi / first_3_pi if first_3_pi > 0 else np.nan
+        elif len(cycle_intervals) >= 2:
+            pinch_speed_decrement_ratio = cycle_intervals[-1] / cycle_intervals[0] if cycle_intervals[0] > 0 else np.nan
+        else:
+            pinch_speed_decrement_ratio = np.nan
             
-        # Hesitations & Halts
+        # Hesitations & Halts (Dynamic rhythm-based, relative to subject's own median)
+        med_cycle = np.median(cycle_intervals) if len(cycle_intervals) > 0 else np.nan
         hesitations = 0
         hesitations_duration = 0.0
         halts = 0
         halts_duration = 0.0
-        if len(cycle_intervals) > 0 and pd.notna(mean_interval):
+        if len(cycle_intervals) > 0 and pd.notna(med_cycle) and med_cycle > 0:
             for iti in cycle_intervals:
-                if iti > 2.0 * mean_interval or iti > 1000.0:
+                if iti > 2.0 * med_cycle:
                     halts += 1
                     halts_duration += iti
-                elif iti > 1.5 * mean_interval or iti > 500.0:
+                elif iti > 1.5 * med_cycle:
                     hesitations += 1
                     hesitations_duration += iti
+
+        # Pinch Lift-Offs (touch interruptions)
+        pinch_lifts_count = 0
+        pinch_lifts_duration_ms = 0.0
+        if len(times) > 1:
+            gaps = np.diff(times)
+            med_dt = np.median(gaps) if len(gaps) > 0 else 16.6
+            lift_threshold = 10.0 * med_dt
+            
+            lift_gaps = gaps[gaps > lift_threshold]
+            pinch_lifts_count = len(lift_gaps)
+            pinch_lifts_duration_ms = float(np.sum(lift_gaps))
+            
+        pinch_mean_lift_duration_ms = (pinch_lifts_duration_ms / pinch_lifts_count) if pinch_lifts_count > 0 else 0.0
                     
         return pd.Series({
             'pinch_duration_ms': row.get('total_tap_time_ms', duration_ms),
@@ -904,10 +1049,15 @@ def extract_features_from_trial(row):
             'pinch_amplitude_slope': amplitude_slope,
             'pinch_amplitude_slope_mm': amplitude_slope * (25.4 / 96.0) if pd.notna(amplitude_slope) else np.nan,
             'pinch_amplitude_decrement_ratio': amplitude_decrement_ratio,
+            'pinch_speed_slope': pinch_speed_slope,
+            'pinch_speed_decrement_ratio': pinch_speed_decrement_ratio,
             'pinch_hesitations_count': hesitations,
             'pinch_hesitations_duration_ms': hesitations_duration,
             'pinch_halts_count': halts,
             'pinch_halts_duration_ms': halts_duration,
+            'pinch_lifts_count': pinch_lifts_count,
+            'pinch_lifts_duration_ms': pinch_lifts_duration_ms,
+            'pinch_mean_lift_duration_ms': pinch_mean_lift_duration_ms,
             'initiation_delay': row.get('initiation_delay', 0),
             'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, 0, hesitations, median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan, is_pinch=True)
         })

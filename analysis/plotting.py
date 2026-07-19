@@ -4,9 +4,43 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+def normalize_participant_codes(func):
+    import functools
+    import inspect
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        sig = inspect.signature(func)
+        bound = sig.bind(*args, **kwargs)
+        bound.apply_defaults()
+        codes = bound.arguments.get('participant_codes')
+        if codes is not None:
+            bound.arguments['participant_codes'] = [
+                'P' + c[2:] if isinstance(c, str) and c.startswith('P0') and len(c) > 2 else c
+                for c in codes
+            ]
+        return func(*bound.args, **bound.kwargs)
+    return wrapper
+
 def resolve_data(trials_df=None, sessions_df=None, participants_df=None,
                  csv_dir=None, trials_path=None, sessions_path=None, participants_path=None,
                  supabase_url=None, supabase_key=None):
+    tdf, sdf, pdf = _resolve_data_raw(
+        trials_df, sessions_df, participants_df,
+        csv_dir, trials_path, sessions_path, participants_path,
+        supabase_url, supabase_key
+    )
+    if pdf is not None and 'participant_code' in pdf.columns:
+        pdf = pdf.copy()
+        pdf['participant_code'] = pdf['participant_code'].map(
+            lambda x: 'P' + x[2:] if isinstance(x, str) and x.startswith('P0') and len(x) > 2 else x
+        )
+    return tdf, sdf, pdf
+
+
+def _resolve_data_raw(trials_df=None, sessions_df=None, participants_df=None,
+                     csv_dir=None, trials_path=None, sessions_path=None, participants_path=None,
+                     supabase_url=None, supabase_key=None):
     """
     Resolves data inputs into pandas DataFrames.
     Can accept:
@@ -68,32 +102,32 @@ def resolve_data(trials_df=None, sessions_df=None, participants_df=None,
 def get_participant_color(index, code=None):
     """Returns a premium, distinct color from a curated palette."""
     colors = {
-        'P01': '#0D9488', # Teal
-        'P02': '#EA580C', # Orange
-        'P03': '#2563EB', # Blue
-        'P04': '#7C3AED', # Purple
-        'P05': '#EC4899', # Pink
-        'P06': '#10B981', # Green
+        'P01': '#2563EB', 'P1': '#2563EB', # Blue
+        'P02': '#EA580C', 'P2': '#EA580C', # Orange
+        'P03': '#0D9488', 'P3': '#0D9488', # Teal
+        'P04': '#7C3AED', 'P4': '#7C3AED', # Purple
+        'P05': '#EC4899', 'P5': '#EC4899', # Pink
+        'P06': '#10B981', 'P6': '#10B981', # Green
     }
     if code in colors:
         return colors[code]
-    palette = ['#0D9488', '#EA580C', '#2563EB', '#7C3AED', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6']
+    palette = ['#2563EB', '#EA580C', '#0D9488', '#7C3AED', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6']
     return palette[index % len(palette)]
 
 
 def get_radar_colors(p_code, idx):
     """Returns line and fill colors for the radar fingerprints chart."""
     colors = {
-        'P01': '#0D9488',
-        'P02': '#EA580C',
-        'P03': '#2563EB',
-        'P04': '#7C3AED'
+        'P01': '#0D9488', 'P1': '#0D9488',
+        'P02': '#EA580C', 'P2': '#EA580C',
+        'P03': '#2563EB', 'P3': '#2563EB',
+        'P04': '#7C3AED', 'P4': '#7C3AED'
     }
     fill_colors = {
-        'P01': '#CCFBF1',
-        'P02': '#FFEDD5',
-        'P03': '#DBEAFE',
-        'P04': '#F3E8FF'
+        'P01': '#CCFBF1', 'P1': '#CCFBF1',
+        'P02': '#FFEDD5', 'P2': '#FFEDD5',
+        'P03': '#DBEAFE', 'P3': '#DBEAFE',
+        'P04': '#F3E8FF', 'P4': '#F3E8FF'
     }
     if p_code in colors:
         return colors[p_code], fill_colors[p_code]
@@ -103,6 +137,7 @@ def get_radar_colors(p_code, idx):
     return palette_colors[idx % len(palette_colors)], palette_fills[idx % len(palette_fills)]
 
 
+@normalize_participant_codes
 def plot_tap_distribution(
     trials_df=None,
     participants_df=None,
@@ -147,6 +182,52 @@ def plot_tap_distribution(
     rows = (num_participants + cols - 1) // cols
     fig, axes = plt.subplots(rows, cols, figsize=(7 * cols, 7 * rows), squeeze=False)
 
+    # Collect coordinates and targets to compute global limits across all participants
+    local_limits = []
+    for p_code in participant_codes:
+        p_rows = pdf[pdf['participant_code'] == p_code]
+        if p_rows.empty:
+            continue
+        p_id = p_rows['id'].values[0]
+        
+        t_data = main_trials[
+            (main_trials['participant_id'] == p_id) & 
+            (main_trials['task_type'] == 'tap') & 
+            (main_trials['trial_number'] == trial_number)
+        ]
+        if t_data.empty:
+            continue
+            
+        trial_row = t_data.iloc[0]
+        tx = trial_row['target_x']
+        ty = trial_row['target_y']
+        tr = trial_row['target_radius']
+        taps = trial_row['taps']
+        if not taps or not isinstance(taps, list):
+            continue
+            
+        xs = [t['x'] for t in taps if 'x' in t]
+        ys = [t['y'] for t in taps if 'y' in t]
+        
+        margin = tr * 1.5
+        ty_top = ty + 220.0
+        x_min = min(tx - margin, min(xs) - 30 if xs else tx - margin)
+        x_max = max(tx + margin, max(xs) + 30 if xs else tx + margin)
+        y_min = min(ty - margin, min(ys) - 30 if ys else ty - margin)
+        y_max = max(ty_top + margin, max(ys) + 30 if ys else ty_top + margin)
+        local_limits.append((x_min, x_max, y_min, y_max))
+
+    if local_limits:
+        global_x_min = min(lim[0] for lim in local_limits)
+        global_x_max = max(lim[1] for lim in local_limits)
+        global_y_min = min(lim[2] for lim in local_limits)
+        global_y_max = max(lim[3] for lim in local_limits)
+    else:
+        global_x_min, global_x_max, global_y_min, global_y_max = 200, 600, 300, 920
+
+    legend_handles = []
+    legend_labels = []
+
     for idx, p_code in enumerate(participant_codes):
         r = idx // cols
         c = idx % cols
@@ -178,41 +259,78 @@ def plot_tap_distribution(
             ax.text(0.5, 0.5, f"No taps recorded in trial for {p_code}", ha='center', va='center')
             continue
 
-        xs = [t['x'] for t in taps if 'x' in t]
-        ys = [t['y'] for t in taps if 'y' in t]
-        hits = [t.get('is_inside_target', True) for t in taps]
-        
+        # Bottom target
         target_circle = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.5, edgecolor='#0284C7', linewidth=2, label='Target Area')
         ax.add_patch(target_circle)
-        ax.plot(tx, ty, marker='+', color='#0284C7', markersize=15, markeredgewidth=2, label='Target Center')
+        center_line, = ax.plot(tx, ty, marker='+', color='#0284C7', markersize=15, markeredgewidth=2, label='Target Center')
         
-        xs_hit = [x for x, h in zip(xs, hits) if h]
-        ys_hit = [y for y, h in zip(ys, hits) if h]
-        xs_miss = [x for x, h in zip(xs, hits) if not h]
-        ys_miss = [y for y, h in zip(ys, hits) if not h]
+        # Top target
+        top_target_circle = plt.Circle((tx, ty + 220.0), tr, fill=True, facecolor='#E0F2FE', alpha=0.5, edgecolor='#0284C7', linewidth=2)
+        ax.add_patch(top_target_circle)
+        ax.plot(tx, ty + 220.0, marker='+', color='#0284C7', markersize=15, markeredgewidth=2)
         
-        ax.scatter(xs_hit, ys_hit, color='#0D9488', alpha=0.8, edgecolors='black', s=60, zorder=3, label='Hit (Inside)')
-        if xs_miss:
-            ax.scatter(xs_miss, ys_miss, color='#DC2626', alpha=0.9, edgecolors='black', s=80, zorder=4, label='Miss (Outside)')
+        xs_hit = []
+        ys_hit = []
+        xs_miss_outside = []
+        ys_miss_outside = []
+        xs_miss_inactive = []
+        ys_miss_inactive = []
+        
+        for t in taps:
+            x = t.get('x')
+            y = t.get('y')
+            if x is None or y is None:
+                continue
+            is_hit = t.get('is_inside_target', True)
+            if is_hit:
+                xs_hit.append(x)
+                ys_hit.append(y)
+            else:
+                expected = t.get('expected_target')
+                if expected is not None:
+                    if expected == 'top':
+                        dist_inactive = np.hypot(x - tx, y - (ty + 220.0))
+                    else:
+                        dist_inactive = np.hypot(x - tx, y - ty)
+                    
+                    if dist_inactive <= tr:
+                        xs_miss_inactive.append(x)
+                        ys_miss_inactive.append(y)
+                    else:
+                        xs_miss_outside.append(x)
+                        ys_miss_outside.append(y)
+                else:
+                    xs_miss_outside.append(x)
+                    ys_miss_outside.append(y)
+                    
+        sc_hit = ax.scatter(xs_hit, ys_hit, color='#0D9488', alpha=0.8, edgecolors='black', s=60, zorder=3, label='Hit (Inside)')
+        
+        if xs_miss_outside:
+            ax.scatter(xs_miss_outside, ys_miss_outside, color='#DC2626', alpha=0.9, edgecolors='black', s=80, zorder=4, label='Miss (Outside)')
+        else:
+            ax.scatter([], [], color='#DC2626', alpha=0.9, edgecolors='black', s=80, label='Miss (Outside)')
+            
+        if xs_miss_inactive:
+            ax.scatter(xs_miss_inactive, ys_miss_inactive, color='#F97316', alpha=0.9, edgecolors='black', s=80, zorder=4, label='Incorrect Tap')
+        else:
+            ax.scatter([], [], color='#F97316', alpha=0.9, edgecolors='black', s=80, label='Incorrect Tap')
             
         hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
-        ax.set_title(f"Tapping Spatial Spread - {p_code} ({hand})\nTrial {int(trial_row['trial_number'])} ({len(taps)} total taps)", fontsize=13, weight='bold', pad=12)
+        hand_str = str(hand).capitalize()
+        ax.set_title(f"{p_code}, Dominant arm - {hand_str}\nTrial {int(trial_row['trial_number'])} ({len(taps)} total taps)", fontsize=12, weight='bold', pad=10)
         ax.set_xlabel("X Coordinate (pixels)", fontsize=11)
         ax.set_ylabel("Y Coordinate (pixels)", fontsize=11)
         ax.set_aspect('equal', 'box')
         
-        margin = tr * 1.5
-        x_min = min(tx - margin, min(xs) - 50 if xs else tx - margin)
-        x_max = max(tx + margin, max(xs) + 50 if xs else tx + margin)
-        y_min = min(ty - margin, min(ys) - 50 if ys else ty - margin)
-        y_max = max(ty + margin, max(ys) + 50 if ys else ty + margin)
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
+        # Center square bounding box around both targets
+        y_half_span = 110.0 + 1.5 * tr
+        ax.set_xlim(tx - y_half_span, tx + y_half_span)
+        ax.set_ylim(ty + 110.0 - y_half_span, ty + 110.0 + y_half_span)
         
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(True, linestyle='--', alpha=0.3)
-        ax.legend(loc='lower right', fontsize=9)
+        ax.legend(loc='lower left', fontsize=10, frameon=True, facecolor='white', edgecolor='lightgray')
 
     # Hide unused axes
     for idx in range(num_participants, rows * cols):
@@ -221,11 +339,12 @@ def plot_tap_distribution(
         fig.delaxes(axes[r, c])
 
     title_suffix = " vs ".join(participant_codes) if len(participant_codes) <= 4 else f"{len(participant_codes)} Participants"
-    plt.suptitle(f"Raw Tap Spatial Distribution Comparison: {title_suffix}", fontsize=16, weight='bold', y=0.98)
-    plt.tight_layout()
+    plt.suptitle(f"Raw Tap Spatial Distribution Comparison: {title_suffix}", fontsize=15, weight='bold', y=0.96)
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
     plt.show()
 
 
+@normalize_participant_codes
 def plot_drag_trajectory(
     trials_df=None,
     participants_df=None,
@@ -301,18 +420,18 @@ def plot_drag_trajectory(
         pxs = [pt['x'] for pt in traj if 'x' in pt]
         pys = [pt['y'] for pt in traj if 'y' in pt]
         
-        start_c = plt.Circle((sx, sy), sr, fill=True, facecolor='#DCFCE7', alpha=0.5, edgecolor='#16A34A', linewidth=2, label='Start Area')
+        start_c = plt.Circle((sx, sy), sr, fill=True, facecolor='#DCFCE7', alpha=0.5, edgecolor='#15803D', linewidth=2)
         ax.add_patch(start_c)
         
-        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.5, edgecolor='#0284C7', linewidth=2, label='Target Area')
+        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#FEE2E2', alpha=0.5, edgecolor='#DC2626', linewidth=2)
         ax.add_patch(target_c)
         
-        ax.plot([sx, tx], [sy, ty], color='#94A3B8', linestyle='--', linewidth=1.5, label='Ideal Axis')
+        ax.plot([sx, tx], [sy, ty], color='black', linestyle='--', linewidth=2.0)
         
         path_color = get_participant_color(idx, p_code)
-        ax.plot(pxs, pys, color=path_color, linewidth=2.5, label='Actual Drag Path', zorder=3)
-        ax.scatter(pxs[0], pys[0], color='#16A34A', s=60, zorder=4, label='Start Touch')
-        ax.scatter(pxs[-1], pys[-1], color='#DC2626', s=60, zorder=4, label='Release Touch')
+        ax.plot(pxs, pys, color=path_color, linewidth=2.5, zorder=3)
+        ax.scatter(pxs[0], pys[0], color='#7C3AED', s=60, zorder=4)
+        ax.scatter(pxs[-1], pys[-1], color='#DC2626', s=60, zorder=4)
         
         hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
         ax.set_title(f"Drag Trajectory (Trial {trial_number}) - {p_code} ({hand})\n({len(traj)} points logged)", fontsize=13, weight='bold', pad=12)
@@ -326,11 +445,21 @@ def plot_drag_trajectory(
         max_y = max(sy, ty) + 100
         ax.set_xlim(min_x, max_x)
         ax.set_ylim(min_y, max_y)
+        ax.invert_yaxis()
         
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(True, linestyle='--', alpha=0.3)
-        ax.legend(loc='lower right', fontsize=9)
+        
+        import matplotlib.lines as mlines
+        start_area_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#DCFCE7', markeredgecolor='#15803D', markeredgewidth=2, markersize=10, alpha=0.5, label='Start Area')
+        target_area_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#FEE2E2', markeredgecolor='#DC2626', markeredgewidth=2, markersize=10, alpha=0.5, label='Target Area')
+        ideal_axis_handle = mlines.Line2D([], [], color='black', linestyle='--', linewidth=2.0, label='Ideal Axis')
+        drag_path_handle = mlines.Line2D([], [], color=path_color, linewidth=2.5, label='Actual Drag Path')
+        touch_init_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#7C3AED', markeredgecolor='#7C3AED', markersize=8, label='Touch Initiated')
+        touch_rel_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#DC2626', markeredgecolor='#DC2626', markersize=8, label='Touch Released')
+        
+        ax.legend(handles=[start_area_handle, target_area_handle, ideal_axis_handle, drag_path_handle, touch_init_handle, touch_rel_handle], loc='lower left', fontsize=9)
 
     # Hide unused axes
     for idx in range(num_participants, rows * cols):
@@ -344,6 +473,7 @@ def plot_drag_trajectory(
     plt.show()
 
 
+@normalize_participant_codes
 def plot_hold_trajectory(
     trials_df=None,
     participants_df=None,
@@ -358,6 +488,140 @@ def plot_hold_trajectory(
     """
     Plots hold postural drift traces side-by-side for given participant codes.
     If participant_codes is None, all participants in the dataset are plotted.
+    """
+    tdf, sdf, pdf = resolve_data(
+        trials_df=trials_df,
+        sessions_df=sessions_df,
+        participants_df=participants_df,
+        csv_dir=csv_dir,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key
+    )
+
+    if participant_codes is None:
+        participant_codes = sorted(pdf['participant_code'].unique().tolist()) if 'participant_code' in pdf.columns else []
+
+    if session_type and sdf is not None:
+        main_session_ids = sdf[sdf['session_type'] == session_type]['id']
+        main_trials = tdf[tdf['session_id'].isin(main_session_ids)]
+    else:
+        main_trials = tdf
+
+    num_participants = len(participant_codes)
+    if num_participants == 0:
+        print("No participants selected.")
+        return
+
+    cols = min(num_participants, 3)
+    rows = (num_participants + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(8.5 * cols, 7 * rows), squeeze=False)
+
+    for idx, p_code in enumerate(participant_codes):
+        r = idx // cols
+        c = idx % cols
+        ax = axes[r, c]
+        
+        p_rows = pdf[pdf['participant_code'] == p_code]
+        if p_rows.empty:
+            ax.text(0.5, 0.5, f"Participant {p_code} not found", ha='center', va='center')
+            continue
+        p_id = p_rows['id'].values[0]
+        
+        t_data = main_trials[
+            (main_trials['participant_id'] == p_id) & 
+            (main_trials['task_type'] == 'hold') & 
+            (main_trials['trial_number'] == trial_number)
+        ]
+        
+        if t_data.empty:
+            ax.text(0.5, 0.5, f"No hold trial {trial_number} for {p_code}", ha='center', va='center')
+            continue
+            
+        trial_row = t_data.iloc[0]
+        tx, ty, tr = trial_row['target_x'], trial_row['target_y'], trial_row['target_radius']
+        events = trial_row['hold_events']
+        
+        if not events or not isinstance(events, list):
+            ax.text(0.5, 0.5, f"No hold events recorded for {p_code}", ha='center', va='center')
+            continue
+
+        hxs = [e['x'] for e in events if 'x' in e and 'y' in e]
+        hys = [e['y'] for e in events if 'x' in e and 'y' in e]
+        
+        if not hxs:
+            ax.text(0.5, 0.5, f"No valid coordinates in hold events for {p_code}", ha='center', va='center')
+            continue
+
+        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.15, edgecolor='#0284C7', linewidth=2.5, label='Target Boundary')
+        ax.add_patch(target_c)
+        ax.plot(tx, ty, marker='+', color='#0284C7', markersize=15, markeredgewidth=2, label='Target Center')
+        
+        path_color = get_participant_color(idx, p_code)
+        ax.plot(hxs, hys, color=path_color, linewidth=1.5, alpha=0.8, label='Hold Drift Trace')
+        
+        ax.scatter(hxs[0], hys[0], color='#7C3AED', s=40, zorder=4, label='Hold Start')
+        ax.scatter(hxs[-1], hys[-1], color='#DC2626', s=40, zorder=4, label='Hold End')
+        
+        hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
+        hand_str = str(hand).capitalize()
+        ax.set_title(f"{p_code}, Dominant arm - {hand_str}\nTrial {trial_number} ({len(hxs)} points logged)", fontsize=12, weight='bold', pad=10)
+        ax.set_xlabel("X Coordinate (pixels)", fontsize=11)
+        ax.set_ylabel("Y Coordinate (pixels)", fontsize=11)
+        ax.set_aspect('equal', 'box')
+        
+        margin = tr * 1.1
+        ax.set_xlim(tx - margin, tx + margin)
+        ax.set_ylim(ty - margin, ty + margin)
+        
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.grid(True, linestyle='--', alpha=0.3)
+        
+        import matplotlib.lines as mlines
+        target_boundary_handle = mlines.Line2D(
+            [], [], 
+            color='#0284C7', 
+            marker='o', 
+            markerfacecolor='#E0F2FE', 
+            markersize=10, 
+            markeredgecolor='#0284C7', 
+            markeredgewidth=1.5, 
+            linestyle='None', 
+            label='Target Boundary'
+        )
+        
+        handles, labels = ax.get_legend_handles_labels()
+        for i, label in enumerate(labels):
+            if label == 'Target Boundary':
+                handles[i] = target_boundary_handle
+        ax.legend(handles=handles, labels=labels, loc='lower right', fontsize=9)
+
+    # Hide unused axes
+    for idx in range(num_participants, rows * cols):
+        r = idx // cols
+        c = idx % cols
+        fig.delaxes(axes[r, c])
+
+    title_suffix = " vs ".join(participant_codes) if len(participant_codes) <= 4 else f"{len(participant_codes)} Participants"
+    plt.suptitle(f"Raw Hold Postural Drift Comparison: {title_suffix} (Equivalent Trial {trial_number})", fontsize=15, weight='bold', y=0.95)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.show()
+
+
+@normalize_participant_codes
+def plot_pinch_trajectory(
+    trials_df=None,
+    participants_df=None,
+    sessions_df=None,
+    participant_codes=None,
+    trial_number=1,
+    session_type='main',
+    csv_dir=None,
+    supabase_url=None,
+    supabase_key=None
+):
+    """
+    Plots raw 2D coordinate paths of the index finger and thumb side-by-side for a representative Pinch trial.
     """
     tdf, sdf, pdf = resolve_data(
         trials_df=trials_df,
@@ -399,55 +663,72 @@ def plot_hold_trajectory(
         
         t_data = main_trials[
             (main_trials['participant_id'] == p_id) & 
-            (main_trials['task_type'] == 'hold') & 
+            (main_trials['task_type'] == 'pinch') & 
             (main_trials['trial_number'] == trial_number)
         ]
         
         if t_data.empty:
-            ax.text(0.5, 0.5, f"No hold trial {trial_number} for {p_code}", ha='center', va='center')
+            ax.text(0.5, 0.5, f"No pinch trial {trial_number} for {p_code}", ha='center', va='center')
             continue
             
         trial_row = t_data.iloc[0]
-        tx, ty, tr = trial_row['target_x'], trial_row['target_y'], trial_row['target_radius']
-        events = trial_row['hold_events']
-        
-        if not events or not isinstance(events, list):
-            ax.text(0.5, 0.5, f"No hold events recorded for {p_code}", ha='center', va='center')
+        traj = trial_row.get('trajectory', [])
+        if isinstance(traj, str):
+            traj = json.loads(traj)
+            
+        if not traj or not isinstance(traj, list):
+            ax.text(0.5, 0.5, f"No trajectory recorded for {p_code}", ha='center', va='center')
             continue
 
-        hxs = [e['x'] for e in events if 'x' in e and 'y' in e]
-        hys = [e['y'] for e in events if 'x' in e and 'y' in e]
-        
-        if not hxs:
-            ax.text(0.5, 0.5, f"No valid coordinates in hold events for {p_code}", ha='center', va='center')
+        px_idx = [pt['x_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_index') is not None]
+        py_idx = [pt['y_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_index') is not None]
+        px_thb = [pt['x_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_thumb') is not None]
+        py_thb = [pt['y_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_thumb') is not None]
+
+        if not px_idx or not px_thb:
+            ax.text(0.5, 0.5, f"No two-finger coordinates logged for {p_code}", ha='center', va='center')
             continue
 
-        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.2, edgecolor='#0284C7', linewidth=2, label='Target Boundary')
-        ax.add_patch(target_c)
-        ax.plot(tx, ty, marker='+', color='#0284C7', markersize=15, markeredgewidth=2, label='Target Center')
-        
-        path_color = get_participant_color(idx, p_code)
-        ax.plot(hxs, hys, color=path_color, linewidth=1.5, alpha=0.8, label='Hold Drift Trace')
-        
-        cx = np.mean(hxs)
-        cy = np.mean(hys)
-        
-        ax.scatter(hxs[0], hys[0], color='#16A34A', s=40, zorder=4, label='Hold Start')
-        ax.scatter(hxs[-1], hys[-1], color='#DC2626', s=40, zorder=4, label='Hold End')
-        
+        # Plot continuous paths
+        ax.plot(px_idx, py_idx, color='#0D9488', linewidth=2.5, zorder=3, label='Index Finger Path')
+        ax.plot(px_thb, py_thb, color='#7C3AED', linewidth=2.5, zorder=3, label='Thumb Path')
+
+        # Start and End points
+        ax.scatter(px_idx[0], py_idx[0], color='#10B981', edgecolors='black', s=80, zorder=4, label='Start Point')
+        ax.scatter(px_thb[0], py_thb[0], color='#10B981', edgecolors='black', s=80, zorder=4)
+        ax.scatter(px_idx[-1], py_idx[-1], color='#DC2626', edgecolors='black', s=80, zorder=4, label='End Point')
+        ax.scatter(px_thb[-1], py_thb[-1], color='#DC2626', edgecolors='black', s=80, zorder=4)
+
         hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
-        ax.set_title(f"Postural Drift Trace (Trial {trial_number}) - {p_code} ({hand})\n({len(hxs)} points logged)", fontsize=13, weight='bold', pad=12)
+        hand_str = str(hand).capitalize()
+        ax.set_title(f"{p_code}, Dominant arm - {hand_str}\nPinch Trial {trial_number} ({len(traj)} frames logged)", fontsize=12, weight='bold', pad=10)
         ax.set_xlabel("X Coordinate (pixels)", fontsize=11)
         ax.set_ylabel("Y Coordinate (pixels)", fontsize=11)
         ax.set_aspect('equal', 'box')
+
+        # Compute tight square box bounding both finger trajectories
+        all_x = px_idx + px_thb
+        all_y = py_idx + py_thb
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        cx = (min_x + max_x) / 2
+        cy = (min_y + max_y) / 2
+        span = max(max_x - min_x, max_y - min_y) * 1.3
         
-        ax.set_xlim(cx - 75, cx + 75)
-        ax.set_ylim(cy - 75, cy + 75)
-        
+        ax.set_xlim(cx - span/2, cx + span/2)
+        ax.set_ylim(cy - span/2, cy + span/2)
+        ax.invert_yaxis()
+
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(True, linestyle='--', alpha=0.3)
-        ax.legend(loc='lower right', fontsize=9)
+
+        import matplotlib.lines as mlines
+        idx_handle = mlines.Line2D([], [], color='#0D9488', linewidth=2.5, label='Index Finger Path')
+        thb_handle = mlines.Line2D([], [], color='#7C3AED', linewidth=2.5, label='Thumb Path')
+        start_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#10B981', markeredgecolor='black', markersize=8, label='Start Point')
+        end_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#DC2626', markeredgecolor='black', markersize=8, label='End Point')
+        ax.legend(handles=[idx_handle, thb_handle, start_handle, end_handle], loc='lower left', fontsize=10, frameon=True, facecolor='white', edgecolor='lightgray')
 
     # Hide unused axes
     for idx in range(num_participants, rows * cols):
@@ -456,11 +737,163 @@ def plot_hold_trajectory(
         fig.delaxes(axes[r, c])
 
     title_suffix = " vs ".join(participant_codes) if len(participant_codes) <= 4 else f"{len(participant_codes)} Participants"
-    plt.suptitle(f"Raw Hold Postural Drift Comparison: {title_suffix} (Equivalent Trial {trial_number} - Zoomed In)", fontsize=16, weight='bold', y=0.98)
-    plt.tight_layout()
+    plt.suptitle(f"Raw Pinch Trajectory Comparison: {title_suffix} (Trial {trial_number})", fontsize=15, weight='bold', y=0.96)
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
     plt.show()
 
 
+@normalize_participant_codes
+def plot_aggregate_pinch_trajectory(
+    trials_df=None,
+    participants_df=None,
+    sessions_df=None,
+    participant_codes=None,
+    session_type='main',
+    csv_dir=None,
+    supabase_url=None,
+    supabase_key=None
+):
+    """
+    Plots overlaid 2D coordinate paths of the index finger and thumb across all pinch trials side-by-side.
+    """
+    tdf, sdf, pdf = resolve_data(
+        trials_df=trials_df,
+        sessions_df=sessions_df,
+        participants_df=participants_df,
+        csv_dir=csv_dir,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key
+    )
+
+    if participant_codes is None:
+        participant_codes = sorted(pdf['participant_code'].unique().tolist()) if 'participant_code' in pdf.columns else []
+
+    if session_type and sdf is not None:
+        main_session_ids = sdf[sdf['session_type'] == session_type]['id']
+        main_trials = tdf[tdf['session_id'].isin(main_session_ids)]
+    else:
+        main_trials = tdf
+
+    num_participants = len(participant_codes)
+    if num_participants == 0:
+        print("No participants selected.")
+        return
+
+    cols = min(num_participants, 3)
+    rows = (num_participants + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(7 * cols, 7 * rows), squeeze=False)
+
+    for idx, p_code in enumerate(participant_codes):
+        r = idx // cols
+        c = idx % cols
+        ax = axes[r, c]
+        
+        p_rows = pdf[pdf['participant_code'] == p_code]
+        if p_rows.empty:
+            ax.text(0.5, 0.5, f"Participant {p_code} not found", ha='center', va='center')
+            continue
+        p_id = p_rows['id'].values[0]
+        
+        trials = main_trials[
+            (main_trials['participant_id'] == p_id) & 
+            (main_trials['task_type'] == 'pinch')
+        ].sort_values(by='trial_number')
+        
+        if trials.empty:
+            ax.text(0.5, 0.5, f"No pinch trials for {p_code}", ha='center', va='center')
+            continue
+
+        linestyles = ['-', '--', ':', '-.']
+        all_x = []
+        all_y = []
+
+        for t_idx, (_, trial_row) in enumerate(trials.iterrows()):
+            traj = trial_row.get('trajectory', [])
+            if isinstance(traj, str):
+                traj = json.loads(traj)
+                
+            if not traj or not isinstance(traj, list):
+                continue
+
+            px_idx = [pt['x_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_index') is not None]
+            py_idx = [pt['y_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_index') is not None]
+            px_thb = [pt['x_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_thumb') is not None]
+            py_thb = [pt['y_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_thumb') is not None]
+
+            if not px_idx or not px_thb:
+                continue
+
+            all_x.extend(px_idx + px_thb)
+            all_y.extend(py_idx + py_thb)
+
+            t_num = trial_row['trial_number']
+            style = linestyles[t_idx % len(linestyles)]
+
+            # Plot paths
+            ax.plot(px_idx, py_idx, color='#0D9488', linestyle=style, linewidth=2.0, alpha=0.75, zorder=3)
+            ax.plot(px_thb, py_thb, color='#7C3AED', linestyle=style, linewidth=2.0, alpha=0.75, zorder=3)
+
+            # Start and End points
+            ax.scatter(px_idx[0], py_idx[0], color='#10B981', edgecolors='black', s=50, alpha=0.8, zorder=4)
+            ax.scatter(px_thb[0], py_thb[0], color='#10B981', edgecolors='black', s=50, alpha=0.8, zorder=4)
+            ax.scatter(px_idx[-1], py_idx[-1], color='#DC2626', edgecolors='black', s=50, alpha=0.8, zorder=4)
+            ax.scatter(px_thb[-1], py_thb[-1], color='#DC2626', edgecolors='black', s=50, alpha=0.8, zorder=4)
+
+        if not all_x or not all_y:
+            ax.text(0.5, 0.5, f"No pinch trajectories logged for {p_code}", ha='center', va='center')
+            continue
+
+        hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
+        hand_str = str(hand).capitalize()
+        ax.set_title(f"All Pinch Trajectories Overlaid - {p_code} ({hand_str})\n(Total trials: {len(trials)})", fontsize=12, weight='bold', pad=10)
+        ax.set_xlabel("X Coordinate (pixels)", fontsize=11)
+        ax.set_ylabel("Y Coordinate (pixels)", fontsize=11)
+        ax.set_aspect('equal', 'box')
+
+        # Compute tight square box bounding all trajectories
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        cx = (min_x + max_x) / 2
+        cy = (min_y + max_y) / 2
+        span = max(max_x - min_x, max_y - min_y) * 1.3
+        
+        ax.set_xlim(cx - span/2, cx + span/2)
+        ax.set_ylim(cy - span/2, cy + span/2)
+        ax.invert_yaxis()
+
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.grid(True, linestyle='--', alpha=0.3)
+
+        import matplotlib.lines as mlines
+        idx_handle = mlines.Line2D([], [], color='#0D9488', linewidth=2.0, label='Index Finger Path')
+        thb_handle = mlines.Line2D([], [], color='#7C3AED', linewidth=2.0, label='Thumb Path')
+        
+        t_handles = []
+        for t_idx, trial_row in enumerate(trials.iterrows()):
+            t_num = trial_row[1]['trial_number']
+            style = linestyles[t_idx % len(linestyles)]
+            label_suffix = " (Solid)" if style == '-' else " (Dashed)" if style == '--' else " (Dotted)" if style == ':' else " (Dash-dot)"
+            t_handles.append(mlines.Line2D([], [], color='gray', linestyle=style, linewidth=1.5, label=f'Trial {int(t_num)}{label_suffix}'))
+            
+        start_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#10B981', markeredgecolor='black', markersize=8, label='Start Point')
+        end_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#DC2626', markeredgecolor='black', markersize=8, label='End Point')
+        
+        ax.legend(handles=[idx_handle, thb_handle] + t_handles + [start_handle, end_handle], loc='lower left', fontsize=8, ncol=2, frameon=True, facecolor='white', edgecolor='lightgray')
+
+    # Hide unused axes
+    for idx in range(num_participants, rows * cols):
+        r = idx // cols
+        c = idx % cols
+        fig.delaxes(axes[r, c])
+
+    title_suffix = " vs ".join(participant_codes) if len(participant_codes) <= 4 else f"{len(participant_codes)} Participants"
+    plt.suptitle(f"Aggregate Pinch Trajectory: {title_suffix} (All Trials Overlaid)", fontsize=15, weight='bold', y=0.96)
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
+    plt.show()
+
+
+@normalize_participant_codes
 def plot_aggregate_drag_trajectories(
     trials_df=None,
     participants_df=None,
@@ -526,13 +959,13 @@ def plot_aggregate_drag_trajectories(
         sx, sy, sr = first_trial['start_x'], first_trial['start_y'], first_trial['start_radius']
         tx, ty, tr = first_trial['target_x'], first_trial['target_y'], first_trial['target_radius']
         
-        start_c = plt.Circle((sx, sy), sr, fill=True, facecolor='#DCFCE7', alpha=0.6, edgecolor='#16A34A', linewidth=2, zorder=1)
+        start_c = plt.Circle((sx, sy), sr, fill=True, facecolor='#DCFCE7', alpha=0.6, edgecolor='#15803D', linewidth=2, zorder=1)
         ax.add_patch(start_c)
         
-        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.6, edgecolor='#0284C7', linewidth=2, zorder=1)
+        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#FEE2E2', alpha=0.6, edgecolor='#DC2626', linewidth=2, zorder=1)
         ax.add_patch(target_c)
         
-        ax.plot([sx, tx], [sy, ty], color='#94A3B8', linestyle='--', linewidth=2, label='Ideal Axis', zorder=2)
+        ax.plot([sx, tx], [sy, ty], color='black', linestyle='--', linewidth=2, zorder=2)
         
         path_color = get_participant_color(idx, p_code)
         
@@ -543,7 +976,9 @@ def plot_aggregate_drag_trajectories(
             pxs = [pt['x'] for pt in traj if 'x' in pt]
             pys = [pt['y'] for pt in traj if 'y' in pt]
             
-            ax.plot(pxs, pys, color=path_color, linewidth=1.5, alpha=0.4, label='Drag Trials' if t_idx == 0 else "")
+            ax.plot(pxs, pys, color=path_color, linewidth=1.5, alpha=0.75)
+            ax.scatter(pxs[0], pys[0], color='#7C3AED', s=30, alpha=0.6, zorder=4)
+            ax.scatter(pxs[-1], pys[-1], color='#DC2626', s=30, alpha=0.6, zorder=4)
             
         hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
         ax.set_title(f"All Drag Trajectories Overlaid - {p_code} ({hand})\n(Total trials: {len(trials)})", fontsize=14, weight='bold', pad=12)
@@ -557,11 +992,19 @@ def plot_aggregate_drag_trajectories(
         max_y = max(sy, ty) + 100
         ax.set_xlim(min_x, max_x)
         ax.set_ylim(min_y, max_y)
+        ax.invert_yaxis()
         
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(True, linestyle='--', alpha=0.3)
-        ax.legend(loc='lower right', fontsize=10)
+        import matplotlib.lines as mlines
+        start_area_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#DCFCE7', markeredgecolor='#15803D', markeredgewidth=2, markersize=10, alpha=0.6, label='Start Area')
+        target_area_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#FEE2E2', markeredgecolor='#DC2626', markeredgewidth=2, markersize=10, alpha=0.6, label='Target Area')
+        ideal_axis_handle = mlines.Line2D([], [], color='black', linestyle='--', linewidth=2.0, label='Ideal Axis')
+        drag_path_handle = mlines.Line2D([], [], color=path_color, linewidth=1.5, alpha=0.75, label='Drag Trials')
+        touch_init_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#7C3AED', markeredgecolor='#7C3AED', markersize=8, label='Touch Initiated')
+        touch_rel_handle = mlines.Line2D([], [], color='none', marker='o', markerfacecolor='#DC2626', markeredgecolor='#DC2626', markersize=8, label='Touch Released')
+        ax.legend(handles=[start_area_handle, target_area_handle, ideal_axis_handle, drag_path_handle, touch_init_handle, touch_rel_handle], loc='lower left', fontsize=10)
 
     # Hide unused axes
     for idx in range(num_participants, rows * cols):
@@ -575,6 +1018,7 @@ def plot_aggregate_drag_trajectories(
     plt.show()
 
 
+@normalize_participant_codes
 def plot_aggregate_tap_distribution(
     trials_df=None,
     participants_df=None,
@@ -616,6 +1060,9 @@ def plot_aggregate_tap_distribution(
     rows = (num_participants + cols - 1) // cols
     fig, axes = plt.subplots(rows, cols, figsize=(7 * cols, 7 * rows), squeeze=False)
 
+    # Collect coordinates and targets to compute global limits across all participants
+    # (Leaving unused global limits for backward compatibility, but we will override local limits locally for a clean square aspect ratio)
+
     for idx, p_code in enumerate(participant_codes):
         r = idx // cols
         c = idx % cols
@@ -639,51 +1086,99 @@ def plot_aggregate_tap_distribution(
         first_trial = trials.iloc[0]
         tx, ty, tr = first_trial['target_x'], first_trial['target_y'], first_trial['target_radius']
         
+        # Bottom target
         target_circle = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.5, edgecolor='#0284C7', linewidth=2, label='Target Area')
         ax.add_patch(target_circle)
         ax.plot(tx, ty, marker='+', color='#0284C7', markersize=15, markeredgewidth=2, label='Target Center')
         
+        # Top target
+        top_target_circle = plt.Circle((tx, ty + 220.0), tr, fill=True, facecolor='#E0F2FE', alpha=0.5, edgecolor='#0284C7', linewidth=2)
+        ax.add_patch(top_target_circle)
+        ax.plot(tx, ty + 220.0, marker='+', color='#0284C7', markersize=15, markeredgewidth=2)
+        
+        # Dummy point for Incorrect Tap so it's always in the legend
+        ax.scatter([], [], color='#F97316', alpha=0.9, edgecolors='black', s=70, label='Incorrect Tap')
+        
         colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4']
         
-        all_xs = []
-        all_ys = []
+        # Check if there are any misses across all trials for this participant
+        has_any_miss = False
+        for _, trial_row in trials.iterrows():
+            taps = trial_row.get('taps', [])
+            if taps and isinstance(taps, list):
+                hits = [t.get('is_inside_target', True) for t in taps]
+                if not all(hits):
+                    has_any_miss = True
+                    break
+        
+        if not has_any_miss:
+            # Draw dummy invisible point for the legend
+            ax.scatter([], [], color='#DC2626', alpha=0.9, edgecolors='black', s=70, label='Trial Misses')
+            
         for t_idx, (_, trial_row) in enumerate(trials.iterrows()):
             taps = trial_row.get('taps', [])
             if not taps or not isinstance(taps, list):
                 continue
-            xs = [t['x'] for t in taps if 'x' in t]
-            ys = [t['y'] for t in taps if 'y' in t]
-            all_xs.extend(xs)
-            all_ys.extend(ys)
-            hits = [t.get('is_inside_target', True) for t in taps]
+                
+            xs_hit = []
+            ys_hit = []
+            xs_miss_outside = []
+            ys_miss_outside = []
+            xs_miss_inactive = []
+            ys_miss_inactive = []
             
-            xs_hit = [x for x, h in zip(xs, hits) if h]
-            ys_hit = [y for y, h in zip(ys, hits) if h]
-            xs_miss = [x for x, h in zip(xs, hits) if not h]
-            ys_miss = [y for y, h in zip(ys, hits) if not h]
+            for t in taps:
+                x = t.get('x')
+                y = t.get('y')
+                if x is None or y is None:
+                    continue
+                is_hit = t.get('is_inside_target', True)
+                if is_hit:
+                    xs_hit.append(x)
+                    ys_hit.append(y)
+                else:
+                    expected = t.get('expected_target')
+                    if expected is not None:
+                        if expected == 'top':
+                            dist_inactive = np.hypot(x - tx, y - (ty + 220.0))
+                        else:
+                            dist_inactive = np.hypot(x - tx, y - ty)
+                        
+                        if dist_inactive <= tr:
+                            xs_miss_inactive.append(x)
+                            ys_miss_inactive.append(y)
+                        else:
+                            xs_miss_outside.append(x)
+                            ys_miss_outside.append(y)
+                    else:
+                        xs_miss_outside.append(x)
+                        ys_miss_outside.append(y)
             
             t_num = trial_row['trial_number']
             color = colors[t_idx % len(colors)]
             ax.scatter(xs_hit, ys_hit, color=color, alpha=0.7, edgecolors='black', s=50, zorder=3, label=f'Trial {int(t_num)} Taps')
-            if xs_miss:
-                ax.scatter(xs_miss, ys_miss, color='#DC2626', alpha=0.9, edgecolors='black', s=70, zorder=4, label=f'Trial {int(t_num)} Misses')
+            
+            if xs_miss_outside:
+                ax.scatter(xs_miss_outside, ys_miss_outside, color='#DC2626', alpha=0.9, edgecolors='black', s=70, zorder=4, label=f'Trial {int(t_num)} Misses')
+            if xs_miss_inactive:
+                ax.scatter(xs_miss_inactive, ys_miss_inactive, color='#F97316', alpha=0.9, edgecolors='black', s=70, zorder=4)
                 
         hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
-        ax.set_title(f"All Tap Trials Overlaid - {p_code} ({hand})\n(Total trials: {len(trials)})", fontsize=13, weight='bold', pad=12)
+        hand_str = str(hand).capitalize()
+        ax.set_title(f"{p_code}, Dominant arm - {hand_str}\n(Total trials: {len(trials)})", fontsize=12, weight='bold', pad=10)
         ax.set_xlabel("X Coordinate (pixels)", fontsize=11)
         ax.set_ylabel("Y Coordinate (pixels)", fontsize=11)
         ax.set_aspect('equal', 'box')
-        margin = tr * 1.5
-        x_min = min(tx - margin, min(all_xs) - 50 if all_xs else tx - margin)
-        x_max = max(tx + margin, max(all_xs) + 50 if all_xs else tx + margin)
-        y_min = min(ty - margin, min(all_ys) - 50 if all_ys else ty - margin)
-        y_max = max(ty + margin, max(all_ys) + 50 if all_ys else ty + margin)
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
+        
+        # Center square bounding box around both targets
+        y_half_span = 110.0 + 1.5 * tr
+        ax.set_xlim(tx - y_half_span, tx + y_half_span)
+        ax.set_ylim(ty + 110.0 - y_half_span, ty + 110.0 + y_half_span)
+        
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(True, linestyle='--', alpha=0.3)
-        ax.legend(loc='lower right', fontsize=8, ncol=2)
+        ax.legend(loc='lower left', fontsize=8, ncol=2, frameon=True, facecolor='white', edgecolor='lightgray')
 
     # Hide unused axes
     for idx in range(num_participants, rows * cols):
@@ -692,11 +1187,12 @@ def plot_aggregate_tap_distribution(
         fig.delaxes(axes[r, c])
 
     title_suffix = " vs ".join(participant_codes) if len(participant_codes) <= 4 else f"{len(participant_codes)} Participants"
-    plt.suptitle(f"Aggregate Tap Distribution: {title_suffix} (All Trials Overlaid)", fontsize=16, weight='bold', y=0.98)
-    plt.tight_layout()
+    plt.suptitle(f"Aggregate Tap Distribution: {title_suffix} (All Trials Overlaid)", fontsize=15, weight='bold', y=0.96)
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
     plt.show()
 
 
+@normalize_participant_codes
 def plot_aggregate_hold_drift(
     trials_df=None,
     participants_df=None,
@@ -736,7 +1232,7 @@ def plot_aggregate_hold_drift(
 
     cols = min(num_participants, 3)
     rows = (num_participants + cols - 1) // cols
-    fig, axes = plt.subplots(rows, cols, figsize=(7 * cols, 7 * rows), squeeze=False)
+    fig, axes = plt.subplots(rows, cols, figsize=(8.5 * cols, 7 * rows), squeeze=False)
 
     for idx, p_code in enumerate(participant_codes):
         r = idx // cols
@@ -761,21 +1257,22 @@ def plot_aggregate_hold_drift(
         first_trial = trials.iloc[0]
         tx, ty, tr = first_trial['target_x'], first_trial['target_y'], first_trial['target_radius']
         
-        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.1, edgecolor='#0284C7', linewidth=2, label='Target Boundary')
+        target_c = plt.Circle((tx, ty), tr, fill=True, facecolor='#E0F2FE', alpha=0.15, edgecolor='#0284C7', linewidth=2.5, label='Target Boundary')
         ax.add_patch(target_c)
         ax.plot(tx, ty, marker='+', color='#0284C7', markersize=15, markeredgewidth=2, label='Target Center')
         
-        # Color gradients per participant
-        if p_code == 'P01':
-            colors = ['#0F766E', '#0D9488', '#2DD4BF', '#14B8A6', '#64D2EC']
-        elif p_code == 'P02':
-            colors = ['#EA580C', '#F97316', '#FB923C', '#FDBA74', '#FFEDD5']
+        # Color gradients per participant (Blue gradients for P1, Orange gradients for P2)
+        if p_code in ['P01', 'P1']:
+            colors = ['#1D4ED8', '#2563EB', '#3B82F6', '#60A5FA', '#93C5FD']
+        elif p_code in ['P02', 'P2']:
+            colors = ['#C2410C', '#EA580C', '#F97316', '#FB923C', '#FDBA74']
         else:
             colors = ['#1D4ED8', '#3B82F6', '#60A5FA', '#93C5FD', '#DBEAFE']
             
         all_xs = []
         all_ys = []
         
+        has_labelled_start_end = False
         for t_idx, (_, trial_row) in enumerate(trials.iterrows()):
             events = trial_row.get('hold_events', [])
             if not events or not isinstance(events, list):
@@ -792,29 +1289,51 @@ def plot_aggregate_hold_drift(
             t_num = trial_row['trial_number']
             color = colors[t_idx % len(colors)]
             ax.plot(hxs, hys, color=color, linewidth=1.2, alpha=0.7, label=f'Trial {int(t_num)} Drift')
-            ax.scatter(hxs[0], hys[0], color='#16A34A', s=30, zorder=4)
-            ax.scatter(hxs[-1], hys[-1], color='#DC2626', s=30, zorder=4)
+            if not has_labelled_start_end:
+                ax.scatter(hxs[0], hys[0], color='#7C3AED', s=30, zorder=4, label='Hold Start')
+                ax.scatter(hxs[-1], hys[-1], color='#DC2626', s=30, zorder=4, label='Hold End')
+                has_labelled_start_end = True
+            else:
+                ax.scatter(hxs[0], hys[0], color='#7C3AED', s=30, zorder=4)
+                ax.scatter(hxs[-1], hys[-1], color='#DC2626', s=30, zorder=4)
             
         if not all_xs:
             ax.text(0.5, 0.5, f"No valid hold coordinate points for {p_code}", ha='center', va='center')
             continue
             
-        cx = np.mean(all_xs)
-        cy = np.mean(all_ys)
-        
         hand = p_rows['dominant_arm'].values[0] if 'dominant_arm' in p_rows.columns else 'Unknown'
-        ax.set_title(f"All Postural Drift Trials Overlaid - {p_code} ({hand})\n(Total trials: {len(trials)})", fontsize=13, weight='bold', pad=12)
+        hand_str = str(hand).capitalize()
+        ax.set_title(f"{p_code}, Dominant arm - {hand_str}\n(Total trials: {len(trials)})", fontsize=12, weight='bold', pad=10)
         ax.set_xlabel("X Coordinate (pixels)", fontsize=11)
         ax.set_ylabel("Y Coordinate (pixels)", fontsize=11)
         ax.set_aspect('equal', 'box')
         
-        ax.set_xlim(cx - 75, cx + 75)
-        ax.set_ylim(cy - 75, cy + 75)
+        margin = tr * 1.1
+        ax.set_xlim(tx - margin, tx + margin)
+        ax.set_ylim(ty - margin, ty + margin)
         
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(True, linestyle='--', alpha=0.3)
-        ax.legend(loc='lower right', fontsize=8, ncol=2)
+        
+        import matplotlib.lines as mlines
+        target_boundary_handle = mlines.Line2D(
+            [], [], 
+            color='#0284C7', 
+            marker='o', 
+            markerfacecolor='#E0F2FE', 
+            markersize=10, 
+            markeredgecolor='#0284C7', 
+            markeredgewidth=1.5, 
+            linestyle='None', 
+            label='Target Boundary'
+        )
+        
+        handles, labels = ax.get_legend_handles_labels()
+        for i, label in enumerate(labels):
+            if label == 'Target Boundary':
+                handles[i] = target_boundary_handle
+        ax.legend(handles=handles, labels=labels, loc='lower right', fontsize=8, ncol=2)
 
     # Hide unused axes
     for idx in range(num_participants, rows * cols):
@@ -823,11 +1342,12 @@ def plot_aggregate_hold_drift(
         fig.delaxes(axes[r, c])
 
     title_suffix = " vs ".join(participant_codes) if len(participant_codes) <= 4 else f"{len(participant_codes)} Participants"
-    plt.suptitle(f"Aggregate Hold Postural Drift: {title_suffix} (All Trials Overlaid - Zoomed In)", fontsize=16, weight='bold', y=0.98)
-    plt.tight_layout()
+    plt.suptitle(f"Aggregate Hold Postural Drift: {title_suffix} (All Trials Overlaid)", fontsize=15, weight='bold', y=0.95)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.show()
 
 
+@normalize_participant_codes
 def plot_motor_profile_fingerprints(
     master_df=None,
     participant_codes=None,
@@ -902,6 +1422,7 @@ def plot_motor_profile_fingerprints(
     plt.show()
 
 
+@normalize_participant_codes
 def plot_key_biomarkers_comparison(
     master_df=None,
     participant_codes=None,
@@ -948,6 +1469,7 @@ def plot_key_biomarkers_comparison(
         'Drag Task (Kinematic)': {
             'drag_Overall_mean_speed_median': ('Speed (px/s)', 'Higher is faster'),
             'drag_Overall_kinetic_tremor_amplitude_median': ('Tremor Amplitude (px)', 'Lower is smoother'),
+            'drag_Overall_kinetic_tremor_frequency_hz_median': ('Tremor Frequency (Hz)', 'Typical tremor is 4-6 Hz'),
             'drag_Overall_drag_hesitations_count_median': ('Hesitations Count', 'Lower is more stable'),
             'drag_Overall_drag_halts_count_median': ('Halts (Freezes) Count', 'Lower is healthier'),
             'drag_Overall_drag_amplitude_decrement_ratio_median': ('Amplitude Decrement Ratio', 'Near 1.0 is stable, lower shows fatiguing')
@@ -1023,7 +1545,7 @@ def plot_key_biomarkers_comparison(
                 if pd.notna(val):
                     ax.text(i, val + (max(vals)*0.015 if max(vals) > 0 else 0.05), f"{val:.3f}", ha='center', va='bottom', fontsize=8.5, fontweight='bold')
                     
-        plt.suptitle(f"{task_name}: Comparison of Key Digital Biomarkers (P01 vs P02)", fontsize=13, fontweight='bold', y=1.05)
+        plt.suptitle(f"{task_name}: Comparison of Key Digital Measures ({' vs '.join(participant_codes)})", fontsize=13, fontweight='bold', y=1.05)
         plt.tight_layout()
         plt.show()
 
@@ -1132,6 +1654,7 @@ def plot_tap_dot_size_analysis(
     plt.show()
 
 
+@normalize_participant_codes
 def simulate_tap_target_diameters(
     trials_df=None,
     participants_df=None,
@@ -1142,8 +1665,8 @@ def simulate_tap_target_diameters(
     supabase_key=None
 ):
     """
-    Simulates tap containment rates for 12mm, 16mm, optimized 120px, and original 300px target diameters
-    for each participant and displays hits, misses, and success rates.
+    Simulates tap containment rates for 12mm, 16mm, 20mm, optimized 120px (31.8mm), and original 300px (79.4mm) target diameters
+    for each participant and returns a summary DataFrame, while plotting a single continuous cohort containment curve.
     """
     tdf, sdf, pdf = resolve_data(
         trials_df=trials_df,
@@ -1161,8 +1684,11 @@ def simulate_tap_target_diameters(
         tap_trials = tdf[tdf['task_type'] == 'tap']
     
     configs = [
-        {"name": "12.0mm Diameter", "radius_px": 6.0 * 96.0 / 25.4, "diameter_mm": 12.0},
         {"name": "16.0mm Diameter", "radius_px": 8.0 * 96.0 / 25.4, "diameter_mm": 16.0},
+        {"name": "20.0mm Diameter", "radius_px": 10.0 * 96.0 / 25.4, "diameter_mm": 20.0},
+        {"name": "25.0mm Diameter", "radius_px": 12.5 * 96.0 / 25.4, "diameter_mm": 25.0},
+        {"name": "26.0mm Diameter", "radius_px": 13.0 * 96.0 / 25.4, "diameter_mm": 26.0},
+        {"name": "28.0mm Diameter", "radius_px": 14.0 * 96.0 / 25.4, "diameter_mm": 28.0},
         {"name": "31.8mm Diameter", "radius_px": 60.0, "diameter_mm": 60.0 * 2.0 * 25.4 / 96.0},
         {"name": "79.4mm Diameter", "radius_px": 150.0, "diameter_mm": 150.0 * 2.0 * 25.4 / 96.0}
     ]
@@ -1170,13 +1696,10 @@ def simulate_tap_target_diameters(
     participants = sorted(pdf['participant_code'].unique().tolist()) if 'participant_code' in pdf.columns else []
     
     rows = []
-    plot_data = {}
     
     for p_code in participants:
         p_ids = pdf[pdf['participant_code'] == p_code]['id'].values if 'participant_code' in pdf.columns else []
         p_trials = tap_trials[tap_trials['participant_id'].isin(p_ids)]
-        
-        plot_data[p_code] = []
         
         for cfg in configs:
             hits = 0
@@ -1185,6 +1708,8 @@ def simulate_tap_target_diameters(
             
             for _, row in p_trials.iterrows():
                 taps = row.get('taps', [])
+                if isinstance(taps, str):
+                    taps = json.loads(taps)
                 if not taps or not isinstance(taps, list):
                     continue
                 for t in taps:
@@ -1206,7 +1731,6 @@ def simulate_tap_target_diameters(
                             misses += 1
             
             rate = (hits / total * 100) if total > 0 else 0
-            plot_data[p_code].append(rate)
             
             rows.append({
                 "Participant": p_code,
@@ -1220,33 +1744,6 @@ def simulate_tap_target_diameters(
             })
             
     df_res = pd.DataFrame(rows)
-    
-    # Generate the bar chart
-    fig, ax = plt.subplots(figsize=(10, 6))
-    x = np.arange(len(configs))
-    width = 0.35
-    colors = ['#2563EB', '#0D9488']
-    
-    for idx, p_code in enumerate(participants):
-        rates = plot_data[p_code]
-        ax.bar(x + (idx - 0.5) * width, rates, width, label=f"Participant {p_code}", color=colors[idx % len(colors)])
-        
-        for i, val in enumerate(rates):
-            ax.text(i + (idx - 0.5) * width, val + 1, f"{val:.1f}%", ha='center', va='bottom', fontsize=9, fontweight='bold')
-            
-    ax.set_title("Tapping Target Containment Rate vs. Target Size", fontsize=14, weight='bold', pad=15)
-    ax.set_xlabel("Target Configuration", fontsize=12)
-    ax.set_ylabel("Percentage of Taps Contained (%)", fontsize=12)
-    ax.set_xticks(x)
-    ax.set_xticklabels([cfg['name'] for cfg in configs])
-    ax.set_ylim(0, 110)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
-    ax.legend(loc='lower right', fontsize=11)
-    plt.tight_layout()
-    plt.show()
-    
     return df_res
 
 
@@ -1896,6 +2393,7 @@ def plot_clinical_metrics_dashboard(master_df, trials_df=None, participants_df=N
             plt.show()
 
 
+@normalize_participant_codes
 def plot_known_groups_validity_boxplots(
     trials_df=None,
     participants_df=None,
@@ -2018,7 +2516,7 @@ def plot_known_groups_validity_boxplots(
     
     summary_lines = [
         "Known-Groups Pilot Comparison Summary\n",
-        "Participant Codes: P01 vs P02",
+        "Participant Codes: P1 vs P2",
         "(Both diagnosed with Parkinson's Disease)\n",
         "Key Differences observed across trials:",
         "----------------------------------------"
@@ -2027,17 +2525,17 @@ def plot_known_groups_validity_boxplots(
     for col, title, _, _ in metrics:
         if col in trial_features.columns:
             medians = trial_features.groupby('participant_code')[col].median()
-            val_p01 = medians.get('P01', np.nan)
-            val_p02 = medians.get('P02', np.nan)
+            val_p01 = medians.get('P1', medians.get('P01', np.nan))
+            val_p02 = medians.get('P2', medians.get('P02', np.nan))
             summary_lines.append(f"• {title}:")
-            summary_lines.append(f"  - P01 Median: {val_p01:.3f}")
-            summary_lines.append(f"  - P02 Median: {val_p02:.3f}")
+            summary_lines.append(f"  - P1 Median: {val_p01:.3f}")
+            summary_lines.append(f"  - P2 Median: {val_p02:.3f}")
             
     summary_text = "\n".join(summary_lines)
     ax_text.text(0.05, 0.95, summary_text, transform=ax_text.transAxes, fontsize=9.5,
                  verticalalignment='top', bbox=dict(boxstyle='round,pad=0.8', facecolor='#F3F4F6', edgecolor='#E5E7EB'))
                  
-    plt.suptitle("Known-Groups Validity Tapping Metrics: Pilot Study P01 vs P02", fontsize=15, fontweight='bold', y=0.96)
+    plt.suptitle("Known-Groups Validity Tapping Metrics: Pilot Study P1 vs P2", fontsize=15, fontweight='bold', y=0.96)
     plt.subplots_adjust(hspace=0.35, wspace=0.3)
     
     if save_path is not None:
@@ -2049,3 +2547,179 @@ def plot_known_groups_validity_boxplots(
         print(f"Saved validity comparison plot to: {save_path}")
     else:
         plt.show()
+
+
+@normalize_participant_codes
+def plot_drag_variability_analysis(
+    trials_df=None,
+    participants_df=None,
+    sessions_df=None,
+    participant_codes=None,
+    session_type='main',
+    csv_dir=None,
+    supabase_url=None,
+    supabase_key=None
+):
+    """
+    Computes and plots trial-to-trial trajectory variability (pairwise distance between trials),
+    start point spatial variability, and endpoint spatial variability for P01 and P02.
+    """
+    import json
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from IPython.display import display
+    
+    tdf, sdf, pdf = resolve_data(
+        trials_df=trials_df,
+        sessions_df=sessions_df,
+        participants_df=participants_df,
+        csv_dir=csv_dir,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key
+    )
+    
+    if participant_codes is None:
+        participant_codes = ['P1', 'P2']
+        
+    if session_type and sdf is not None:
+        main_session_ids = sdf[sdf['session_type'] == session_type]['id']
+        main_trials = tdf[tdf['session_id'].isin(main_session_ids)]
+    else:
+        main_trials = tdf
+
+    summary_data = []
+    pairwise_records = []
+    
+    for p_code in participant_codes:
+        p_rows = pdf[pdf['participant_code'] == p_code]
+        if p_rows.empty:
+            continue
+        p_id = p_rows['id'].values[0]
+        
+        p_trials = main_trials[
+            (main_trials['participant_id'] == p_id) & 
+            (main_trials['task_type'] == 'drag')
+        ].copy()
+        
+        standard_paths = []
+        start_points = []
+        end_points = []
+        
+        for idx, row in p_trials.iterrows():
+            traj = row['trajectory']
+            if isinstance(traj, str):
+                traj = json.loads(traj)
+            if not traj or not isinstance(traj, list):
+                continue
+                
+            coords = np.array([[pt['x'], pt['y']] for pt in traj if 'x' in pt])
+            if len(coords) < 3:
+                continue
+                
+            start_pt = coords[0]
+            end_pt = coords[-1]
+            start_points.append(start_pt)
+            end_points.append(end_pt)
+            
+            # Calculate cumulative distance along path for interpolation
+            diffs = np.diff(coords, axis=0)
+            segment_lengths = np.linalg.norm(diffs, axis=1)
+            cum_dist = np.insert(np.cumsum(segment_lengths), 0, 0.0)
+            
+            if cum_dist[-1] > 0:
+                norm_dist = cum_dist / cum_dist[-1]
+                target_s = np.linspace(0, 1, 100)
+                xs = np.interp(target_s, norm_dist, coords[:, 0])
+                ys = np.interp(target_s, norm_dist, coords[:, 1])
+                standard_paths.append(np.column_stack((xs, ys)))
+                
+        start_points = np.array(start_points)
+        end_points = np.array(end_points)
+        
+        # Calculate start point spatial SD
+        start_var = np.nan
+        if len(start_points) > 1:
+            start_centroid = np.mean(start_points, axis=0)
+            start_var = np.std(np.linalg.norm(start_points - start_centroid, axis=1))
+            
+        # Calculate endpoint spatial SD
+        end_var = np.nan
+        if len(end_points) > 1:
+            end_centroid = np.mean(end_points, axis=0)
+            end_var = np.std(np.linalg.norm(end_points - end_centroid, axis=1))
+            
+        # Calculate pairwise trajectory distances
+        n_paths = len(standard_paths)
+        p_dists = []
+        for i in range(n_paths):
+            for j in range(i + 1, n_paths):
+                p_a = standard_paths[i]
+                p_b = standard_paths[j]
+                avg_dist = np.mean(np.linalg.norm(p_a - p_b, axis=1))
+                p_dists.append(avg_dist)
+                pairwise_records.append({
+                    'participant_code': p_code,
+                    'pairwise_distance': avg_dist
+                })
+                
+        p_dists = np.array(p_dists) if len(p_dists) > 0 else np.array([])
+        
+        median_traj_var = np.median(p_dists) if len(p_dists) > 0 else np.nan
+        q75, q25 = np.percentile(p_dists, [75, 25]) if len(p_dists) > 0 else (np.nan, np.nan)
+        iqr_traj_var = q75 - q25 if pd.notna(q75) else np.nan
+        
+        summary_data.append({
+            'Participant': p_code,
+            'Median Trajectory Variability (px)': median_traj_var,
+            'IQR Trajectory Variability (px)': iqr_traj_var,
+            'Start Point Variability (px)': start_var,
+            'Endpoint Variability (px)': end_var,
+            'Trials Count': len(p_trials)
+        })
+        
+    summary_df = pd.DataFrame(summary_data).set_index('Participant')
+    print("=== Drag Task Trial-to-Trial Variability Summary ===")
+    display(summary_df)
+    
+    # Single Plot: Pairwise Trajectory Distance (Inter-trial variability)
+    pairwise_df = pd.DataFrame(pairwise_records)
+    
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+    colors = ['#3B82F6', '#EA580C']
+    
+    sns.boxplot(
+        x='participant_code',
+        y='pairwise_distance',
+        data=pairwise_df,
+        ax=ax,
+        palette=colors,
+        hue='participant_code',
+        legend=False,
+        width=0.4,
+        showfliers=False,
+        boxprops=dict(alpha=0.85, edgecolor='black', linewidth=1.5),
+        whiskerprops=dict(color='black', linewidth=1.5),
+        capprops=dict(color='black', linewidth=1.5),
+        medianprops=dict(color='black', linewidth=2.0)
+    )
+    sns.stripplot(
+        x='participant_code',
+        y='pairwise_distance',
+        data=pairwise_df,
+        color='black',
+        size=6,
+        alpha=0.6,
+        jitter=0.1,
+        ax=ax
+    )
+    ax.set_title("Trial-to-Trial Trajectory Variability", fontsize=12, fontweight='bold', pad=12)
+    ax.set_xlabel("Participant", fontsize=11)
+    ax.set_ylabel("Pairwise Path Distance (px)", fontsize=11)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    plt.show()

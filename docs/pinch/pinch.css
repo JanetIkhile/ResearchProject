@@ -81,8 +81,8 @@ body {
     position: fixed;
     left: 50%;
     transform: translateX(-50%);
-    width: 120px;
-    height: 120px;
+    width: 98px; /* Radius 49px (26.0mm at 96dpi) */
+    height: 98px; /* Radius 49px (26.0mm at 96dpi) */
     border-radius: 50%;
     background-color: blue; /* Blue by default */
     opacity: 1.0; /* Full opacity by default */
