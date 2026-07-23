@@ -21,7 +21,11 @@ let isBetweenTrials = false;
 let warningTimeout = null;
 let indexTouchId = null;
 let thumbTouchId = null;
-let isInterrupted = false;
+let requiresReset = false;
+let lastIndexX = null;
+let lastIndexY = null;
+let lastThumbX = null;
+let lastThumbY = null;
 
 const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your index finger on the top circle. Open and close your fingers <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.";
 
@@ -109,6 +113,9 @@ function handleTouch(e) {
         return;
     }
     
+    // Prevent any native browser scrolling, panning, or gestures immediately
+    e.preventDefault();
+    
     const touches = e.touches;
     const now = Date.now();
     
@@ -120,17 +127,10 @@ function handleTouch(e) {
     }
     
     if (touches.length === 2) {
-        // Prevent scrolling/scaling gestures
-        e.preventDefault();
-        
         // Clear any pending warning timer and restore normal text
         if (warningTimeout) {
             clearTimeout(warningTimeout);
             warningTimeout = null;
-        }
-        if (taskActive) {
-            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-            instructionEl.style.display = "block";
         }
 
         // Distinguish between Index (higher up, lower Y) and Thumb (lower down, higher Y)
@@ -167,7 +167,7 @@ function handleTouch(e) {
                 const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
                 
                 if (oneInTop && oneInBottom) {
-                    isInterrupted = false;
+                    requiresReset = false;
                     startPinchTrial(now);
                 } else {
                     // Show a warning instruction if fingers are not placed inside the outlined guides
@@ -177,13 +177,13 @@ function handleTouch(e) {
             }
         } else {
             // During the active trial
-            if (isInterrupted) {
-                // Enforce placing fingers back inside baseline circles to resume trial
+            if (requiresReset) {
+                // Enforce placing fingers back inside baseline circles to resume trial (from 0 touches)
                 const oneInTop = isTouchInsideElement(indexTouch, topTarget) || isTouchInsideElement(thumbTouch, topTarget);
                 const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
                 
                 if (oneInTop && oneInBottom) {
-                    isInterrupted = false; // Recovered!
+                    requiresReset = false; // Recovered!
                 } else {
                     // Still out of bounds -> keep instruction warning and log interruption state
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
@@ -215,6 +215,12 @@ function handleTouch(e) {
             bottomTarget.style.top = `${y2}px`;
             bottomTarget.style.transform = "translate(-50%, -50%)";
             
+            // Cache coordinates as last known positions
+            lastIndexX = x1;
+            lastIndexY = y1;
+            lastThumbX = x2;
+            lastThumbY = y2;
+            
             // Record trajectory frame
             trajectory.push({
                 t: now - trialStartTime,
@@ -228,53 +234,122 @@ function handleTouch(e) {
         }
         
     } else {
-        // Less than 2 touches -> hide tracking overlay
+        // Less than 2 touches -> hide live distance overlay
         liveDistanceLabel.style.display = "none";
         
-        // Reset target guides back to their baseline vertical positions
-        resetTargetPositions();
-        
         if (taskActive) {
-            isInterrupted = true; // Mark as interrupted when touches drop below 2
-            // Determine the explicit cause of the touch interruption and identify remaining finger
-            let frameState = "0_touch_lift_off";
-            let x_idx = null, y_idx = null, x_th = null, y_th = null;
-            
             if (touches.length === 1) {
-                const remainingTouch = touches[0];
-                if (remainingTouch.identifier === indexTouchId) {
-                    frameState = "1_touch_partial_index_active"; // Thumb left first
-                    x_idx = remainingTouch.clientX;
-                    y_idx = remainingTouch.clientY;
-                } else if (remainingTouch.identifier === thumbTouchId) {
-                    frameState = "1_touch_partial_thumb_active"; // Index left first
-                    x_th = remainingTouch.clientX;
-                    y_th = remainingTouch.clientY;
-                } else {
-                    frameState = "1_touch_partial";
-                }
-            } else if (touches.length >= 3) {
-                frameState = "3plus_invalid";
-            }
-            
-            // 1. Log the touch loss frame to database (distance: null ensures gap analysis counts it)
-            trajectory.push({
-                t: now - trialStartTime,
-                state: frameState,
-                x_index: x_idx,
-                y_index: y_idx,
-                x_thumb: x_th,
-                y_thumb: y_th,
-                distance: null
-            });
-            
-            // 2. Set a 150ms debounce timer for the on-screen warning alert to prevent flickering on touch merges
-            if (!warningTimeout) {
-                warningTimeout = setTimeout(() => {
-                    instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please keep both fingers on the screen!</span>`;
+                if (requiresReset) {
+                    // If we previously dropped to 0 touches, they must place BOTH fingers back on circles to recover
+                    trajectory.push({
+                        t: now - trialStartTime,
+                        state: "1_touch_partial_reset",
+                        x_index: null,
+                        y_index: null,
+                        x_thumb: null,
+                        y_thumb: null,
+                        distance: null
+                    });
+                    
+                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
                     instructionEl.style.display = "block";
-                }, 150);
+                } else {
+                    // This is a pause/resume state (1 finger remains). Keep last known position of the missing finger!
+                    const remainingTouch = touches[0];
+                    let frameState = "1_touch_paused";
+                    let x_idx = null, y_idx = null, x_th = null, y_th = null;
+                    
+                    if (remainingTouch.identifier === indexTouchId) {
+                        frameState = "1_touch_paused_thumb_lifted"; // Index remains active, Thumb uses last known position
+                        x_idx = remainingTouch.clientX;
+                        y_idx = remainingTouch.clientY;
+                        x_th = lastThumbX;
+                        y_th = lastThumbY;
+                    } else if (remainingTouch.identifier === thumbTouchId) {
+                        frameState = "1_touch_paused_index_lifted"; // Thumb remains active, Index uses last known position
+                        x_idx = lastIndexX;
+                        y_idx = lastIndexY;
+                        x_th = remainingTouch.clientX;
+                        y_th = remainingTouch.clientY;
+                    } else {
+                        // Fallback if identifiers don't match (e.g. touch mismatch)
+                        x_idx = remainingTouch.clientX;
+                        y_idx = remainingTouch.clientY;
+                        x_th = lastThumbX;
+                        y_th = lastThumbY;
+                    }
+                    
+                    // Calculate distance using active finger and last known position of missing finger
+                    let currentDist = null;
+                    if (x_idx !== null && x_th !== null) {
+                        const dx = x_idx - x_th;
+                        const dy = y_idx - y_th;
+                        currentDist = Math.sqrt(dx * dx + dy * dy);
+                    }
+                    
+                    // Log the frame
+                    trajectory.push({
+                        t: now - trialStartTime,
+                        state: frameState,
+                        x_index: x_idx,
+                        y_index: y_idx,
+                        x_thumb: x_th,
+                        y_thumb: y_th,
+                        distance: currentDist
+                    });
+                    
+                    // Update visual feedback: position active circle under finger, lock missing circle stationary
+                    if (remainingTouch.identifier === indexTouchId) {
+                        topTarget.style.left = `${x_idx}px`;
+                        topTarget.style.top = `${y_idx}px`;
+                        topTarget.style.transform = "translate(-50%, -50%)";
+                        
+                        if (lastThumbX !== null) {
+                            bottomTarget.style.left = `${lastThumbX}px`;
+                            bottomTarget.style.top = `${lastThumbY}px`;
+                            bottomTarget.style.transform = "translate(-50%, -50%)";
+                        }
+                    } else {
+                        bottomTarget.style.left = `${x_th}px`;
+                        bottomTarget.style.top = `${y_th}px`;
+                        bottomTarget.style.transform = "translate(-50%, -50%)";
+                        
+                        if (lastIndexX !== null) {
+                            topTarget.style.left = `${lastIndexX}px`;
+                            topTarget.style.top = `${lastIndexY}px`;
+                            topTarget.style.transform = "translate(-50%, -50%)";
+                        }
+                    }
+                    
+                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`;
+                    instructionEl.style.display = "block";
+                }
+            } else {
+                // 0 touches or 3+ invalid touches -> enters reset state
+                requiresReset = true;
+                resetTargetPositions();
+                
+                let frameState = "0_touch_reset";
+                if (touches.length >= 3) {
+                    frameState = "3plus_invalid_reset";
+                }
+                
+                trajectory.push({
+                    t: now - trialStartTime,
+                    state: frameState,
+                    x_index: null,
+                    y_index: null,
+                    x_thumb: null,
+                    y_thumb: null,
+                    distance: null
+                });
+                
+                instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
+                instructionEl.style.display = "block";
             }
+        } else {
+            // If trial not active, just reset circles
+            resetTargetPositions();
         }
     }
 }
@@ -286,6 +361,11 @@ function startPinchTrial(now) {
     trialStartTime = now;
     trajectory = [];
     timeRemaining = 10;
+    requiresReset = false;
+    lastIndexX = null;
+    lastIndexY = null;
+    lastThumbX = null;
+    lastThumbY = null;
     
     // Keep instruction text visible, show countdown timer separately
     instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
@@ -311,6 +391,12 @@ function startPinchTrial(now) {
 async function stopPinchTrial() {
     taskActive = false;
     clearInterval(countdownTimer);
+    
+    // Clear any pending warning timeouts immediately
+    if (warningTimeout) {
+        clearTimeout(warningTimeout);
+        warningTimeout = null;
+    }
     
     // Hide tracking overlays immediately
     liveDistanceLabel.style.display = "none";
@@ -395,6 +481,12 @@ function endPinchTask() {
     document.removeEventListener("touchmove", handleTouch);
     document.removeEventListener("touchend", handleTouch);
     document.removeEventListener("touchcancel", handleTouch);
+    
+    // Clear any pending warning timeouts immediately
+    if (warningTimeout) {
+        clearTimeout(warningTimeout);
+        warningTimeout = null;
+    }
     
     // Visual completes
     topTarget.style.display = "none";
