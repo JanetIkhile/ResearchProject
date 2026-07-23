@@ -196,7 +196,7 @@ function handleTouch(e) {
                         y_index: y1,
                         x_thumb: x2,
                         y_thumb: y2,
-                        distance: null // Keep distance null so post-hoc analysis counts it as interruption
+                        distance: distPx
                     });
                     return; // Exit early without moving targets or recording active frames
                 }
