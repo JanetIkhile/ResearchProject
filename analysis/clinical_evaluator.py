@@ -72,7 +72,9 @@ REGISTRY = {
         {'col': 'pinch_cv_pinch_interval', 'display_name': 'Pinch Rhythm CV'},
         {'col': 'pinch_pinch_lifts_count', 'display_name': 'Pinch Screen Lifts Count'},
         {'col': 'pinch_pinch_lifts_duration_ms', 'display_name': 'Pinch Screen Lifts Duration (ms)'},
-        {'col': 'pinch_pinch_mean_lift_duration_ms', 'display_name': 'Pinch Mean Lift Duration (ms)'}
+        {'col': 'pinch_pinch_mean_lift_duration_ms', 'display_name': 'Pinch Mean Lift Duration (ms)'},
+        {'col': 'pinch_pinch_mean_orientation_deviation', 'display_name': 'Pinch Mean Orientation Deviation (deg)'},
+        {'col': 'pinch_pinch_orientation_drift_sd', 'display_name': 'Pinch Orientation Drift SD (deg)'}
     ],
     'akinesia': [
         {'col': 'tap_initiation_delay', 'display_name': 'Tapping Initiation Delay (ms)'},
@@ -162,10 +164,10 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
     """
     from clinical_metrics import extract_features_from_trial
 
-    # Filter trials for main session type if sessions_df is provided
-    if sessions_df is not None:
+    # Filter trials for main session type if sessions_df is provided and not empty
+    if sessions_df is not None and not sessions_df.empty:
         print("Filtering trials for 'main' session type to isolate analysis session trials...")
-        main_session_ids = sessions_df[sessions_df['session_type'] == 'main']['id']
+        main_session_ids = sessions_df[sessions_df['session_type'] == 'main']['id'] if 'session_type' in sessions_df.columns else sessions_df['id']
         trials_df = trials_df[trials_df['session_id'].isin(main_session_ids)]
 
     print("Extracting features from all trials...")

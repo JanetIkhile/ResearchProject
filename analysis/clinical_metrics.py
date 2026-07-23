@@ -555,6 +555,8 @@ def extract_features_from_trial(row):
                 k_clinical_grade = np.nan
                 drag_deviation_slope = np.nan
                 drag_deviation_decrement_ratio = np.nan
+                drag_speed_slope = np.nan
+                drag_speed_decrement_ratio = np.nan
         else:
             movement_variability = np.nan
             max_deviation = np.nan
@@ -571,6 +573,9 @@ def extract_features_from_trial(row):
             drag_deviation_slope = np.nan
             drag_deviation_decrement_ratio = np.nan
             drag_amplitude = np.nan
+            drag_speed_slope = np.nan
+            drag_speed_decrement_ratio = np.nan
+            drag_median_deviation = np.nan
             
         # Velocity / Pauses / Hesitations / Halts
         mean_speed = np.mean(vel) if len(vel) > 0 else np.nan
@@ -1038,6 +1043,31 @@ def extract_features_from_trial(row):
             
         pinch_mean_lift_duration_ms = (pinch_lifts_duration_ms / pinch_lifts_count) if pinch_lifts_count > 0 else 0.0
                     
+        # Pinch Orientation Drift (deviation from vertical)
+        angles = []
+        for pt in valid_points:
+            x_i = pt.get('x_index')
+            y_i = pt.get('y_index')
+            x_t = pt.get('x_thumb')
+            y_t = pt.get('y_thumb')
+            if x_i is not None and y_i is not None and x_t is not None and y_t is not None:
+                dx = x_i - x_t
+                dy = y_i - y_t
+                if dx != 0 or dy != 0:
+                    angle = np.degrees(np.arctan2(dy, dx))
+                    angle_normalized = angle % 180.0
+                    angles.append(angle_normalized)
+        
+        if len(angles) > 0:
+            angles = np.array(angles)
+            deviations = np.abs(angles - 90.0)
+            deviations = np.minimum(deviations, 180.0 - deviations)
+            pinch_mean_orientation_deviation = np.mean(deviations)
+            pinch_orientation_drift_sd = np.std(angles)
+        else:
+            pinch_mean_orientation_deviation = np.nan
+            pinch_orientation_drift_sd = np.nan
+
         return pd.Series({
             'pinch_duration_ms': row.get('total_tap_time_ms', duration_ms),
             'pinch_count': cycle_count,
@@ -1058,6 +1088,8 @@ def extract_features_from_trial(row):
             'pinch_lifts_count': pinch_lifts_count,
             'pinch_lifts_duration_ms': pinch_lifts_duration_ms,
             'pinch_mean_lift_duration_ms': pinch_mean_lift_duration_ms,
+            'pinch_mean_orientation_deviation': pinch_mean_orientation_deviation,
+            'pinch_orientation_drift_sd': pinch_orientation_drift_sd,
             'initiation_delay': row.get('initiation_delay', 0),
             'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, 0, hesitations, median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan, is_pinch=True)
         })

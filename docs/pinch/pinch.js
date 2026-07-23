@@ -18,8 +18,11 @@ let trajectory = []; // list of { t, x_index, y_index, x_thumb, y_thumb, distanc
 let initiationDelay = null;
 let firstTouchTime = null;
 let isBetweenTrials = false;
+let warningTimeout = null;
+let indexTouchId = null;
+let thumbTouchId = null;
 
-const ORIGINAL_INSTRUCTION = "Place your thumb and index finger on the screen vertically. Open and close your fingers <strong class=\"highlight-instruction\">as quickly</strong> and <strong class=\"highlight-instruction\">as widely</strong> as possible!";
+const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your index finger on the top circle. Open and close your fingers <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.";
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -65,6 +68,7 @@ async function startSession() {
             header.appendChild(label);
         }
         
+        
         // Listen to touches
         document.addEventListener("touchstart", handleTouch, { passive: false });
         document.addEventListener("touchmove", handleTouch, { passive: false });
@@ -105,9 +109,14 @@ function handleTouch(e) {
     }
     
     if (touches.length === 2) {
-        e.preventDefault(); // Prevent scrolling/scaling gestures
+        // Prevent scrolling/scaling gestures
+        e.preventDefault();
         
-        // Restore normal instruction text if it was displaying a warning
+        // Clear any pending warning timer and restore normal text
+        if (warningTimeout) {
+            clearTimeout(warningTimeout);
+            warningTimeout = null;
+        }
         if (taskActive) {
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             instructionEl.style.display = "block";
@@ -119,6 +128,10 @@ function handleTouch(e) {
         let indexTouch = (t1.clientY < t2.clientY) ? t1 : t2;
         let thumbTouch = (t1.clientY < t2.clientY) ? t2 : t1;
         
+        // Store touch identifiers to distinguish partial lift-offs
+        indexTouchId = indexTouch.identifier;
+        thumbTouchId = thumbTouch.identifier;
+        
         const x1 = indexTouch.clientX;
         const y1 = indexTouch.clientY;
         const x2 = thumbTouch.clientX;
@@ -127,53 +140,45 @@ function handleTouch(e) {
         const dx = x1 - x2;
         const dy = y1 - y2;
         const distPx = Math.sqrt(dx * dx + dy * dy);
-        const distMm = distPx * PX_TO_MM;
 
-        // Logic check: Must be vertical (dy > dx)
-        const isVertical = Math.abs(dy) > Math.abs(dx);
-        if (!isVertical) {
-            instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please place and move your fingers vertically!</span>`;
-            instructionEl.style.display = "block";
-            
-            fingerLine.style.display = "none";
-            liveDistanceLabel.style.display = "none";
-            
-            if (!taskActive) {
+        if (!taskActive) {
+            // Before the trial starts, enforce vertical layout check
+            const isVertical = Math.abs(dy) > Math.abs(dx);
+            if (!isVertical) {
+                instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please place your fingers vertically!</span>`;
+                instructionEl.style.display = "block";
+                fingerLine.style.display = "none";
                 return;
             }
-        } else {
-            // Hide vertical warning if active
-            if (taskActive) {
-                instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-                instructionEl.style.display = "block";
-            }
             
-            // Visual connection line
+            // Check target containment to start the trial
+            if (!savingTrial) {
+                const oneInTop = isTouchInsideElement(indexTouch, topTarget) || isTouchInsideElement(thumbTouch, topTarget);
+                const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
+                
+                if (oneInTop && oneInBottom) {
+                    startPinchTrial(now);
+                } else {
+                    // Show a warning instruction if fingers are not placed inside the outlined guides
+                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to start!</span>`;
+                    instructionEl.style.display = "block";
+                }
+            }
+        } else {
+            // During the active trial: Restore normal instructions and draw the line in any direction
+            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+            instructionEl.style.display = "block";
+            
             fingerLine.setAttribute("x1", x1);
             fingerLine.setAttribute("y1", y1);
             fingerLine.setAttribute("x2", x2);
             fingerLine.setAttribute("y2", y2);
             fingerLine.style.display = "block";
             
-            // Floating MM label
-            const xMid = (x1 + x2) / 2;
-            const yMid = (y1 + y2) / 2;
-            liveDistanceLabel.style.left = `${xMid}px`;
-            liveDistanceLabel.style.top = `${yMid}px`;
-            liveDistanceLabel.textContent = `${distMm.toFixed(1)} mm`;
-            liveDistanceLabel.style.display = "block";
-            
-            // Automatic start trigger if two fingers are placed on the screen vertically
-            if (!taskActive && !savingTrial) {
-                startPinchTrial(now);
-            }
-        }
-        
-        // Record trajectory frame
-        if (taskActive) {
+            // Record trajectory frame
             trajectory.push({
                 t: now - trialStartTime,
-                touches_count: 2,
+                state: "2_touches_active",
                 x_index: x1,
                 y_index: y1,
                 x_thumb: x2,
@@ -187,20 +192,46 @@ function handleTouch(e) {
         fingerLine.style.display = "none";
         liveDistanceLabel.style.display = "none";
         
-        // If the trial is active, log touch loss state in trajectory and alert the user
         if (taskActive) {
+            // Determine the explicit cause of the touch interruption and identify remaining finger
+            let frameState = "0_touch_lift_off";
+            let x_idx = null, y_idx = null, x_th = null, y_th = null;
+            
+            if (touches.length === 1) {
+                const remainingTouch = touches[0];
+                if (remainingTouch.identifier === indexTouchId) {
+                    frameState = "1_touch_partial_index_active"; // Thumb left first
+                    x_idx = remainingTouch.clientX;
+                    y_idx = remainingTouch.clientY;
+                } else if (remainingTouch.identifier === thumbTouchId) {
+                    frameState = "1_touch_partial_thumb_active"; // Index left first
+                    x_th = remainingTouch.clientX;
+                    y_th = remainingTouch.clientY;
+                } else {
+                    frameState = "1_touch_partial";
+                }
+            } else if (touches.length >= 3) {
+                frameState = "3plus_invalid";
+            }
+            
+            // 1. Log the touch loss frame to database (distance: null ensures gap analysis counts it)
             trajectory.push({
                 t: now - trialStartTime,
-                touches_count: touches.length,
-                x_index: null,
-                y_index: null,
-                x_thumb: null,
-                y_thumb: null,
+                state: frameState,
+                x_index: x_idx,
+                y_index: y_idx,
+                x_thumb: x_th,
+                y_thumb: y_th,
                 distance: null
             });
             
-            instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please keep both fingers on the screen!</span>`;
-            instructionEl.style.display = "block";
+            // 2. Set a 150ms debounce timer for the on-screen warning alert to prevent flickering on touch merges
+            if (!warningTimeout) {
+                warningTimeout = setTimeout(() => {
+                    instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please keep both fingers on the screen!</span>`;
+                    instructionEl.style.display = "block";
+                }, 150);
+            }
         }
     }
 }
