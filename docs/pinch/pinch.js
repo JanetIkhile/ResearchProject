@@ -21,6 +21,7 @@ let isBetweenTrials = false;
 let warningTimeout = null;
 let indexTouchId = null;
 let thumbTouchId = null;
+let isInterrupted = false;
 
 const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your index finger on the top circle. Open and close your fingers <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.";
 
@@ -166,6 +167,7 @@ function handleTouch(e) {
                 const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
                 
                 if (oneInTop && oneInBottom) {
+                    isInterrupted = false;
                     startPinchTrial(now);
                 } else {
                     // Show a warning instruction if fingers are not placed inside the outlined guides
@@ -174,7 +176,33 @@ function handleTouch(e) {
                 }
             }
         } else {
-            // During the active trial: Restore normal instructions and draw the line in any direction
+            // During the active trial
+            if (isInterrupted) {
+                // Enforce placing fingers back inside baseline circles to resume trial
+                const oneInTop = isTouchInsideElement(indexTouch, topTarget) || isTouchInsideElement(thumbTouch, topTarget);
+                const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
+                
+                if (oneInTop && oneInBottom) {
+                    isInterrupted = false; // Recovered!
+                } else {
+                    // Still out of bounds -> keep instruction warning and log interruption state
+                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
+                    instructionEl.style.display = "block";
+                    
+                    trajectory.push({
+                        t: now - trialStartTime,
+                        state: "2_touches_out_of_bounds",
+                        x_index: x1,
+                        y_index: y1,
+                        x_thumb: x2,
+                        y_thumb: y2,
+                        distance: null // Keep distance null so post-hoc analysis counts it as interruption
+                    });
+                    return; // Exit early without moving targets or recording active frames
+                }
+            }
+            
+            // Restore normal instructions and draw the targets
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             instructionEl.style.display = "block";
             
@@ -207,6 +235,7 @@ function handleTouch(e) {
         resetTargetPositions();
         
         if (taskActive) {
+            isInterrupted = true; // Mark as interrupted when touches drop below 2
             // Determine the explicit cause of the touch interruption and identify remaining finger
             let frameState = "0_touch_lift_off";
             let x_idx = null, y_idx = null, x_th = null, y_th = null;
