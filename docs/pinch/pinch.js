@@ -156,7 +156,7 @@ function handleTouch(e) {
             // Before the trial starts, enforce vertical layout check
             const isVertical = Math.abs(dy) > Math.abs(dx);
             if (!isVertical) {
-                instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please place your fingers vertically!</span>`;
+                instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers vertically!</span>`;
                 instructionEl.style.display = "block";
                 return;
             }
@@ -344,7 +344,7 @@ function handleTouch(e) {
                     distance: null
                 });
                 
-                instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
+                instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
                 instructionEl.style.display = "block";
             }
         } else {
