@@ -27,7 +27,7 @@ let lastIndexY = null;
 let lastThumbX = null;
 let lastThumbY = null;
 
-const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your index finger on the top circle. Open and close your fingers <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.";
+const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your index finger on the top circle. Open your fingers <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible, then lift both fingers and repeat.";
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -186,7 +186,7 @@ function handleTouch(e) {
                     requiresReset = false; // Recovered!
                 } else {
                     // Still out of bounds -> keep instruction warning and log interruption state
-                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
+                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`;
                     instructionEl.style.display = "block";
                     
                     trajectory.push({
@@ -251,7 +251,7 @@ function handleTouch(e) {
                         distance: null
                     });
                     
-                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
+                    instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
                     instructionEl.style.display = "block";
                 } else {
                     // This is a pause/resume state (1 finger remains). Keep last known position of the missing finger!
@@ -321,13 +321,24 @@ function handleTouch(e) {
                         }
                     }
                     
-                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`;
-                    instructionEl.style.display = "block";
+                    // Show pause warning with debounce
+                    if (!warningTimeout) {
+                        warningTimeout = setTimeout(() => {
+                            instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`;
+                            instructionEl.style.display = "block";
+                        }, 150);
+                    }
                 }
             } else {
                 // 0 touches or 3+ invalid touches -> enters reset state
                 requiresReset = true;
                 resetTargetPositions();
+                
+                // Clear warning timeout if touches are 0
+                if (warningTimeout) {
+                    clearTimeout(warningTimeout);
+                    warningTimeout = null;
+                }
                 
                 let frameState = "0_touch_reset";
                 if (touches.length >= 3) {
@@ -344,7 +355,7 @@ function handleTouch(e) {
                     distance: null
                 });
                 
-                instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to resume!</span>`;
+                instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
                 instructionEl.style.display = "block";
             }
         } else {
