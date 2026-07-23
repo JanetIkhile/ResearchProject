@@ -80,6 +80,8 @@ async function startSession() {
         document.addEventListener("touchend", handleTouch, { passive: false });
         document.addEventListener("touchcancel", handleTouch, { passive: false });
         
+        // Align baseline instruction
+        instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
     } catch (err) {
         console.error("Session initialization failed:", err);
     }
