@@ -26,6 +26,7 @@ let lastIndexX = null;
 let lastIndexY = null;
 let lastThumbX = null;
 let lastThumbY = null;
+let maxStrokeDistance = 0;
 
 const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your index finger on the top circle. Open your fingers <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible, then lift both fingers and repeat.";
 
@@ -97,6 +98,7 @@ function isTouchInsideElement(touch, element) {
 
 // Helper to reset circles back to their baseline CSS positions
 function resetTargetPositions() {
+    maxStrokeDistance = 0;
     topTarget.style.left = "";
     topTarget.style.top = "";
     topTarget.style.transform = "";
@@ -168,9 +170,9 @@ function handleTouch(e) {
                 
                 if (oneInTop && oneInBottom) {
                     requiresReset = false;
+                    maxStrokeDistance = distPx;
                     startPinchTrial(now);
                 } else {
-                    // Show a warning instruction if fingers are not placed inside the outlined guides
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to start!</span>`;
                     instructionEl.style.display = "block";
                 }
@@ -184,8 +186,8 @@ function handleTouch(e) {
                 
                 if (oneInTop && oneInBottom) {
                     requiresReset = false; // Recovered!
+                    maxStrokeDistance = distPx; // Initialize max distance for this new stroke!
                 } else {
-                    // Still out of bounds -> keep instruction warning and log interruption state
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`;
                     instructionEl.style.display = "block";
                     
@@ -202,26 +204,36 @@ function handleTouch(e) {
                 }
             }
             
+            // Check if this is the start of a stroke (maxStrokeDistance is 0 or uninitialized)
+            if (maxStrokeDistance === 0) {
+                maxStrokeDistance = distPx;
+            }
+            
+            // Lock circles to monotonically non-decreasing distance during active pinching
+            if (distPx >= maxStrokeDistance) {
+                maxStrokeDistance = distPx;
+                
+                // Dynamically position target circles directly under the user's touch points
+                topTarget.style.left = `${x1}px`;
+                topTarget.style.top = `${y1}px`;
+                topTarget.style.transform = "translate(-50%, -50%)";
+                
+                bottomTarget.style.left = `${x2}px`;
+                bottomTarget.style.top = `${y2}px`;
+                bottomTarget.style.transform = "translate(-50%, -50%)";
+                
+                // Cache coordinates as last known positions
+                lastIndexX = x1;
+                lastIndexY = y1;
+                lastThumbX = x2;
+                lastThumbY = y2;
+            }
+            
             // Restore normal instructions and draw the targets
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             instructionEl.style.display = "block";
             
-            // Dynamically position target circles directly under the user's touch points
-            topTarget.style.left = `${x1}px`;
-            topTarget.style.top = `${y1}px`;
-            topTarget.style.transform = "translate(-50%, -50%)";
-            
-            bottomTarget.style.left = `${x2}px`;
-            bottomTarget.style.top = `${y2}px`;
-            bottomTarget.style.transform = "translate(-50%, -50%)";
-            
-            // Cache coordinates as last known positions
-            lastIndexX = x1;
-            lastIndexY = y1;
-            lastThumbX = x2;
-            lastThumbY = y2;
-            
-            // Record trajectory frame
+            // Record trajectory frame (always logs actual touch coordinates and actual distance)
             trajectory.push({
                 t: now - trialStartTime,
                 state: "2_touches_active",
