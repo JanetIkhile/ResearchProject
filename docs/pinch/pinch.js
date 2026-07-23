@@ -27,7 +27,6 @@ const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your ind
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
 const bottomTarget = document.getElementById("bottomTarget");
-const fingerLine = document.getElementById("fingerLine");
 const liveDistanceLabel = document.getElementById("liveDistanceLabel");
 const instructionEl = document.getElementById("pinchInstruction");
 const timerEl = document.getElementById("countdownTimer");
@@ -91,6 +90,17 @@ function isTouchInsideElement(touch, element) {
     );
 }
 
+// Helper to reset circles back to their baseline CSS positions
+function resetTargetPositions() {
+    topTarget.style.left = "";
+    topTarget.style.top = "";
+    topTarget.style.transform = "";
+    
+    bottomTarget.style.left = "";
+    bottomTarget.style.top = "";
+    bottomTarget.style.transform = "";
+}
+
 // Multi-Touch Handler
 function handleTouch(e) {
     // If modal is open or task is completed, do nothing
@@ -147,7 +157,6 @@ function handleTouch(e) {
             if (!isVertical) {
                 instructionEl.innerHTML = `<span style="color: #dc2626; font-weight: bold;">⚠️ Please place your fingers vertically!</span>`;
                 instructionEl.style.display = "block";
-                fingerLine.style.display = "none";
                 return;
             }
             
@@ -169,11 +178,14 @@ function handleTouch(e) {
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             instructionEl.style.display = "block";
             
-            fingerLine.setAttribute("x1", x1);
-            fingerLine.setAttribute("y1", y1);
-            fingerLine.setAttribute("x2", x2);
-            fingerLine.setAttribute("y2", y2);
-            fingerLine.style.display = "block";
+            // Dynamically position target circles directly under the user's touch points
+            topTarget.style.left = `${x1}px`;
+            topTarget.style.top = `${y1}px`;
+            topTarget.style.transform = "translate(-50%, -50%)";
+            
+            bottomTarget.style.left = `${x2}px`;
+            bottomTarget.style.top = `${y2}px`;
+            bottomTarget.style.transform = "translate(-50%, -50%)";
             
             // Record trajectory frame
             trajectory.push({
@@ -189,8 +201,10 @@ function handleTouch(e) {
         
     } else {
         // Less than 2 touches -> hide tracking overlay
-        fingerLine.style.display = "none";
         liveDistanceLabel.style.display = "none";
+        
+        // Reset target guides back to their baseline vertical positions
+        resetTargetPositions();
         
         if (taskActive) {
             // Determine the explicit cause of the touch interruption and identify remaining finger
@@ -270,8 +284,10 @@ async function stopPinchTrial() {
     clearInterval(countdownTimer);
     
     // Hide tracking overlays immediately
-    fingerLine.style.display = "none";
     liveDistanceLabel.style.display = "none";
+    
+    // Reset guide target positions back to baseline
+    resetTargetPositions();
     
     // Synchronously update screen to disabled transition state at start of stopPinchTrial
     isBetweenTrials = true;
@@ -354,7 +370,6 @@ function endPinchTask() {
     // Visual completes
     topTarget.style.display = "none";
     bottomTarget.style.display = "none";
-    fingerLine.style.display = "none";
     liveDistanceLabel.style.display = "none";
     instructionEl.style.display = "none";
     
