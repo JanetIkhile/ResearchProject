@@ -185,7 +185,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
     text-align: center;
     z-index: 2000;
 }
@@ -263,6 +263,15 @@ body {
 
     #taskHeader h2 {
         font-size: 2rem;
+    }
+
+    #completionText {
+        font-size: 2rem;
+    }
+
+    #nextTaskButton {
+        font-size: 1.8rem;
+        padding: 28px 50px;
     }
 }
 
