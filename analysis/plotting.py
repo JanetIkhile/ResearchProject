@@ -680,10 +680,10 @@ def plot_pinch_trajectory(
             ax.text(0.5, 0.5, f"No trajectory recorded for {p_code}", ha='center', va='center')
             continue
 
-        px_idx = [pt['x_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_index') is not None]
-        py_idx = [pt['y_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_index') is not None]
-        px_thb = [pt['x_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_thumb') is not None]
-        py_thb = [pt['y_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_thumb') is not None]
+        px_idx = [pt['x_index'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('x_index') is not None and pt.get('x_thumb') is not None)) and pt.get('x_index') is not None]
+        py_idx = [pt['y_index'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('y_index') is not None and pt.get('y_thumb') is not None)) and pt.get('y_index') is not None]
+        px_thb = [pt['x_thumb'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('x_index') is not None and pt.get('x_thumb') is not None)) and pt.get('x_thumb') is not None]
+        py_thb = [pt['y_thumb'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('y_index') is not None and pt.get('y_thumb') is not None)) and pt.get('y_thumb') is not None]
 
         if not px_idx or not px_thb:
             ax.text(0.5, 0.5, f"No two-finger coordinates logged for {p_code}", ha='center', va='center')
@@ -815,10 +815,10 @@ def plot_aggregate_pinch_trajectory(
             if not traj or not isinstance(traj, list):
                 continue
 
-            px_idx = [pt['x_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_index') is not None]
-            py_idx = [pt['y_index'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_index') is not None]
-            px_thb = [pt['x_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('x_thumb') is not None]
-            py_thb = [pt['y_thumb'] for pt in traj if pt.get('touches_count') == 2 and pt.get('y_thumb') is not None]
+            px_idx = [pt['x_index'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('x_index') is not None and pt.get('x_thumb') is not None)) and pt.get('x_index') is not None]
+            py_idx = [pt['y_index'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('y_index') is not None and pt.get('y_thumb') is not None)) and pt.get('y_index') is not None]
+            px_thb = [pt['x_thumb'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('x_index') is not None and pt.get('x_thumb') is not None)) and pt.get('x_thumb') is not None]
+            py_thb = [pt['y_thumb'] for pt in traj if (pt.get('touches_count') == 2 or pt.get('state') == '2_touches_active' or (pt.get('y_index') is not None and pt.get('y_thumb') is not None)) and pt.get('y_thumb') is not None]
 
             if not px_idx or not px_thb:
                 continue

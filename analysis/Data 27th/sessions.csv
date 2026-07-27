@@ -1,0 +1,3 @@
+id,participant_id,started_at,drag_completed,tap_completed,hold_completed,completed,completed_at,device_info,notes,session_type
+25dc4ed2-418e-4abd-9dc3-c6a1ae8dd519,ffa27ff7-98ef-4dcf-a5c6-8ca82fd54a78,2026-07-27 21:29:29.897+00,true,true,true,true,2026-07-27 21:32:43.272+00,,,main
+2ae1f162-2df3-4831-867f-40e93af7eb2b,ffa27ff7-98ef-4dcf-a5c6-8ca82fd54a78,2026-07-27 21:26:46.088+00,true,true,true,true,2026-07-27 21:29:14.339+00,,,practice

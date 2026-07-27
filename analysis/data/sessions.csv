@@ -1,5 +1,5 @@
 id,participant_id,started_at,drag_completed,tap_completed,hold_completed,completed,completed_at,device_info,notes,session_type
-35a8d43f-47c0-4148-b104-1d766e27e4eb,957a6ed3-3ad3-4187-a462-986a96f8750b,2026-06-22 18:11:17.336+00,true,true,true,true,2026-06-22 18:12:54.625+00,,,main
-a9da47f2-9ec2-45e1-b670-502be9258c4e,18787b70-6d1f-4bd8-b8cb-a723f6289be6,2026-06-23 15:49:23.235+00,true,true,true,true,2026-06-23 15:50:28.981+00,,,practice
-c1ce66d3-069f-49f2-89af-acb44b57f3a8,18787b70-6d1f-4bd8-b8cb-a723f6289be6,2026-06-23 15:50:36.469+00,true,true,true,true,2026-06-23 15:52:17.845+00,,,main
-d1c3808e-8ad1-47be-bec1-13a929044fa1,957a6ed3-3ad3-4187-a462-986a96f8750b,2026-06-22 18:10:27.319+00,true,true,true,true,2026-06-22 18:11:08.3+00,,,practice
+7b4a12ca-f071-46fb-a0c0-6de3942f3ee5,7d36b6ba-b140-4742-ab9d-83cffd5a3b21,2026-07-23 19:52:56.201+00,True,True,True,True,2026-07-23 19:55:31.915+00,,,main
+d5728770-7d42-463e-9703-8205bd3d9d91,7d36b6ba-b140-4742-ab9d-83cffd5a3b21,2026-07-23 19:50:51.865+00,True,True,True,True,2026-07-23 19:52:51.8+00,,,practice
+25dc4ed2-418e-4abd-9dc3-c6a1ae8dd519,ffa27ff7-98ef-4dcf-a5c6-8ca82fd54a78,2026-07-27 21:29:29.897+00,True,True,True,True,2026-07-27 21:32:43.272+00,,,main
+2ae1f162-2df3-4831-867f-40e93af7eb2b,ffa27ff7-98ef-4dcf-a5c6-8ca82fd54a78,2026-07-27 21:26:46.088+00,True,True,True,True,2026-07-27 21:29:14.339+00,,,practice
