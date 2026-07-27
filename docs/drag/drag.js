@@ -112,7 +112,21 @@ function handleTouchStart(e) {
     }
 
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
+
+    // Enforce that touch must start inside the outer green circle
+    const outerStart = document.getElementById('startPoint');
+    const outerStartRect = outerStart.getBoundingClientRect();
+    const sX = outerStartRect.left + outerStartRect.width / 2;
+    const sY = outerStartRect.top + outerStartRect.height / 2;
+    const sRad = outerStartRect.width / 2;
+
     const touch = e.changedTouches[0];
+    const distToStart = Math.hypot(touch.clientX - sX, touch.clientY - sY);
+
+    if (distToStart > sRad) {
+        return; // Ignore touches starting outside the green circle
+    }
+
     activeTouchId = touch.identifier;
 
     if (clearCanvasTimeout) {
@@ -145,7 +159,7 @@ function handleTouchStart(e) {
     pointer.id = `pointer-${touch.identifier}`;
     document.body.append(pointer);
 
-    const startRect = startPoint.getBoundingClientRect();
+    const startRect = startPoint.getBoundingClientRect(); // startPoint refers to startInnerDot
     const targetRect = targetPoint.getBoundingClientRect();
 
     startX = startRect.left + startRect.width / 2;
