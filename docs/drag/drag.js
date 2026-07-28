@@ -9,6 +9,7 @@ let trialNumber = 0;
 const TASK_TYPE = "drag";
 let TRIAL_LIMIT = 10;
 let taskCompleted = false;
+let sessionNumber = null;
 let hasShownSpeedPrompt = false;
 let pageLoadTime = Date.now();
 let lastTrialEndTime = pageLoadTime;
@@ -25,7 +26,7 @@ const instructionSub = document.getElementById("instructionSub");
         participantId = result.participantId;
         sessionId = result.sessionId;
 
-        const sessionNumber = result.sessionNumber;
+        sessionNumber = result.sessionNumber;
         const header = document.getElementById("taskHeader");
 
         if (header) {
@@ -109,10 +110,10 @@ function animateDemoPath() {
 
     const rect = demoPointer.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
-    
-    // Get finger tip coordinate (roughly center-top of the hand emoji)
+
+    // Get finger tip coordinate (top-center of the 80x80 container)
     const curX = rect.left + rect.width / 2 - canvasRect.left;
-    const curY = rect.top + rect.height / 2 - canvasRect.top;
+    const curY = rect.top - canvasRect.top;
 
     demoPath.push({ x: curX, y: curY });
 
@@ -150,7 +151,7 @@ function showFeedback(message, type) {
     feedback.style.textAlign = "center";
     feedback.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
     feedback.style.transition = "opacity 0.3s ease-out";
-    
+
     if (type === "success") {
         feedback.style.backgroundColor = "#d1fae5";
         feedback.style.color = "#065f46";
@@ -177,6 +178,7 @@ function showFeedback(message, type) {
 }
 
 function startDemoAnimation() {
+    if (sessionNumber !== 1) return; // Only practice phase
     if (trialNumber > 0 || taskCompleted) return;
 
     if (!demoPointer) {
@@ -202,9 +204,9 @@ function startDemoAnimation() {
     const targetRect = targetPoint.getBoundingClientRect();
 
     const sX = startRect.left + startRect.width / 2 - 30;
-    const sY = startRect.top + startRect.height / 2 - 30;
+    const sY = startRect.top + startRect.height / 2;
     const tX = targetRect.left + targetRect.width / 2 - 30;
-    const tY = targetRect.top + targetRect.height / 2 - 30;
+    const tY = targetRect.top + targetRect.height / 2;
 
     function runAnimationCycle() {
         if (trialNumber > 0 || taskCompleted) {
@@ -348,7 +350,7 @@ function handleTouchStart(e) {
     startX = startRect.left + startRect.width / 2;
     startY = startRect.top + startRect.height / 2;
     startRadius = startRect.width / 2;
-    
+
     targetX = targetRect.left + targetRect.width / 2;
     targetY = targetRect.top + targetRect.height / 2;
     targetRadius = targetRect.width / 2;
@@ -357,7 +359,7 @@ function handleTouchStart(e) {
 function handleTouchMove(e) {
     if (taskCompleted) return;
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
-    
+
     const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
     if (!touch) return;
 
@@ -394,7 +396,7 @@ function handleTouchMove(e) {
 async function handleTouchEnd(e) {
     if (taskCompleted) return;
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
-    
+
     const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
     if (!touch) return;
     activeTouchId = null;
@@ -537,7 +539,7 @@ function handleTouchCancel(e) {
     if (taskCompleted) return;
     const touch = Array.from(e.changedTouches).find(t => t.identifier === activeTouchId);
     if (!touch) return;
-    
+
     // Abort cleanly without recording a trial
     activeTouchId = null;
     const pointer = document.getElementById(`pointer-${touch.identifier}`);
@@ -560,4 +562,4 @@ document.addEventListener("touchend", handleTouchEnd);
 document.addEventListener("touchcancel", handleTouchCancel);
 
 // Prevent long-press context menu globally
-document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
+document.addEventListener("contextmenu", function (e) { e.preventDefault(); });

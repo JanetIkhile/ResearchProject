@@ -18,6 +18,7 @@ let timerInterval = null;
 let tapEvents = [];
 let tapTrajectory = [];
 let taskCompleted = false;
+let sessionNumber = null;
 let savingInProgress = false;
 
 let trialStartTime = null;
@@ -69,7 +70,131 @@ function toggleExpectedTarget() {
 }
 
 // attach handler reference so we can remove it later
+
+// ---------------- DEMO ANIMATION FOR TAP TASK ----------------
+let demoInterval = null;
+let demoPointer = null;
+
+function startDemoAnimation() {
+    if (sessionNumber !== 1) return; // Only practice phase
+    if (trialNumber > 0 || taskActive || taskCompleted) return;
+
+    if (!demoPointer) {
+        demoPointer = document.createElement("div");
+        demoPointer.id = "demoPointer";
+        demoPointer.style.position = "absolute";
+        demoPointer.style.width = "60px";
+        demoPointer.style.height = "60px";
+        demoPointer.style.fontSize = "54px";
+        demoPointer.style.textAlign = "center";
+        demoPointer.style.lineHeight = "60px";
+        demoPointer.style.zIndex = "1000";
+        demoPointer.style.pointerEvents = "none";
+        demoPointer.innerText = "👆";
+        document.body.appendChild(demoPointer);
+    }
+
+    const tRect = topTarget.getBoundingClientRect();
+    const bRect = bottomTarget.getBoundingClientRect();
+    const tX = tRect.left + tRect.width / 2 - 30;
+    const tY = tRect.top + tRect.height / 2;
+    const bX = bRect.left + bRect.width / 2 - 30;
+    const bY = bRect.top + bRect.height / 2;
+
+    function runAnimationCycle() {
+        if (trialNumber > 0 || taskActive || taskCompleted) {
+            stopDemoAnimation();
+            return;
+        }
+
+        // Force Top Target active initially at the start of the demo cycle
+        expectedTarget = "top";
+        if (topTarget) {
+            topTarget.classList.remove("inactive");
+            topTarget.classList.add("active");
+        }
+        if (bottomTarget) {
+            bottomTarget.classList.remove("active");
+            bottomTarget.classList.add("inactive");
+        }
+
+        // 1. Position at Top Target (opacity 0)
+        demoPointer.style.transition = "none";
+        demoPointer.style.transform = "scale(1.0)";
+        demoPointer.style.left = `${tX}px`;
+        demoPointer.style.top = `${tY}px`;
+        demoPointer.style.opacity = "0";
+
+        // Fade in
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "opacity 0.2s ease-in";
+            demoPointer.style.opacity = "1";
+        }, 100);
+
+        // Tap Top Target (shrink)
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "transform 0.08s ease-out";
+            demoPointer.style.transform = "scale(0.75)";
+        }, 400);
+
+        // Restore scale and toggle target highlight (Top -> Bottom)
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "transform 0.08s ease-in";
+            demoPointer.style.transform = "scale(1.0)";
+            toggleExpectedTarget(); // Toggles bottom target active, top inactive
+        }, 480);
+
+        // Jump to Bottom Target instantly (no slide)
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "none";
+            demoPointer.style.left = `${bX}px`;
+            demoPointer.style.top = `${bY}px`;
+        }, 900);
+
+        // Tap Bottom Target (shrink)
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "transform 0.08s ease-out";
+            demoPointer.style.transform = "scale(0.75)";
+        }, 1200);
+
+        // Restore scale and toggle target highlight back (Bottom -> Top)
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "transform 0.08s ease-in";
+            demoPointer.style.transform = "scale(1.0)";
+            toggleExpectedTarget(); // Toggles top target active, bottom inactive
+        }, 1280);
+
+        // Fade out
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "opacity 0.2s ease-out";
+            demoPointer.style.opacity = "0";
+        }, 1600);
+    }
+
+    runAnimationCycle();
+    demoInterval = setInterval(runAnimationCycle, 2000);
+}
+
+function stopDemoAnimation() {
+    if (demoInterval) {
+        clearInterval(demoInterval);
+        demoInterval = null;
+    }
+    if (demoPointer) {
+        demoPointer.remove();
+        demoPointer = null;
+    }
+}
+
 function handleTouchStart(e) {
+    stopDemoAnimation();
     if (window.isModalOpen) return;
     if (taskCompleted) return;
 
@@ -140,7 +265,7 @@ function handleTouchStart(e) {
         sessionId = result.sessionId;
         console.log("Session verified:", sessionId, result.sessionRow);
 
-        const sessionNumber = result.sessionNumber;
+        sessionNumber = result.sessionNumber;
 
         const header = document.getElementById("taskHeader");
         if (header) {
@@ -205,6 +330,7 @@ function handleTouchStart(e) {
     document.addEventListener("touchstart", handleTouchStart, { passive: false });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd, { passive: false });
+    setTimeout(startDemoAnimation, 500);
 })();
 
 // ---------- Start a trial ----------
