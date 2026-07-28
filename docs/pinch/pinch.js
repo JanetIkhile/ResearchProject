@@ -45,15 +45,14 @@ const PX_TO_MM = 25.4 / 96.0;
 async function startSession() {
     try {
         const sessionData = await initSession({ dashboardPath: "../dashboard/dashboard.html" });
+        sessionNumber = sessionData.sessionNumber;
         participantId = sessionData.participantId;
         sessionId = sessionData.sessionId;
         sessionType = sessionStorage.getItem("session_type") || "main";
         TRIAL_LIMIT = (sessionType === 'practice') ? 1 : 3;
-        
+
         console.log("Pinch task session active. Participant:", participantId, "Limit:", TRIAL_LIMIT);
-        
-        // Show session label badge
-        const sessionNumber = sessionData.sessionNumber;
+
         const header = document.getElementById("taskHeader");
         if (header) {
             const existing = header.querySelector(".session-label");
@@ -72,16 +71,17 @@ async function startSession() {
             }
             header.appendChild(label);
         }
-        
-        
+
+
         // Listen to touches
         document.addEventListener("touchstart", handleTouch, { passive: false });
         document.addEventListener("touchmove", handleTouch, { passive: false });
         document.addEventListener("touchend", handleTouch, { passive: false });
         document.addEventListener("touchcancel", handleTouch, { passive: false });
-        
+
         // Align baseline instruction
         instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+        setTimeout(startDemoAnimation, 500);
     } catch (err) {
         console.error("Session initialization failed:", err);
     }
@@ -104,32 +104,175 @@ function resetTargetPositions() {
     topTarget.style.left = "";
     topTarget.style.top = "";
     topTarget.style.transform = "";
-    
+
     bottomTarget.style.left = "";
     bottomTarget.style.top = "";
     bottomTarget.style.transform = "";
 }
 
 // Multi-Touch Handler
+
+// ---------------- DEMO ANIMATION FOR PINCH TASK ----------------
+let sessionNumber = null;
+let demoInterval = null;
+let demoPointer1 = null;
+let demoPointer2 = null;
+
+function startDemoAnimation() {
+    if (sessionNumber !== 1) return; // Only practice phase
+    if (trialNumber > 0 || taskActive) return;
+
+    if (!demoPointer1) {
+        demoPointer1 = document.createElement("div");
+        demoPointer1.id = "demoPointer1";
+        demoPointer1.style.position = "absolute";
+        demoPointer1.style.width = "60px";
+        demoPointer1.style.height = "60px";
+        demoPointer1.style.fontSize = "54px";
+        demoPointer1.style.textAlign = "center";
+        demoPointer1.style.lineHeight = "60px";
+        demoPointer1.style.zIndex = "1000";
+        demoPointer1.style.pointerEvents = "none";
+        demoPointer1.style.opacity = "0";
+        demoPointer1.innerText = "👆";
+        document.body.appendChild(demoPointer1);
+    }
+
+    if (!demoPointer2) {
+        demoPointer2 = document.createElement("div");
+        demoPointer2.id = "demoPointer2";
+        demoPointer2.style.position = "absolute";
+        demoPointer2.style.width = "60px";
+        demoPointer2.style.height = "60px";
+        demoPointer2.style.fontSize = "54px";
+        demoPointer2.style.textAlign = "center";
+        demoPointer2.style.lineHeight = "60px";
+        demoPointer2.style.zIndex = "1000";
+        demoPointer2.style.pointerEvents = "none";
+        demoPointer2.style.opacity = "0";
+        demoPointer2.innerText = "👇";
+        document.body.appendChild(demoPointer2);
+    }
+
+    const tRect = topTarget.getBoundingClientRect();
+    const bRect = bottomTarget.getBoundingClientRect();
+    const tX = tRect.left + tRect.width / 2 - 30;
+    const tY = tRect.top + tRect.height / 2;
+    const bX = bRect.left + bRect.width / 2 - 30;
+    const bY = bRect.top + bRect.height / 2 - 60;
+
+    function runAnimationCycle() {
+        if (trialNumber > 0 || taskActive) {
+            stopDemoAnimation();
+            return;
+        }
+
+        // Reset positions (Instant)
+        demoPointer1.style.transition = "none";
+        demoPointer1.style.left = `${tX}px`;
+        demoPointer1.style.top = `${tY}px`;
+        demoPointer1.style.opacity = "0";
+
+        demoPointer2.style.transition = "none";
+        demoPointer2.style.left = `${bX}px`;
+        demoPointer2.style.top = `${bY}px`;
+        demoPointer2.style.opacity = "0";
+
+        topTarget.style.transition = "none";
+        topTarget.style.left = `${tRect.left + tRect.width / 2}px`;
+        topTarget.style.top = `${tRect.top + tRect.height / 2}px`;
+        topTarget.style.transform = "translate(-50%, -50%)";
+
+        bottomTarget.style.transition = "none";
+        bottomTarget.style.left = `${bRect.left + bRect.width / 2}px`;
+        bottomTarget.style.top = `${bRect.top + bRect.height / 2}px`;
+        bottomTarget.style.transform = "translate(-50%, -50%)";
+
+        // Fade in
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || !demoPointer1 || !demoPointer2) return;
+            demoPointer1.style.transition = "opacity 0.3s ease-in";
+            demoPointer1.style.opacity = "1";
+            demoPointer2.style.transition = "opacity 0.3s ease-in";
+            demoPointer2.style.opacity = "1";
+        }, 100);
+
+        // Move apart (spread fingers and follow targets)
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || !demoPointer1 || !demoPointer2) return;
+            demoPointer1.style.transition = "top 1.0s ease-out";
+            demoPointer1.style.top = `${tY - 120}px`;
+
+            topTarget.style.transition = "top 1.0s ease-out";
+            topTarget.style.top = `${tRect.top + tRect.height / 2 - 120}px`;
+
+            demoPointer2.style.transition = "top 1.0s ease-out";
+            demoPointer2.style.top = `${bY + 120}px`;
+
+            bottomTarget.style.transition = "top 1.0s ease-out";
+            bottomTarget.style.top = `${bRect.top + bRect.height / 2 + 120}px`;
+        }, 500);
+
+        // Fade out pointers
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive || !demoPointer1 || !demoPointer2) return;
+            demoPointer1.style.transition = "opacity 0.3s ease-out";
+            demoPointer1.style.opacity = "0";
+            demoPointer2.style.transition = "opacity 0.3s ease-out";
+            demoPointer2.style.opacity = "0";
+        }, 1700);
+
+        // Smoothly return targets to start
+        setTimeout(() => {
+            if (trialNumber > 0 || taskActive) return;
+            topTarget.style.transition = "top 0.3s ease-in-out";
+            topTarget.style.top = `${tRect.top + tRect.height / 2}px`;
+
+            bottomTarget.style.transition = "top 0.3s ease-in-out";
+            bottomTarget.style.top = `${bRect.top + bRect.height / 2}px`;
+        }, 2050);
+    }
+
+    runAnimationCycle();
+    demoInterval = setInterval(runAnimationCycle, 2400);
+}
+
+function stopDemoAnimation() {
+    if (demoInterval) {
+        clearInterval(demoInterval);
+        demoInterval = null;
+    }
+    if (demoPointer1) {
+        demoPointer1.remove();
+        demoPointer1 = null;
+    }
+    if (demoPointer2) {
+        demoPointer2.remove();
+        demoPointer2 = null;
+    }
+    resetTargetPositions(); // Instantly restore target circles to baseline CSS
+}
+
 function handleTouch(e) {
+    stopDemoAnimation();
     // If modal is open or task is completed, do nothing
     if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive) || isBetweenTrials) {
         return;
     }
-    
+
     // Prevent any native browser scrolling, panning, or gestures immediately
     e.preventDefault();
-    
+
     const touches = e.touches;
     const now = Date.now();
-    
+
     // Track initiation delay on first touch of the session/trial
     if (touches.length > 0 && !firstTouchTime && !taskActive) {
         firstTouchTime = now;
         const pageLoadTime = parseFloat(sessionStorage.getItem("pinch_page_load") || now);
         initiationDelay = now - pageLoadTime;
     }
-    
+
     if (touches.length === 2) {
         // Clear any pending warning timer and restore normal text
         if (warningTimeout) {
@@ -142,16 +285,16 @@ function handleTouch(e) {
         let t2 = touches[1];
         let indexTouch = (t1.clientY < t2.clientY) ? t1 : t2;
         let thumbTouch = (t1.clientY < t2.clientY) ? t2 : t1;
-        
+
         // Store touch identifiers to distinguish partial lift-offs
         indexTouchId = indexTouch.identifier;
         thumbTouchId = thumbTouch.identifier;
-        
+
         const x1 = indexTouch.clientX;
         const y1 = indexTouch.clientY;
         const x2 = thumbTouch.clientX;
         const y2 = thumbTouch.clientY;
-        
+
         const dx = x1 - x2;
         const dy = y1 - y2;
         const distPx = Math.sqrt(dx * dx + dy * dy);
@@ -164,12 +307,12 @@ function handleTouch(e) {
                 instructionEl.style.display = "block";
                 return;
             }
-            
+
             // Check target containment to start the trial
             if (!savingTrial) {
                 const oneInTop = isTouchInsideElement(indexTouch, topTarget) || isTouchInsideElement(thumbTouch, topTarget);
                 const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
-                
+
                 if (oneInTop && oneInBottom) {
                     requiresReset = false;
                     maxStrokeDistance = distPx;
@@ -185,14 +328,14 @@ function handleTouch(e) {
                 // Enforce placing fingers back inside baseline circles to resume trial (from 0 touches)
                 const oneInTop = isTouchInsideElement(indexTouch, topTarget) || isTouchInsideElement(thumbTouch, topTarget);
                 const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
-                
+
                 if (oneInTop && oneInBottom) {
                     requiresReset = false; // Recovered!
                     maxStrokeDistance = distPx; // Initialize max distance for this new stroke!
                 } else {
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`;
                     instructionEl.style.display = "block";
-                    
+
                     trajectory.push({
                         t: now - trialStartTime,
                         state: "2_touches_out_of_bounds",
@@ -205,36 +348,37 @@ function handleTouch(e) {
                     return; // Exit early without moving targets or recording active frames
                 }
             }
-            
+
             // Check if this is the start of a stroke (maxStrokeDistance is 0 or uninitialized)
             if (maxStrokeDistance === 0) {
                 maxStrokeDistance = distPx;
             }
-            
+
             // Lock circles to monotonically non-decreasing distance during active pinching
             if (distPx >= maxStrokeDistance) {
                 maxStrokeDistance = distPx;
-                
+
                 // Dynamically position target circles directly under the user's touch points
                 topTarget.style.left = `${x1}px`;
                 topTarget.style.top = `${y1}px`;
                 topTarget.style.transform = "translate(-50%, -50%)";
-                
+
                 bottomTarget.style.left = `${x2}px`;
                 bottomTarget.style.top = `${y2}px`;
                 bottomTarget.style.transform = "translate(-50%, -50%)";
-                
+
                 // Cache coordinates as last known positions
                 lastIndexX = x1;
                 lastIndexY = y1;
                 lastThumbX = x2;
                 lastThumbY = y2;
             }
-            
+
             // Restore normal instructions and draw the targets
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+            setTimeout(startDemoAnimation, 500);
             instructionEl.style.display = "block";
-            
+
             // Record trajectory frame (always logs actual touch coordinates and actual distance)
             trajectory.push({
                 t: now - trialStartTime,
@@ -246,11 +390,11 @@ function handleTouch(e) {
                 distance: distPx
             });
         }
-        
+
     } else {
         // Less than 2 touches -> hide live distance overlay
         liveDistanceLabel.style.display = "none";
-        
+
         if (taskActive) {
             if (touches.length === 1) {
                 if (requiresReset) {
@@ -264,15 +408,16 @@ function handleTouch(e) {
                         y_thumb: null,
                         distance: null
                     });
-                    
+
                     instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+                    setTimeout(startDemoAnimation, 500);
                     instructionEl.style.display = "block";
                 } else {
                     // This is a pause/resume state (1 finger remains). Keep last known position of the missing finger!
                     const remainingTouch = touches[0];
                     let frameState = "1_touch_paused";
                     let x_idx = null, y_idx = null, x_th = null, y_th = null;
-                    
+
                     if (remainingTouch.identifier === indexTouchId) {
                         frameState = "1_touch_paused_thumb_lifted"; // Index remains active, Thumb uses last known position
                         x_idx = remainingTouch.clientX;
@@ -292,7 +437,7 @@ function handleTouch(e) {
                         x_th = lastThumbX;
                         y_th = lastThumbY;
                     }
-                    
+
                     // Calculate distance using active finger and last known position of missing finger
                     let currentDist = null;
                     if (x_idx !== null && x_th !== null) {
@@ -300,7 +445,7 @@ function handleTouch(e) {
                         const dy = y_idx - y_th;
                         currentDist = Math.sqrt(dx * dx + dy * dy);
                     }
-                    
+
                     // Log the frame
                     trajectory.push({
                         t: now - trialStartTime,
@@ -311,13 +456,13 @@ function handleTouch(e) {
                         y_thumb: y_th,
                         distance: currentDist
                     });
-                    
+
                     // Update visual feedback: position active circle under finger, lock missing circle stationary
                     if (remainingTouch.identifier === indexTouchId) {
                         topTarget.style.left = `${x_idx}px`;
                         topTarget.style.top = `${y_idx}px`;
                         topTarget.style.transform = "translate(-50%, -50%)";
-                        
+
                         if (lastThumbX !== null) {
                             bottomTarget.style.left = `${lastThumbX}px`;
                             bottomTarget.style.top = `${lastThumbY}px`;
@@ -327,14 +472,14 @@ function handleTouch(e) {
                         bottomTarget.style.left = `${x_th}px`;
                         bottomTarget.style.top = `${y_th}px`;
                         bottomTarget.style.transform = "translate(-50%, -50%)";
-                        
+
                         if (lastIndexX !== null) {
                             topTarget.style.left = `${lastIndexX}px`;
                             topTarget.style.top = `${lastIndexY}px`;
                             topTarget.style.transform = "translate(-50%, -50%)";
                         }
                     }
-                    
+
                     // Show pause warning with debounce
                     if (!warningTimeout) {
                         warningTimeout = setTimeout(() => {
@@ -347,18 +492,18 @@ function handleTouch(e) {
                 // 0 touches or 3+ invalid touches -> enters reset state
                 requiresReset = true;
                 resetTargetPositions();
-                
+
                 // Clear warning timeout if touches are 0
                 if (warningTimeout) {
                     clearTimeout(warningTimeout);
                     warningTimeout = null;
                 }
-                
+
                 let frameState = "0_touch_reset";
                 if (touches.length >= 3) {
                     frameState = "3plus_invalid_reset";
                 }
-                
+
                 trajectory.push({
                     t: now - trialStartTime,
                     state: frameState,
@@ -368,8 +513,9 @@ function handleTouch(e) {
                     y_thumb: null,
                     distance: null
                 });
-                
+
                 instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+                setTimeout(startDemoAnimation, 500);
                 instructionEl.style.display = "block";
             }
         } else {
@@ -391,14 +537,15 @@ function startPinchTrial(now) {
     lastIndexY = null;
     lastThumbX = null;
     lastThumbY = null;
-    
+
     // Keep instruction text visible, show countdown timer separately
     instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+    setTimeout(startDemoAnimation, 500);
     instructionEl.style.display = "block";
-    
+
     timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
     timerEl.style.display = "block";
-    
+
     // Countdown Timer
     countdownTimer = setInterval(() => {
         timeRemaining -= 1;
@@ -408,7 +555,7 @@ function startPinchTrial(now) {
             timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
         }
     }, 1000);
-    
+
     console.log(`Pinch trial ${trialNumber} started.`);
 }
 
@@ -416,43 +563,44 @@ function startPinchTrial(now) {
 async function stopPinchTrial() {
     taskActive = false;
     clearInterval(countdownTimer);
-    
+
     // Clear any pending warning timeouts immediately
     if (warningTimeout) {
         clearTimeout(warningTimeout);
         warningTimeout = null;
     }
-    
+
     // Hide tracking overlays immediately
     liveDistanceLabel.style.display = "none";
-    
+
     // Reset guide target positions back to baseline
     resetTargetPositions();
-    
+
     // Synchronously update screen to disabled transition state at start of stopPinchTrial
     isBetweenTrials = true;
     instructionEl.textContent = "Stop pinching";
     instructionEl.style.display = "block";
     timerEl.style.display = "none";
-    
+
     console.log(`Pinch trial ${trialNumber} ended. Recorded frames:`, trajectory.length);
-    
+
     // Save to database asynchronously
     savingTrial = true;
     const savePromise = savePinchTrial(trialStartTime, Date.now()).then(() => {
         savingTrial = false;
     });
-    
+
     // 2 seconds transition/cooldown
     setTimeout(async () => {
         // Wait for save operation to finish before advancing, if it takes longer than 2 seconds
         await savePromise;
-        
+
         if (trialNumber >= TRIAL_LIMIT) {
             endPinchTask();
         } else {
             isBetweenTrials = false;
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+            setTimeout(startDemoAnimation, 500);
             timerEl.innerHTML = `Time remaining: <span class="timer-badge">10</span> seconds`;
             timerEl.style.display = "block";
             firstTouchTime = null;
@@ -469,23 +617,23 @@ async function savePinchTrial(startTime, endTime) {
         task_type: TASK_TYPE,
         trial_number: trialNumber,
         timestamp: new Date().toISOString(),
-        
+
         total_taps: 0, // Placeholder
         total_tap_time_ms: endTime - startTime,
         initiation_delay: initiationDelay || 0,
-        
+
         viewport_width: window.innerWidth,
         viewport_height: window.innerHeight,
         device_pixel_ratio: window.devicePixelRatio,
-        
+
         target_x: 0,
         target_y: 0,
         target_radius: 0,
-        
+
         taps: [], // No discrete taps recorded
         trajectory: trajectory
     };
-    
+
     try {
         const { error } = await supabase.from("trial_results").insert(payload);
         if (error) throw error;
@@ -500,25 +648,25 @@ async function savePinchTrial(startTime, endTime) {
 function endPinchTask() {
     // Save state
     sessionStorage.setItem("pinch_completed", "true");
-    
+
     // Remove listeners
     document.removeEventListener("touchstart", handleTouch);
     document.removeEventListener("touchmove", handleTouch);
     document.removeEventListener("touchend", handleTouch);
     document.removeEventListener("touchcancel", handleTouch);
-    
+
     // Clear any pending warning timeouts immediately
     if (warningTimeout) {
         clearTimeout(warningTimeout);
         warningTimeout = null;
     }
-    
+
     // Visual completes
     topTarget.style.display = "none";
     bottomTarget.style.display = "none";
     liveDistanceLabel.style.display = "none";
     instructionEl.style.display = "none";
-    
+
     completionBox.style.display = "flex";
 }
 
