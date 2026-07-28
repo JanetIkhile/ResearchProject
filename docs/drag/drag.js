@@ -9,6 +9,7 @@ let trialNumber = 0;
 const TASK_TYPE = "drag";
 let TRIAL_LIMIT = 10;
 let taskCompleted = false;
+let hasShownSpeedPrompt = false;
 let pageLoadTime = Date.now();
 let lastTrialEndTime = pageLoadTime;
 let initiationDelay = null;
@@ -45,7 +46,7 @@ const instructionSub = document.getElementById("instructionSub");
         }
 
         if (sessionNumber === 1) {
-            TRIAL_LIMIT = 1;   // practice session
+            TRIAL_LIMIT = 3;   // practice session
         } else {
             TRIAL_LIMIT = 10;  // real session
         }
@@ -57,6 +58,7 @@ const instructionSub = document.getElementById("instructionSub");
         console.log("Session:", sessionId);
         console.log("Session number:", sessionNumber);
         console.log("Trial limit:", TRIAL_LIMIT);
+        setTimeout(startDemoAnimation, 500);
 
     } catch (err) {
         return;
@@ -95,8 +97,189 @@ function touchForce(touch) {
     return (typeof touch.force === 'number') ? touch.force : null;
 }
 
+
+// ---------------- DEMO ANIMATION FOR DRAG TASK ----------------
+let demoInterval = null;
+let demoPointer = null;
+let isAnimatingDemo = false;
+let demoPath = [];
+
+function animateDemoPath() {
+    if (!isAnimatingDemo || !demoPointer) return;
+
+    const rect = demoPointer.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    // Get finger tip coordinate (roughly center-top of the hand emoji)
+    const curX = rect.left + rect.width / 2 - canvasRect.left;
+    const curY = rect.top + rect.height / 2 - canvasRect.top;
+
+    demoPath.push({ x: curX, y: curY });
+
+    if (ctx && demoPath.length > 1) {
+        ctx.strokeStyle = 'rgba(0, 128, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const prev = demoPath[demoPath.length - 2];
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(curX, curY);
+        ctx.stroke();
+    }
+
+    requestAnimationFrame(animateDemoPath);
+}
+
+
+// ---------------- DYNAMIC TRIAL FEEDBACK ----------------
+function showFeedback(message, type) {
+    const existing = document.getElementById("trialFeedback");
+    if (existing) existing.remove();
+
+    const feedback = document.createElement("div");
+    feedback.id = "trialFeedback";
+    feedback.style.position = "absolute";
+    feedback.style.top = "30vh";
+    feedback.style.left = "50vw";
+    feedback.style.transform = "translate(-50%, -50%)";
+    feedback.style.padding = "16px 28px";
+    feedback.style.borderRadius = "12px";
+    feedback.style.fontSize = "22px";
+    feedback.style.fontWeight = "bold";
+    feedback.style.zIndex = "2000";
+    feedback.style.pointerEvents = "none";
+    feedback.style.textAlign = "center";
+    feedback.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+    feedback.style.transition = "opacity 0.3s ease-out";
+    
+    if (type === "success") {
+        feedback.style.backgroundColor = "#d1fae5";
+        feedback.style.color = "#065f46";
+        feedback.style.border = "2px solid #34d399";
+    } else if (type === "warning") {
+        feedback.style.backgroundColor = "#fef3c7";
+        feedback.style.color = "#92400e";
+        feedback.style.border = "2px solid #fbbf24";
+    } else {
+        feedback.style.backgroundColor = "#fee2e2";
+        feedback.style.color = "#991b1b";
+        feedback.style.border = "2px solid #f87171";
+    }
+
+    feedback.innerText = message;
+    document.body.appendChild(feedback);
+
+    setTimeout(() => {
+        if (feedback) {
+            feedback.style.opacity = "0";
+            setTimeout(() => feedback.remove(), 300);
+        }
+    }, 1500);
+}
+
+function startDemoAnimation() {
+    if (trialNumber > 0 || taskCompleted) return;
+
+    if (!demoPointer) {
+        demoPointer = document.createElement("div");
+        demoPointer.id = "demoPointer";
+        demoPointer.style.position = "absolute";
+        demoPointer.style.width = "60px";
+        demoPointer.style.height = "60px";
+        demoPointer.style.fontSize = "54px";
+        demoPointer.style.textAlign = "center";
+        demoPointer.style.lineHeight = "60px";
+        demoPointer.style.zIndex = "1000";
+        demoPointer.style.pointerEvents = "none";
+        demoPointer.style.opacity = "0";
+        demoPointer.innerText = "👆";
+        document.body.appendChild(demoPointer);
+    }
+
+    const outerStart = document.getElementById('startPoint');
+    const targetPoint = document.getElementById('targetInnerDot');
+    if (!outerStart || !targetPoint) return;
+    const startRect = outerStart.getBoundingClientRect();
+    const targetRect = targetPoint.getBoundingClientRect();
+
+    const sX = startRect.left + startRect.width / 2 - 30;
+    const sY = startRect.top + startRect.height / 2 - 30;
+    const tX = targetRect.left + targetRect.width / 2 - 30;
+    const tY = targetRect.top + targetRect.height / 2 - 30;
+
+    function runAnimationCycle() {
+        if (trialNumber > 0 || taskCompleted) {
+            stopDemoAnimation();
+            return;
+        }
+
+        // Reset canvas and animation variables
+        isAnimatingDemo = false;
+        demoPath = [];
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Set to start position (opacity 0)
+        demoPointer.style.transition = "none";
+        demoPointer.style.left = `${sX}px`;
+        demoPointer.style.top = `${sY}px`;
+        demoPointer.style.opacity = "0";
+
+        // Fade in
+        setTimeout(() => {
+            if (trialNumber > 0 || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "opacity 0.3s ease-in";
+            demoPointer.style.opacity = "1";
+        }, 100);
+
+        // Start drawing path and move to target
+        setTimeout(() => {
+            if (trialNumber > 0 || taskCompleted || !demoPointer) return;
+            isAnimatingDemo = true;
+            animateDemoPath();
+
+            demoPointer.style.transition = "left 1.2s ease-in-out, top 1.2s ease-in-out, opacity 0.3s ease-in";
+            demoPointer.style.left = `${tX}px`;
+            demoPointer.style.top = `${tY}px`;
+        }, 500);
+
+        // Stop drawing path (reaches target)
+        setTimeout(() => {
+            isAnimatingDemo = false;
+        }, 1700);
+
+        // Fade out
+        setTimeout(() => {
+            if (trialNumber > 0 || taskCompleted || !demoPointer) return;
+            demoPointer.style.transition = "opacity 0.3s ease-out";
+            demoPointer.style.opacity = "0";
+        }, 2000);
+
+        // Clear canvas trail after fade out
+        setTimeout(() => {
+            if (trialNumber > 0 || taskCompleted) return;
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }, 2350);
+    }
+
+    runAnimationCycle();
+    demoInterval = setInterval(runAnimationCycle, 3000);
+}
+
+function stopDemoAnimation() {
+    isAnimatingDemo = false;
+    if (demoInterval) {
+        clearInterval(demoInterval);
+        demoInterval = null;
+    }
+    if (demoPointer) {
+        demoPointer.remove();
+        demoPointer = null;
+    }
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 // ---------- Named touch handlers (so we can remove them) ----------
 function handleTouchStart(e) {
+    stopDemoAnimation();
     if (taskCompleted) return;  // prevent further trials
 
     if (activeTouchId !== null) return; // Prevent multiple fingers
@@ -235,6 +418,24 @@ async function handleTouchEnd(e) {
     }
 
     trialEndTime = Date.now();
+    // Calculate target reach based on the outer red circle (targetPoint in HTML)
+    const outerTarget = document.getElementById('targetPoint');
+    const outerTargetRect = outerTarget.getBoundingClientRect();
+    const outerTargetRadius = outerTargetRect.width / 2;
+
+    const distToTarget = Math.hypot(touchEndX - targetX, touchEndY - targetY);
+    const targetReached = distToTarget <= outerTargetRadius;
+
+    if (targetReached) {
+        if (!hasShownSpeedPrompt) {
+            showFeedback("Good! Move as fast as possible.", "success");
+            hasShownSpeedPrompt = true;
+        } else {
+            showFeedback("Good!", "success");
+        }
+    } else {
+        showFeedback("Drag all the way to the red circle.", "warning");
+    }
     lastTrialEndTime = trialEndTime;
 
     trajectoryLog.push({
