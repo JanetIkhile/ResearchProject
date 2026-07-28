@@ -428,15 +428,17 @@ async function handleTouchEnd(e) {
     const distToTarget = Math.hypot(touchEndX - targetX, touchEndY - targetY);
     const targetReached = distToTarget <= outerTargetRadius;
 
-    if (targetReached) {
-        if (!hasShownSpeedPrompt) {
-            showFeedback("Good! Move as fast as possible.", "success");
-            hasShownSpeedPrompt = true;
+    if (sessionNumber === 1) {
+        if (targetReached) {
+            if (!hasShownSpeedPrompt) {
+                showFeedback("Good! Move as fast as possible.", "success");
+                hasShownSpeedPrompt = true;
+            } else {
+                showFeedback("Good!", "success");
+            }
         } else {
-            showFeedback("Good!", "success");
+            showFeedback("Drag all the way to the red circle.", "warning");
         }
-    } else {
-        showFeedback("Drag all the way to the red circle.", "warning");
     }
     lastTrialEndTime = trialEndTime;
 
