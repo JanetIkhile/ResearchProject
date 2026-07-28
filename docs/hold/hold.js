@@ -3,6 +3,187 @@
 import { supabase } from "../client/supabaseClient.js";
 import { initSession, updateSessionFlags } from "../utils/sessionManager.js";
 
+
+// ---------------- DEMO ANIMATION FOR HOLD TASK ----------------
+let sessionNumber = null;
+let demoInterval = null;
+let demoPointer = null;
+let demoTimeouts = [];
+
+function startDemoAnimation() {
+    if (sessionNumber !== 1) return; // Only practice phase
+    if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive) return;
+
+    if (!demoPointer) {
+        demoPointer = document.createElement("div");
+        demoPointer.id = "demoPointer";
+        demoPointer.style.position = "absolute";
+        demoPointer.style.width = "60px";
+        demoPointer.style.height = "60px";
+        demoPointer.style.fontSize = "54px";
+        demoPointer.style.textAlign = "center";
+        demoPointer.style.lineHeight = "60px";
+        demoPointer.style.zIndex = "1000";
+        demoPointer.style.pointerEvents = "none";
+        demoPointer.style.opacity = "0";
+        demoPointer.innerText = "👆";
+        document.body.appendChild(demoPointer);
+    }
+
+    // Capture initial layouts
+    const startRect = startButton.getBoundingClientRect();
+    const startX = startRect.left + startRect.width / 2 - 30;
+    const startY = startRect.top + startRect.height / 2;
+
+    const targetRect = holdTarget.getBoundingClientRect();
+    const targetX = targetRect.left + targetRect.width / 2 - 30;
+    const targetY = targetRect.top + targetRect.height / 2;
+
+    function clearDemoTimeouts() {
+        demoTimeouts.forEach(t => clearTimeout(t));
+        demoTimeouts = [];
+    }
+
+    function runAnimationCycle() {
+        if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive) {
+            stopDemoAnimation();
+            return;
+        }
+
+        clearDemoTimeouts();
+
+        // 1. Initial State: Pointer starts below Start button, invisible
+        demoPointer.style.transition = "none";
+        demoPointer.style.left = `${startX}px`;
+        demoPointer.style.top = `${startY + 60}px`;
+        demoPointer.style.opacity = "0";
+        demoPointer.style.transform = "scale(1)";
+
+        holdTarget.style.transition = "none";
+        holdTarget.style.backgroundColor = "blue";
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
+
+        holdInstruction.innerHTML = "Click Start and immediately hold<br>the blue circle.";
+        startButton.style.transition = "opacity 0.2s ease";
+        startButton.style.opacity = "1";
+
+        // 2. Fade in and slide to Start button (0.2s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            demoPointer.style.transition = "top 0.4s ease-out, opacity 0.4s ease-in";
+            demoPointer.style.top = `${startY}px`;
+            demoPointer.style.opacity = "1";
+        }, 200));
+
+        // 3. Simulates Click (0.8s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            demoPointer.style.transition = "transform 0.15s ease";
+            demoPointer.style.transform = "scale(0.85)";
+            
+            // Simulates start button click visually
+            startButton.style.opacity = "0.2";
+        }, 800));
+
+        // 4. Shrink/Press animation release, Start button disappears (1.0s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            demoPointer.style.transform = "scale(1)";
+            startButton.style.opacity = "0";
+        }, 1000));
+
+        // 5. Move from Start button to target circle (1.2s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            demoPointer.style.transition = "left 0.6s ease-in-out, top 0.6s ease-in-out";
+            demoPointer.style.left = `${targetX}px`;
+            demoPointer.style.top = `${targetY}px`;
+        }, 1200));
+
+        // 6. Hold begins (1.8s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            // Target circle shrinks/presses
+            holdTarget.style.transition = "transform 0.2s ease";
+            holdTarget.style.transform = "translateX(-50%) scale(0.95)";
+            
+            // Simulates countdown
+            holdInstruction.innerHTML = "Keep holding steady for<br><span class=\"timer-badge\">5</span> seconds...";
+        }, 1800));
+
+        // 7. Simulates Hold progress (2.8s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            holdInstruction.innerHTML = "Keep holding steady for<br><span class=\"timer-badge\">4</span> seconds...";
+        }, 2800));
+
+        // 8. Simulates Hold progress (3.8s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            holdInstruction.innerHTML = "Keep holding steady for<br><span class=\"timer-badge\">3</span> seconds...";
+        }, 3800));
+
+        // 9. Hold completes: turns green! (4.5s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            holdTarget.style.transition = "background-color 0.3s ease";
+            holdTarget.style.backgroundColor = "green";
+            holdInstruction.innerText = "✅ You can release now!";
+        }, 4500));
+
+        // 10. Fade out and reset pointer (5.2s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
+            demoPointer.style.transition = "opacity 0.4s ease-out, top 0.4s ease-out";
+            demoPointer.style.opacity = "0";
+            demoPointer.style.top = `${targetY + 60}px`;
+        }, 5200));
+
+        // 11. Smoothly clean up targets/button (5.6s)
+        demoTimeouts.push(setTimeout(() => {
+            if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive) return;
+            holdTarget.style.transition = "background-color 0.2s ease, transform 0.2s ease";
+            holdTarget.style.backgroundColor = "blue";
+            holdTarget.style.transform = "translateX(-50%) scale(1)";
+            startButton.style.opacity = "1";
+            holdInstruction.innerHTML = "Click Start and immediately hold<br>the blue circle.";
+        }, 5600));
+    }
+
+    runAnimationCycle();
+    demoInterval = setInterval(runAnimationCycle, 6000);
+
+    // Stop demo on first physical interaction
+    document.addEventListener("touchstart", stopDemoAnimation, { once: true });
+    document.addEventListener("mousedown", stopDemoAnimation, { once: true });
+}
+
+function stopDemoAnimation() {
+    if (demoInterval) {
+        clearInterval(demoInterval);
+        demoInterval = null;
+    }
+    demoTimeouts.forEach(t => clearTimeout(t));
+    demoTimeouts = [];
+
+    if (demoPointer) {
+        demoPointer.remove();
+        demoPointer = null;
+    }
+
+    // Reset visual elements
+    if (holdTarget) {
+        holdTarget.style.backgroundColor = "blue";
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
+    }
+    if (startButton) {
+        startButton.style.opacity = "1";
+    }
+    if (holdInstruction) {
+        holdInstruction.innerHTML = "Click Start and immediately hold<br>the blue circle.";
+    }
+}
+
 let participantId = null;
 let sessionId = null;
 let trialNumber = 0;
@@ -52,7 +233,7 @@ let initiationDelay = null;
         sessionId = result.sessionId;
         console.log("Session verified:", sessionId, result.sessionRow);
 
-        const sessionNumber = result.sessionNumber;
+        sessionNumber = result.sessionNumber;
 
         const header = document.getElementById("taskHeader");
         if (header) {
@@ -97,6 +278,8 @@ let initiationDelay = null;
     pressureGaugeFill = document.getElementById("pressureGaugeFill");
     pressureFeedbackText = document.getElementById("pressureFeedbackText");
 
+    setTimeout(startDemoAnimation, 500);
+
     if (!holdTarget) {
         console.error("holdTarget element not found");
         return;
@@ -115,6 +298,7 @@ let initiationDelay = null;
 
             const now = Date.now();
             initiationDelay = now - lastTrialEndTime;
+            stopDemoAnimation();
             if (!trialActive) startHoldTrial();
         });
     }
@@ -126,6 +310,7 @@ let initiationDelay = null;
         if (!trialActive) return; // won't register touches before Start
 
         const touch = e.changedTouches[0];
+        stopDemoAnimation();
         if (!isHolding && !readyToRelease) beginHold(touch);
     }, { passive: false });
 
