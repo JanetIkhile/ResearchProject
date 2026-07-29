@@ -9,13 +9,20 @@ REGISTRY = {
     'bradykinesia': [
         {'col': 'tap_tap_frequency', 'display_name': 'Tapping Frequency (Hz)'},
         {'col': 'tap_mean_intertap_interval_ms', 'display_name': 'Mean Intertap Interval (ms)'},
+        {'col': 'tap_cv_intertap_interval', 'display_name': 'Tapping Rhythm CV'},
         {'col': 'drag_mean_speed', 'display_name': 'Drag Mean Speed (px/s)'},
         {'col': 'drag_median_speed', 'display_name': 'Drag Median Speed (px/s)'},
         {'col': 'drag_peak_speed_ms', 'display_name': 'Drag Peak Speed (px/s)'},
         {'col': 'drag_movement_time_ms', 'display_name': 'Drag Movement Time (ms)'},
-        {'col': 'drag_fitts_law_throughput', 'display_name': 'Drag Fitts Throughput (bits/s)'},
         {'col': 'pinch_pinch_frequency', 'display_name': 'Pinch Cycle Frequency (Hz)'},
-        {'col': 'pinch_mean_pinch_interval_ms', 'display_name': 'Mean Pinch Interval (ms)'}
+        {'col': 'pinch_mean_pinch_interval_ms', 'display_name': 'Mean Pinch Interval (ms)'},
+        {'col': 'pinch_pinch_mean_opening_speed_mm_s', 'display_name': 'Pinch Mean Opening Speed (mm/s)'},
+        {'col': 'pinch_pinch_median_opening_speed_mm_s', 'display_name': 'Pinch Median Opening Speed (mm/s)'},
+        {'col': 'pinch_pinch_max_opening_velocity_mm_s', 'display_name': 'Pinch Max Opening Velocity (mm/s)'},
+        {'col': 'tap_initiation_delay', 'display_name': 'Tapping Initiation Delay (ms)'},
+        {'col': 'drag_initiation_delay', 'display_name': 'Drag Initiation Delay (ms)'},
+        {'col': 'pinch_initiation_delay', 'display_name': 'Pinch Initiation Delay (ms)'},
+        {'col': 'hold_initiation_delay', 'display_name': 'Hold Initiation Delay (ms)'}
     ],
     'hypokinesia': [
         {'col': 'tap_median_amplitude_mm', 'display_name': 'Median Tapping Amplitude (mm)'},

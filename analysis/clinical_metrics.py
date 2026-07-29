@@ -961,9 +961,9 @@ def extract_features_from_trial(row):
         # Chronological matching
         all_events = []
         for p in peaks:
-            all_events.append((times[p], 'peak', distances_smooth[p]))
+            all_events.append((times[p], 'peak', distances_smooth[p], p))
         for v in valleys:
-            all_events.append((times[v], 'valley', distances_smooth[v]))
+            all_events.append((times[v], 'valley', distances_smooth[v], v))
         all_events.sort(key=lambda x: x[0])
         
         cycle_amplitudes = []
@@ -972,6 +972,39 @@ def extract_features_from_trial(row):
             e_next = all_events[i+1]
             if (e_curr[1] == 'peak' and e_next[1] == 'valley') or (e_curr[1] == 'valley' and e_next[1] == 'peak'):
                 cycle_amplitudes.append(abs(e_curr[2] - e_next[2]))
+                
+        # Calculate opening speeds and instantaneous opening velocities (valley to peak)
+        opening_cycle_speeds = []
+        opening_instant_velocities = []
+        
+        for i in range(len(all_events) - 1):
+            e_curr = all_events[i]
+            e_next = all_events[i+1]
+            if e_curr[1] == 'valley' and e_next[1] == 'peak':
+                t_val, _, d_val, idx_val = e_curr
+                t_pk, _, d_pk, idx_pk = e_next
+                
+                dt_cycle = t_pk - t_val
+                dd_cycle = d_pk - d_val
+                
+                if dt_cycle > 0:
+                    speed_cycle = 1000.0 * (dd_cycle / dt_cycle)
+                    opening_cycle_speeds.append(speed_cycle)
+                    
+                    for j in range(idx_val + 1, idx_pk + 1):
+                        dt_step = times[j] - times[j-1]
+                        if dt_step > 0:
+                            v_step = 1000.0 * ((distances_smooth[j] - distances_smooth[j-1]) / dt_step)
+                            if v_step > 0:
+                                opening_instant_velocities.append(v_step)
+
+        mean_opening_speed_px = np.mean(opening_cycle_speeds) if len(opening_cycle_speeds) > 0 else np.nan
+        median_opening_speed_px = np.median(opening_cycle_speeds) if len(opening_cycle_speeds) > 0 else np.nan
+        max_opening_velocity_px = np.max(opening_instant_velocities) if len(opening_instant_velocities) > 0 else np.nan
+        
+        mean_opening_speed_mm = mean_opening_speed_px * (25.4 / 96.0) if pd.notna(mean_opening_speed_px) else np.nan
+        median_opening_speed_mm = median_opening_speed_px * (25.4 / 96.0) if pd.notna(median_opening_speed_px) else np.nan
+        max_opening_velocity_mm = max_opening_velocity_px * (25.4 / 96.0) if pd.notna(max_opening_velocity_px) else np.nan
                 
         cycle_intervals = np.diff(times[peaks]) if len(peaks) > 1 else np.array([])
         
@@ -1090,6 +1123,9 @@ def extract_features_from_trial(row):
             'pinch_mean_lift_duration_ms': pinch_mean_lift_duration_ms,
             'pinch_mean_orientation_deviation': pinch_mean_orientation_deviation,
             'pinch_orientation_drift_sd': pinch_orientation_drift_sd,
+            'pinch_mean_opening_speed_mm_s': mean_opening_speed_mm,
+            'pinch_median_opening_speed_mm_s': median_opening_speed_mm,
+            'pinch_max_opening_velocity_mm_s': max_opening_velocity_mm,
             'initiation_delay': row.get('initiation_delay', 0),
             'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, 0, hesitations, median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan, is_pinch=True)
         })

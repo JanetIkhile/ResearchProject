@@ -81,7 +81,7 @@ async function startSession() {
 
         // Align baseline instruction
         instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-        setTimeout(startDemoAnimation, 500);
+        scheduleDemoAnimation(500);
     } catch (err) {
         console.error("Session initialization failed:", err);
     }
@@ -115,8 +115,23 @@ function resetTargetPositions() {
 // ---------------- DEMO ANIMATION FOR PINCH TASK ----------------
 let sessionNumber = null;
 let demoInterval = null;
+let demoTimeout = null;
 let demoPointer1 = null;
 let demoPointer2 = null;
+
+function scheduleDemoAnimation(delay = 1000) {
+    clearDemoTimeout();
+    if (sessionNumber === 1 && trialNumber === 0 && !taskActive) {
+        demoTimeout = setTimeout(startDemoAnimation, delay);
+    }
+}
+
+function clearDemoTimeout() {
+    if (demoTimeout) {
+        clearTimeout(demoTimeout);
+        demoTimeout = null;
+    }
+}
 
 function startDemoAnimation() {
     if (sessionNumber !== 1) return; // Only practice phase
@@ -238,6 +253,7 @@ function startDemoAnimation() {
 }
 
 function stopDemoAnimation() {
+    clearDemoTimeout();
     if (demoInterval) {
         clearInterval(demoInterval);
         demoInterval = null;
@@ -255,6 +271,7 @@ function stopDemoAnimation() {
 
 function handleTouch(e) {
     stopDemoAnimation();
+    clearDemoTimeout();
     // If modal is open or task is completed, do nothing
     if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive) || isBetweenTrials) {
         return;
@@ -376,7 +393,6 @@ function handleTouch(e) {
 
             // Restore normal instructions and draw the targets
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-            setTimeout(startDemoAnimation, 500);
             instructionEl.style.display = "block";
 
             // Record trajectory frame (always logs actual touch coordinates and actual distance)
@@ -410,7 +426,6 @@ function handleTouch(e) {
                     });
 
                     instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-                    setTimeout(startDemoAnimation, 500);
                     instructionEl.style.display = "block";
                 } else {
                     // This is a pause/resume state (1 finger remains). Keep last known position of the missing finger!
@@ -515,13 +530,16 @@ function handleTouch(e) {
                 });
 
                 instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-                setTimeout(startDemoAnimation, 500);
                 instructionEl.style.display = "block";
             }
         } else {
             // If trial not active, just reset circles
             resetTargetPositions();
         }
+    }
+
+    if (touches.length === 0 && !taskActive && trialNumber === 0) {
+        scheduleDemoAnimation(1000);
     }
 }
 
@@ -540,7 +558,6 @@ function startPinchTrial(now) {
 
     // Keep instruction text visible, show countdown timer separately
     instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-    setTimeout(startDemoAnimation, 500);
     instructionEl.style.display = "block";
 
     timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
@@ -600,7 +617,6 @@ async function stopPinchTrial() {
         } else {
             isBetweenTrials = false;
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-            setTimeout(startDemoAnimation, 500);
             timerEl.innerHTML = `Time remaining: <span class="timer-badge">10</span> seconds`;
             timerEl.style.display = "block";
             firstTouchTime = null;
