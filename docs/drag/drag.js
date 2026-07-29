@@ -16,6 +16,13 @@ let lastTrialEndTime = pageLoadTime;
 let initiationDelay = null;
 const instructionMain = document.getElementById("instructionMain");
 const instructionSub = document.getElementById("instructionSub");
+
+// Progressive disclosure practice states
+let practiceStep = 'initial_demo'; // 'initial_demo', 'try_button_shown', 'waiting_for_touch', 'help_banner_shown', 'detailed_demo', 'gif_ready_prompt', 'active_practice'
+let demoLoopCount = 0;
+let inactivityTimer = null;
+let gifTimer = null;
+let continueInactivityTimer = null;
 // const dragInstruction = document.getElementById("dragInstruction");
 
 // async setup
@@ -48,11 +55,16 @@ const instructionSub = document.getElementById("instructionSub");
 
         if (sessionNumber === 1) {
             TRIAL_LIMIT = 3;   // practice session
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionSub.style.display = "none";
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "inline-block";
         } else {
             TRIAL_LIMIT = 10;  // real session
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
+            instructionSub.style.display = "inline-block";
         }
-        instructionMain.innerHTML = "Drag from Start to Target <strong class=\"highlight-instruction\">as fast</strong> and<br>accurately as possible.";
-        instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
 
         console.log("Drag task started");
         console.log("Participant:", participantId);
@@ -214,6 +226,33 @@ function startDemoAnimation() {
             return;
         }
 
+        if (sessionNumber === 1 && trialNumber === 0) {
+            demoLoopCount += 1;
+            if (demoLoopCount > 3) {
+                stopDemoAnimation();
+                practiceStep = 'try_button_shown';
+                const tryItButton = document.getElementById("tryItButton");
+                if (tryItButton) tryItButton.style.display = "block";
+
+                // Start inactivity timer: if user does nothing for 7 seconds (either in try_button_shown or waiting_for_touch)
+                if (inactivityTimer) clearTimeout(inactivityTimer);
+                inactivityTimer = setTimeout(() => {
+                    if (practiceStep === 'try_button_shown' || practiceStep === 'waiting_for_touch') {
+                        practiceStep = 'help_banner_shown';
+                        
+                        // Hide try button and indicator
+                        if (tryItButton) tryItButton.style.display = "none";
+                        const indicator = document.getElementById("watchExampleIndicator");
+                        if (indicator) indicator.style.display = "none";
+                        
+                        const helpBanner = document.getElementById("helpBanner");
+                        if (helpBanner) helpBanner.style.display = "flex";
+                    }
+                }, 7000);
+                return;
+            }
+        }
+
         // Reset canvas and animation variables
         isAnimatingDemo = false;
         demoPath = [];
@@ -277,24 +316,71 @@ function stopDemoAnimation() {
         demoPointer = null;
     }
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Clear progressive timers
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+    }
+    if (gifTimer) {
+        clearTimeout(gifTimer);
+        gifTimer = null;
+    }
+    if (continueInactivityTimer) {
+        clearTimeout(continueInactivityTimer);
+        continueInactivityTimer = null;
+    }
+    const continuePointer = document.getElementById("continuePointer");
+    if (continuePointer) continuePointer.remove();
+
+    // Hide progressive disclosure helper UI
+    const tryItButton = document.getElementById("tryItButton");
+    if (tryItButton) tryItButton.style.display = "none";
+    const helpBanner = document.getElementById("helpBanner");
+    if (helpBanner) helpBanner.style.display = "none";
+    const gifModal = document.getElementById("gifModal");
+    if (gifModal) gifModal.style.display = "none";
+    const watchExampleIndicator = document.getElementById("watchExampleIndicator");
+    if (watchExampleIndicator) watchExampleIndicator.style.display = "none";
 }
 
 // ---------- Named touch handlers (so we can remove them) ----------
 function handleTouchStart(e) {
+    if (e.target.id === "watchExampleIndicator" || e.target.closest("#instructionBox")) {
+        return;
+    }
+
+    if (e.target.id === "tryItButton" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.closest("#gifModal") || e.target.closest("#helpBanner")) {
+        return; // Let custom button click handlers capture the action
+    }
+
+    if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'help_banner_shown') {
+            const helpBanner = document.getElementById("helpBanner");
+            if (helpBanner && !helpBanner.contains(e.target)) {
+                helpBanner.style.display = "none";
+                practiceStep = 'waiting_for_touch';
+                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+                instructionSub.style.display = "inline-block";
+                instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
+
+                // Setup inactivity timer when dismissing the help banner
+                if (inactivityTimer) clearTimeout(inactivityTimer);
+                inactivityTimer = setTimeout(() => {
+                    if (practiceStep === 'waiting_for_touch') {
+                        practiceStep = 'help_banner_shown';
+                        const banner = document.getElementById("helpBanner");
+                        if (banner) banner.style.display = "flex";
+                    }
+                }, 7000);
+            }
+        }
+    }
+
     stopDemoAnimation();
     if (taskCompleted) return;  // prevent further trials
 
     if (activeTouchId !== null) return; // Prevent multiple fingers
-
-    if (trialNumber >= TRIAL_LIMIT) {
-        taskCompleted = true;
-        const nextButton = document.getElementById('nextTaskButton');
-        if (nextButton) nextButton.style.display = 'block';
-        // remove listeners and disable interactions
-        removeTouchListeners();
-        if (canvas) canvas.style.pointerEvents = 'none';
-        return;
-    }
 
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
 
@@ -307,6 +393,45 @@ function handleTouchStart(e) {
 
     const touch = e.changedTouches[0];
     const distToStart = Math.hypot(touch.clientX - sX, touch.clientY - sY);
+
+    if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'help_banner_shown' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
+            return; // Lock task interaction during dialog phases
+        }
+        if (practiceStep === 'initial_demo' || practiceStep === 'try_button_shown' || practiceStep === 'waiting_for_touch') {
+            const tryItButton = document.getElementById("tryItButton");
+            if (tryItButton) tryItButton.style.display = "none";
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "none";
+
+            if (inactivityTimer) {
+                clearTimeout(inactivityTimer);
+                inactivityTimer = null;
+            }
+
+            if (distToStart <= sRad) {
+                // Touched green circle: start trial immediately
+                practiceStep = 'active_practice';
+                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+                instructionSub.style.display = "inline-block";
+                instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
+            } else {
+                // Touched outside green circle: transition to waiting_for_touch and set inactivity timer
+                practiceStep = 'waiting_for_touch';
+                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+                instructionSub.style.display = "inline-block";
+                instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
+
+                inactivityTimer = setTimeout(() => {
+                    if (practiceStep === 'waiting_for_touch') {
+                        practiceStep = 'help_banner_shown';
+                        const helpBanner = document.getElementById("helpBanner");
+                        if (helpBanner) helpBanner.style.display = "flex";
+                    }
+                }, 7000);
+            }
+        }
+    }
 
     if (distToStart > sRad) {
         return; // Ignore touches starting outside the green circle
@@ -428,18 +553,7 @@ async function handleTouchEnd(e) {
     const distToTarget = Math.hypot(touchEndX - targetX, touchEndY - targetY);
     const targetReached = distToTarget <= outerTargetRadius;
 
-    if (sessionNumber === 1) {
-        if (targetReached) {
-            if (!hasShownSpeedPrompt) {
-                showFeedback("Good! Move as fast as possible.", "success");
-                hasShownSpeedPrompt = true;
-            } else {
-                showFeedback("Good!", "success");
-            }
-        } else {
-            showFeedback("Drag all the way to the red circle.", "warning");
-        }
-    }
+    // Replaced feedback block with empty code for practice phase
     lastTrialEndTime = trialEndTime;
 
     trajectoryLog.push({
@@ -510,20 +624,39 @@ async function handleTouchEnd(e) {
         if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }, 300);
 
-    // ---- CHECK IF TASK COMPLETE ----
     if (trialNumber >= TRIAL_LIMIT) {
         console.log("All trials completed.");
         const completionBox = document.getElementById("completionBox");
         const instructionBox = document.getElementById("instructionBox");
 
+        const completionText = document.getElementById("completionText");
+        if (completionText) {
+            if (sessionNumber === 1) {
+                completionText.innerText = "✅ Practice Complete";
+            } else {
+                completionText.innerText = "✅ Task Complete";
+            }
+        }
+
         if (instructionBox) instructionBox.style.display = "none";
         if (completionBox) completionBox.style.display = "block";
+
+        if (sessionNumber === 1) {
+            // Dim background task elements during practice completion
+            const elementsToDim = ['taskHeader', 'mainContainer', 'startPoint', 'targetPoint', 'pathCanvas'];
+            elementsToDim.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add("dimmed");
+            });
+        }
+
         // indicate stop
         if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
         const nextButton = document.getElementById('nextTaskButton');
         if (nextButton) {
+            nextButton.innerText = "Continue ➔";
             nextButton.style.display = 'block';
         }
         if (!taskCompleted) {
@@ -534,6 +667,26 @@ async function handleTouchEnd(e) {
         // Disable further input by removing listeners and disabling canvas
         removeTouchListeners();
         if (canvas) canvas.style.pointerEvents = 'none';
+
+        // Show clicking hand animation if they are inactive for 5 seconds on completion screen
+        if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
+        continueInactivityTimer = setTimeout(() => {
+            if (nextButton && completionBox.style.display === "block" && !document.getElementById("continuePointer")) {
+                const pointer = document.createElement("div");
+                pointer.id = "continuePointer";
+                pointer.innerText = "👆";
+                pointer.style.position = "absolute";
+                pointer.style.fontSize = "54px";
+                pointer.style.zIndex = "3000";
+                pointer.style.pointerEvents = "none";
+                pointer.classList.add("continue-pointer-animate");
+                
+                const rect = nextButton.getBoundingClientRect();
+                pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+                pointer.style.top = `${rect.bottom + 15}px`;
+                document.body.appendChild(pointer);
+            }
+        }, 5000);
     }
 }
 
@@ -565,3 +718,114 @@ document.addEventListener("touchcancel", handleTouchCancel);
 
 // Prevent long-press context menu globally
 document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+// ---------- Progressive Disclosure Initialization & Click Listeners ----------
+(function initProgressiveDisclosure() {
+    const tryItButton = document.getElementById("tryItButton");
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    const gifBtnYes = document.getElementById("gifBtnYes");
+    const gifBtnAgain = document.getElementById("gifBtnAgain");
+
+    if (tryItButton) {
+        tryItButton.addEventListener("click", () => {
+            tryItButton.style.display = "none";
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "none";
+
+            practiceStep = 'waiting_for_touch';
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionSub.style.display = "inline-block";
+            instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
+            
+            // Start inactivity timer
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                if (practiceStep === 'waiting_for_touch') {
+                    practiceStep = 'help_banner_shown';
+                    const helpBanner = document.getElementById("helpBanner");
+                    if (helpBanner) helpBanner.style.display = "flex";
+                }
+            }, 7000);
+        });
+    }
+
+    if (watchExampleBtn) {
+        watchExampleBtn.addEventListener("click", () => {
+            const helpBanner = document.getElementById("helpBanner");
+            if (helpBanner) helpBanner.style.display = "none";
+            
+            practiceStep = 'detailed_demo';
+            const gifModal = document.getElementById("gifModal");
+            if (gifModal) gifModal.style.display = "block";
+            
+            document.getElementById("gifPromptTitle").style.display = "none";
+            document.getElementById("gifBtnGroup").style.display = "none";
+            
+            // Refresh gif to start from beginning
+            const img = document.getElementById("gifDemoImage");
+            if (img) {
+                const src = img.src;
+                img.src = "";
+                img.src = src;
+            }
+            
+            if (gifTimer) clearTimeout(gifTimer);
+            gifTimer = setTimeout(() => {
+                if (practiceStep === 'detailed_demo') {
+                    practiceStep = 'gif_ready_prompt';
+                    document.getElementById("gifPromptTitle").style.display = "block";
+                    document.getElementById("gifBtnGroup").style.display = "flex";
+                }
+            }, 6000);
+        });
+    }
+
+    if (gifBtnYes) {
+        gifBtnYes.addEventListener("click", () => {
+            const gifModal = document.getElementById("gifModal");
+            if (gifModal) gifModal.style.display = "none";
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "none";
+            
+            practiceStep = 'waiting_for_touch';
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionSub.style.display = "inline-block";
+            instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
+            
+            // Restart inactivity timer
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                if (practiceStep === 'waiting_for_touch') {
+                    practiceStep = 'help_banner_shown';
+                    const helpBanner = document.getElementById("helpBanner");
+                    if (helpBanner) helpBanner.style.display = "flex";
+                }
+            }, 7000);
+        });
+    }
+
+    if (gifBtnAgain) {
+        gifBtnAgain.addEventListener("click", () => {
+            practiceStep = 'detailed_demo';
+            document.getElementById("gifPromptTitle").style.display = "none";
+            document.getElementById("gifBtnGroup").style.display = "none";
+            
+            // Refresh gif
+            const img = document.getElementById("gifDemoImage");
+            if (img) {
+                const src = img.src;
+                img.src = "";
+                img.src = src;
+            }
+            
+            if (gifTimer) clearTimeout(gifTimer);
+            gifTimer = setTimeout(() => {
+                if (practiceStep === 'detailed_demo') {
+                    practiceStep = 'gif_ready_prompt';
+                    document.getElementById("gifPromptTitle").style.display = "block";
+                    document.getElementById("gifBtnGroup").style.display = "flex";
+                }
+            }, 6000);
+        });
+    }
+})();

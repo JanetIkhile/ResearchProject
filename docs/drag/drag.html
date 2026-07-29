@@ -18,8 +18,9 @@
     </header>
     <div id="mainContainer">
         <div id="instructionBox">
-            <p id="instructionMain">Drag from Start to Target <strong class="highlight-instruction">as fast</strong> and<br>accurately as possible.</p>
+            <p id="instructionMain">Use your Index finger to drag from Start to Target<br><strong class="highlight-instruction">as fast</strong> and accurately as possible.</p>
             <p id="instructionSub"></p>
+            <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
         </div>
     </div>
 
@@ -31,6 +32,26 @@
     <div id="targetPoint">
         <div id="targetInnerDot"></div>
         <div class="label">Target</div>
+    </div>
+
+    <button id="tryItButton" style="display:none;">Now try it yourself.</button>
+
+    <div id="helpBanner" style="display:none;">
+        <p id="helpBannerText">Need help? Watch this example.</p>
+        <button id="watchExampleBtn">Watch Example</button>
+    </div>
+
+    <div id="gifModal" class="modal" style="display:none;">
+        <div class="gif-modal-content">
+            <div class="gif-container">
+                <img id="gifDemoImage" src="drag.gif" class="gif-image" alt="Instructional Demo">
+            </div>
+            <p class="gif-prompt-title" id="gifPromptTitle" style="display:none;">Are you ready to try it now?</p>
+            <div class="gif-btn-group" id="gifBtnGroup" style="display:none;">
+                <button class="gif-btn gif-btn-primary" id="gifBtnYes">Yes, I'm ready</button>
+                <button class="gif-btn gif-btn-secondary" id="gifBtnAgain">Watch again</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal -->

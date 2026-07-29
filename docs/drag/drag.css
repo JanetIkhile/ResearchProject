@@ -78,7 +78,7 @@ body {
 }
 
 #instructionMain {
-    font-size: clamp(1.2rem, 5.5vw, 2.2rem);
+    font-size: clamp(1.2rem, 4.2vw, 2.0rem);
     font-weight: 600;
     margin-bottom: 10px;
 }
@@ -188,6 +188,8 @@ canvas {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     cursor: pointer;
     transition: background-color 0.2s, transform 0.1s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 #nextTaskButton:hover {
@@ -267,7 +269,7 @@ canvas {
 @media (min-width: 600px) {
 
     #instructionMain {
-        font-size: 2.2rem;
+        font-size: 2.0rem;
     }
 
     #instructionSub {
@@ -331,4 +333,206 @@ canvas {
     color: inherit;            /* Inherit normal text color */
     padding: 0 4px;
     border-radius: 4px;
+}
+
+/* ========================================================
+   PROGRESSIVE DISCLOSURE HELP SYSTEM (PRACTICE PHASE)
+   ======================================================== */
+
+#tryItButton {
+    position: fixed;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #003366;
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-weight: bold;
+    font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+    padding: clamp(20px, 3.5vw, 32px) clamp(36px, 6vw, 60px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    z-index: 1500;
+    transition: background-color 0.2s, transform 0.1s, opacity 0.3s ease-out;
+}
+
+#tryItButton:hover {
+    background-color: #002244;
+}
+
+#tryItButton:active {
+    transform: translate(-50%, -50%) scale(0.97);
+}
+
+#helpBanner {
+    position: fixed;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 255, 255, 0.98);
+    border: 2px solid #fbbf24;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+    border-radius: 16px;
+    padding: 28px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    z-index: 1500;
+    max-width: 90%;
+    width: 440px;
+    text-align: center;
+    transition: opacity 0.3s ease-out;
+}
+
+#helpBannerText {
+    font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+    font-weight: bold;
+    color: #1f2937;
+    margin: 0;
+}
+
+#watchExampleBtn {
+    background-color: #fbbf24;
+    color: #78350f;
+    border: none;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+    padding: 16px 32px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+#watchExampleBtn:hover {
+    background-color: #f59e0b;
+}
+
+#watchExampleBtn:active {
+    transform: scale(0.97);
+}
+
+.gif-modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 24px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 480px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.gif-container {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+}
+
+.gif-image {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.gif-prompt-title {
+    font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+    font-weight: bold;
+    color: #1f2937;
+    margin: 0;
+}
+
+.gif-btn-group {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    justify-content: center;
+}
+
+.gif-btn {
+    flex: 1;
+    max-width: 160px;
+    padding: 12px 20px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.gif-btn-primary {
+    background-color: #16a34a;
+    color: white;
+}
+
+.gif-btn-primary:hover {
+    background-color: #15803d;
+}
+
+.gif-btn-secondary {
+    background-color: #e5e7eb;
+    color: #374151;
+}
+
+.gif-btn-secondary:hover {
+    background-color: #d1d5db;
+}
+
+.gif-btn:active {
+    transform: scale(0.97);
+}
+
+.watch-example-indicator {
+    margin-top: 16px;
+    background-color: #003366;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+    padding: clamp(12px, 2.2vw, 20px) clamp(24px, 4vw, 40px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    display: inline-block;
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+}
+
+.dimmed {
+    opacity: 0.25;
+    pointer-events: none !important;
+    transition: opacity 0.5s ease-out;
+}
+
+@keyframes tapContinue {
+    0% {
+        transform: translateY(0) scale(1);
+    }
+    40% {
+        transform: translateY(-32px) scale(1);
+    }
+    50% {
+        transform: translateY(-28px) scale(0.8); /* Click scale */
+    }
+    60% {
+        transform: translateY(-32px) scale(1);
+    }
+    100% {
+        transform: translateY(0) scale(1);
+    }
+}
+
+.continue-pointer-animate {
+    animation: tapContinue 1.5s infinite ease-in-out;
 }
