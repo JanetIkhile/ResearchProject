@@ -300,6 +300,7 @@ function startDemoAnimation() {
     if (sessionNumber !== 1) return; // Only practice phase
     if (trialNumber > 0 || taskActive) return;
     isFingerDemoAnimating = true;
+    updateInstructions(false);
 
     resetTargetPositions();
     const tRect = topTarget.getBoundingClientRect();
@@ -848,6 +849,7 @@ function setupProgressiveDisclosure() {
             });
 
             practiceStep = 'waiting_for_touch';
+            updateInstructions(true, (sessionNumber === 1) ? 5 : 10);
         });
     }
 
@@ -883,6 +885,7 @@ function setupProgressiveDisclosure() {
             window.isModalOpen = false;
 
             practiceStep = 'waiting_for_touch';
+            updateInstructions(true, (sessionNumber === 1) ? 5 : 10);
         });
     }
 

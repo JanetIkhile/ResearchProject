@@ -244,6 +244,7 @@ function startDemoAnimation() {
 }
 
 function stopDemoAnimation() {
+    if (!isFingerDemoAnimating) return;
     isFingerDemoAnimating = false;
     if (demoCountdownInterval) {
         clearInterval(demoCountdownInterval);
