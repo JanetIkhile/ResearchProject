@@ -81,11 +81,11 @@ body {
 }
 
 #topTarget {
-    top: 200px;
+    top: 260px;
 }
 
 #bottomTarget {
-    top: 427px; /* 200px + 227px center-to-center (60mm) */
+    top: 487px; /* 260px + 227px center-to-center (60mm) */
 }
 
 .tap-target.active {

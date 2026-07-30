@@ -45,7 +45,7 @@ let gifTimer = null;
 let continueInactivityTimer = null;
 let practiceStep = 'initial_demo'; // initial_demo -> try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
 
-const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles.<br>Open them <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible!";
+const ORIGINAL_INSTRUCTION = "Place your index finger and thumb<br>on the guide circles. Open them<br><strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible!";
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -137,10 +137,12 @@ function resetTargetPositions() {
     topTarget.style.left = "";
     topTarget.style.top = "";
     topTarget.style.transform = "";
+    topTarget.style.transition = "";
 
     bottomTarget.style.left = "";
     bottomTarget.style.top = "";
     bottomTarget.style.transform = "";
+    bottomTarget.style.transition = "";
 }
 
 // Multi-Touch Handler
@@ -558,10 +560,12 @@ function handleTouch(e) {
                 maxStrokeDistance = distPx;
 
                 // Dynamically position target circles directly under the user's touch points
+                topTarget.style.transition = "none";
                 topTarget.style.left = `${x1}px`;
                 topTarget.style.top = `${y1}px`;
                 topTarget.style.transform = "translate(-50%, -50%)";
 
+                bottomTarget.style.transition = "none";
                 bottomTarget.style.left = `${x2}px`;
                 bottomTarget.style.top = `${y2}px`;
                 bottomTarget.style.transform = "translate(-50%, -50%)";
