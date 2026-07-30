@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tap Task</title>
-    <link rel="stylesheet" href="tap.css">
+    <link rel="stylesheet" href="tap.css?v=2">
     <script type="module" src="tap.js" defer></script>
 </head>
 
@@ -17,10 +17,33 @@
     </header>
     <!-- Tap Area -->
     <div id="tapArea">
-        <p id="tapInstruction">Use your index finger to tap the highlighted circle alternatively <strong class="highlight-instruction">as fast as possible</strong>!<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span></p>
+        <p id="tapInstruction">Use your index finger to tap the highlighted circle<br>alternatively <strong class="highlight-instruction">as fast as possible</strong>!</p>
         <p id="countdownTimer" style="display:none;"></p>
+        <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
+        <p id="timerLine" class="timer-line" style="display:none;">Time remaining: <span id="timerBadge" class="timer-badge">10</span> seconds</p>
+        <div id="attemptsCounter" class="attempts-container" style="display:none;"></div>
         <div id="topTarget" class="tap-target active"></div>
         <div id="bottomTarget" class="tap-target inactive"></div>
+    </div>
+
+    <div id="practiceOptionsOverlay" class="practice-options-overlay" style="display:none;">
+        <div id="practiceOptionsContainer" class="practice-options-container">
+            <button id="tryItButton" class="practice-option-btn practice-option-primary">Start Practice</button>
+            <button id="watchVideoBtn" class="practice-option-btn practice-option-secondary">Watch Video</button>
+        </div>
+    </div>
+
+    <div id="gifModal" class="modal" style="display:none;">
+        <div class="gif-modal-content">
+            <div class="gif-container">
+                <img id="gifDemoImage" src="tap.gif" class="gif-image" alt="Instructional Demo">
+            </div>
+            <p class="gif-prompt-title" id="gifPromptTitle" style="display:none;">Are you ready to try it now?</p>
+            <div class="gif-btn-group" id="gifBtnGroup" style="display:none;">
+                <button class="gif-btn gif-btn-primary" id="gifBtnYes">Yes, I'm ready</button>
+                <button class="gif-btn gif-btn-secondary" id="gifBtnAgain">Watch again</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal -->
@@ -36,7 +59,7 @@
             </div>
         </div>
     </div>
-    <div id="completionBox" style="display:none;">
+    <div id="completionBox" style="display:none; cursor: pointer;" onclick="window.location.href='../pinch/pinch.html'">
         <p id="completionText">✅ Task Complete</p>
 
         <button id="nextTaskButton" onclick="window.location.href='../pinch/pinch.html'">

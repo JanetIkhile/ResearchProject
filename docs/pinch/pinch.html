@@ -6,8 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pinch Task</title>
-    <link rel="stylesheet" href="pinch.css?v=8">
-    <script type="module" src="pinch.js?v=6" defer></script>
+    <link rel="stylesheet" href="pinch.css?v=9">
+    <script type="module" src="pinch.js?v=7" defer></script>
 </head>
 
 <body>
@@ -19,8 +19,10 @@
     <!-- Pinch Area -->
     <div id="pinchArea">
         <div class="instruction-container">
-            <p id="pinchInstruction">Place your thumb on the bottom circle and your index finger on the top circle. Open your fingers <strong class="highlight-instruction">as widely</strong> and <strong class="highlight-instruction">as quickly</strong> as possible, then lift both fingers and repeat.</p>
-            <p id="countdownTimer">Time remaining: <span class="timer-badge">10</span> seconds</p>
+            <p id="pinchInstruction">Place your index finger and thumb on the guide circles. Open them <strong class="highlight-instruction">as widely</strong> and <strong class="highlight-instruction">as quickly</strong> as possible!</p>
+            <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
+            <p id="timerLine" class="timer-line" style="display:none;">Time remaining: <span id="timerBadge" class="timer-badge">10</span> seconds</p>
+            <div id="attemptsCounter" class="attempts-container" style="display:none;"></div>
         </div>
         
 
@@ -29,6 +31,27 @@
         
         <!-- Live distance floating label -->
         <div id="liveDistanceLabel" style="display:none;">0 mm</div>
+    </div>
+
+    <div id="practiceOptionsOverlay" class="practice-options-overlay" style="display:none;">
+        <div id="practiceOptionsContainer" class="practice-options-container">
+            <button id="tryItButton" class="practice-option-btn practice-option-primary">Start Practice</button>
+            <button id="watchVideoBtn" class="practice-option-btn practice-option-secondary">Watch Video</button>
+        </div>
+    </div>
+
+    <!-- Modal for GIF -->
+    <div id="gifModal" class="modal" style="display:none;">
+        <div class="gif-modal-content">
+            <div class="gif-container">
+                <img id="gifDemoImage" src="pinch.gif" class="gif-image" alt="Instructional Demo">
+            </div>
+            <p id="gifPromptTitle" style="display:none;">Are you ready to try it yourself?</p>
+            <div id="gifBtnGroup" style="display:none;">
+                <button id="gifBtnYes" class="gif-btn gif-btn-primary">Yes, I'm ready</button>
+                <button id="gifBtnAgain" class="gif-btn gif-btn-secondary">Watch again</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal for feedback -->
@@ -46,10 +69,10 @@
     </div>
 
     <!-- Completion routing -->
-    <div id="completionBox" style="display:none;">
-        <p id="completionText">✅ Task Complete</p>
-        <button id="nextTaskButton" onclick="window.location.href='../hold/hold.html'">
-            Next: Hold Task
+    <div id="completionBox" style="display:none; cursor:pointer;" onclick="window.location.href='../hold/hold.html'">
+        <p id="completionText">✅ Practice Complete</p>
+        <button id="nextTaskButton">
+            Continue ➔
         </button>
     </div>
 

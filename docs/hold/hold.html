@@ -15,9 +15,13 @@
         <h2>✋ Hold Task</h2>
     </header>
 
+    <div class="instruction-container">
+        <p id="holdInstruction">Press Start and immediately hold the blue circle with your index finger</p>
+        <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
+        <div id="attemptsCounter" class="attempts-container" style="display:none;"></div>
+    </div>
+
     <div id="holdArea">
-        <p id="holdInstruction">Click Start and immediately hold<br>the blue circle.</p>
-        
         <div id="pressureGaugeContainer" style="display: none;">
             <p id="pressureFeedbackText">Force: Optimal</p>
             <div id="pressureGaugeBar">
@@ -27,6 +31,27 @@
 
         <div id="holdTarget"></div>
         <button id="startTaskButton" style="display: none;">Start</button>
+    </div>
+
+    <div id="practiceOptionsOverlay" class="practice-options-overlay" style="display:none;">
+        <div id="practiceOptionsContainer" class="practice-options-container">
+            <button id="tryItButton" class="practice-option-btn practice-option-primary">Start Practice</button>
+            <button id="watchVideoBtn" class="practice-option-btn practice-option-secondary">Watch Video</button>
+        </div>
+    </div>
+
+    <!-- Modal for GIF -->
+    <div id="gifModal" class="modal" style="display:none;">
+        <div class="gif-modal-content">
+            <div class="gif-container">
+                <img id="gifDemoImage" src="hold.gif" class="gif-image" alt="Instructional Demo">
+            </div>
+            <h3 id="gifPromptTitle" class="gif-prompt-title" style="display:none;">Are you ready to try it yourself?</h3>
+            <div id="gifBtnGroup" class="gif-btn-group" style="display:none;">
+                <button id="gifBtnYes" class="gif-btn-yes">Yes, I'm ready</button>
+                <button id="gifBtnAgain" class="gif-btn-again">Watch Again</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal -->
@@ -43,7 +68,7 @@
         </div>
     </div>
     <div id="completionBox" style="display:none;">
-        <p id="completionText">✅ Task Complete</p>
+        <p id="completionText">✅ Practice Complete</p>
 
         <button id="nextTaskButton">
             Finish Tasks

@@ -34,11 +34,11 @@
         <div class="label">Target</div>
     </div>
 
-    <button id="tryItButton" style="display:none;">Now try it yourself.</button>
-
-    <div id="helpBanner" style="display:none;">
-        <p id="helpBannerText">Need help? Watch this example.</p>
-        <button id="watchExampleBtn">Watch Example</button>
+    <div id="practiceOptionsOverlay" class="practice-options-overlay" style="display:none;">
+        <div id="practiceOptionsContainer" class="practice-options-container">
+            <button id="tryItButton" class="practice-option-btn practice-option-primary">Start Practice</button>
+            <button id="watchVideoBtn" class="practice-option-btn practice-option-secondary">Watch Video</button>
+        </div>
     </div>
 
     <div id="gifModal" class="modal" style="display:none;">
@@ -70,7 +70,7 @@
         </div>
     </div>
     <!-- <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/docs/drag/adaptive_drag.html'"> -->
-    <div id="completionBox" style="display:none;">
+    <div id="completionBox" style="display:none; cursor: pointer;" onclick="window.location.href='../tap/tap.html'">
         <p id="completionText">✅ Task Complete</p>
         <button id="nextTaskButton" style="display:none;" onclick="window.location.href='../tap/tap.html'">
             Next: Tap Task

@@ -9,6 +9,7 @@ let trialNumber = 0;
 let TRIAL_LIMIT = 3;
 
 let taskActive = false;
+let taskCompleted = false;
 let savingTrial = false;
 let trialStartTime = null;
 let countdownTimer = null;
@@ -28,14 +29,32 @@ let lastThumbX = null;
 let lastThumbY = null;
 let maxStrokeDistance = 0;
 
-const ORIGINAL_INSTRUCTION = "Place your thumb on the bottom circle and your index finger on the top circle. Open your fingers <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible, then lift both fingers and repeat.";
+// Progressive Disclosure state variables
+let demoLoopCount = 0;
+let isFingerDemoAnimating = false;
+let demoCountdownInterval = null;
+let demoPinchInterval = null;
+let demoTrialNumber = 1;
+let demoTimeouts = [];
+let baselineTopCenterX = null;
+let baselineTopCenterY = null;
+let baselineBottomCenterX = null;
+let baselineBottomCenterY = null;
+let inactivityTimer = null;
+let gifTimer = null;
+let continueInactivityTimer = null;
+let practiceStep = 'initial_demo'; // initial_demo -> try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
+
+const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles.<br>Open them <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible!";
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
 const bottomTarget = document.getElementById("bottomTarget");
 const liveDistanceLabel = document.getElementById("liveDistanceLabel");
 const instructionEl = document.getElementById("pinchInstruction");
-const timerEl = document.getElementById("countdownTimer");
+let timerLine = null;
+let timerBadge = null;
+let attemptsCounter = null;
 const completionBox = document.getElementById("completionBox");
 
 // Standard CSS baseline PPI conversions
@@ -49,9 +68,18 @@ async function startSession() {
         participantId = sessionData.participantId;
         sessionId = sessionData.sessionId;
         sessionType = sessionStorage.getItem("session_type") || "main";
-        TRIAL_LIMIT = (sessionType === 'practice') ? 1 : 3;
+
+        if (sessionNumber === 1) {
+            TRIAL_LIMIT = 2;   // 2 practice trials
+        } else {
+            TRIAL_LIMIT = 3;   // 3 real trials
+        }
 
         console.log("Pinch task session active. Participant:", participantId, "Limit:", TRIAL_LIMIT);
+
+        timerLine = document.getElementById("timerLine");
+        timerBadge = document.getElementById("timerBadge");
+        attemptsCounter = document.getElementById("attemptsCounter");
 
         const header = document.getElementById("taskHeader");
         if (header) {
@@ -72,15 +100,20 @@ async function startSession() {
             header.appendChild(label);
         }
 
-
         // Listen to touches
         document.addEventListener("touchstart", handleTouch, { passive: false });
         document.addEventListener("touchmove", handleTouch, { passive: false });
         document.addEventListener("touchend", handleTouch, { passive: false });
         document.addEventListener("touchcancel", handleTouch, { passive: false });
 
-        // Align baseline instruction
-        instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+        if (sessionNumber === 1) {
+            updateInstructions(false);
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "inline-block";
+            setupProgressiveDisclosure();
+        } else {
+            updateInstructions(true);
+        }
         scheduleDemoAnimation(500);
     } catch (err) {
         console.error("Session initialization failed:", err);
@@ -133,9 +166,146 @@ function clearDemoTimeout() {
     }
 }
 
+function runDemoTrialCycle() {
+    if (trialNumber > 0 || taskActive || taskCompleted) {
+        stopDemoAnimation();
+        return;
+    }
+
+    if (demoTrialNumber > 2) {
+        stopDemoAnimation();
+        practiceStep = 'options_shown';
+        const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+        if (optionsOverlay) optionsOverlay.style.display = "flex";
+        const optionsContainer = document.getElementById("practiceOptionsContainer");
+        if (optionsContainer) optionsContainer.style.display = "flex";
+        const tryItButton = document.getElementById("tryItButton");
+        if (tryItButton) tryItButton.style.display = "block";
+        const indicator = document.getElementById("watchExampleIndicator");
+        if (indicator) indicator.style.display = "none";
+
+        // Dim background elements
+        ['taskHeader', 'pinchArea'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add("dimmed");
+        });
+        return;
+    }
+
+    // Start a 5-second trial simulation (internally)
+    let remainingTime = 5;
+
+    // Show demo pointers
+    if (demoPointer1) demoPointer1.style.opacity = "1";
+    if (demoPointer2) demoPointer2.style.opacity = "1";
+
+    function doPinchAnimationCycle() {
+        if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer1 || !demoPointer2) return;
+
+        // Reset pointers & targets to initial center positions
+        demoPointer1.style.transition = "none";
+        demoPointer1.style.left = `${baselineTopCenterX - 30}px`;
+        demoPointer1.style.top = `${baselineTopCenterY}px`;
+        demoPointer1.style.opacity = "1";
+
+        demoPointer2.style.transition = "none";
+        demoPointer2.style.left = `${baselineBottomCenterX - 30}px`;
+        demoPointer2.style.top = `${baselineBottomCenterY - 54}px`;
+        demoPointer2.style.opacity = "1";
+
+        topTarget.style.transition = "none";
+        topTarget.style.left = `${baselineTopCenterX}px`;
+        topTarget.style.top = `${baselineTopCenterY}px`;
+        topTarget.style.transform = "translate(-50%, -50%)";
+
+        bottomTarget.style.transition = "none";
+        bottomTarget.style.left = `${baselineBottomCenterX}px`;
+        bottomTarget.style.top = `${baselineBottomCenterY}px`;
+        bottomTarget.style.transform = "translate(-50%, -50%)";
+
+        // Move apart (spread fingers and guide targets together in lockstep)
+        demoTimeouts.push(setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer1 || !demoPointer2) return;
+            demoPointer1.style.transition = "top 0.6s ease-out";
+            demoPointer1.style.top = `${baselineTopCenterY - 120}px`;
+
+            topTarget.style.transition = "top 0.6s ease-out";
+            topTarget.style.top = `${baselineTopCenterY - 120}px`;
+
+            demoPointer2.style.transition = "top 0.6s ease-out";
+            demoPointer2.style.top = `${baselineBottomCenterY + 120 - 54}px`;
+
+            bottomTarget.style.transition = "top 0.6s ease-out";
+            bottomTarget.style.top = `${baselineBottomCenterY + 120}px`;
+        }, 200));
+
+        // Fade out pointers
+        demoTimeouts.push(setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer1 || !demoPointer2) return;
+            demoPointer1.style.transition = "opacity 0.2s ease-out";
+            demoPointer1.style.opacity = "0";
+            demoPointer2.style.transition = "opacity 0.2s ease-out";
+            demoPointer2.style.opacity = "0";
+        }, 850));
+
+        // Smoothly return target circles together back to center
+        demoTimeouts.push(setTimeout(() => {
+            if (trialNumber > 0 || taskActive || taskCompleted) return;
+            topTarget.style.transition = "top 0.3s ease-in-out";
+            topTarget.style.top = `${baselineTopCenterY}px`;
+
+            bottomTarget.style.transition = "top 0.3s ease-in-out";
+            bottomTarget.style.top = `${baselineBottomCenterY}px`;
+        }, 1100));
+    }
+
+    doPinchAnimationCycle();
+    demoPinchInterval = setInterval(doPinchAnimationCycle, 1500);
+
+    // Countdown interval (every 1 second)
+    demoCountdownInterval = setInterval(() => {
+        remainingTime -= 1;
+        if (remainingTime <= 0) {
+            // End of this 5-second demo trial
+            clearInterval(demoCountdownInterval);
+            clearInterval(demoPinchInterval);
+            demoTimeouts.forEach(t => clearTimeout(t));
+            demoTimeouts = [];
+
+            if (demoPointer1) demoPointer1.style.opacity = "0";
+            if (demoPointer2) demoPointer2.style.opacity = "0";
+
+            // Restore target circles back to baseline CSS instantly during Stop pinching break
+            resetTargetPositions();
+
+            // Briefly show "Stop pinching" just like a real trial end!
+            const pinchInstruction = document.getElementById("pinchInstruction");
+            const originalInstructionText = pinchInstruction ? pinchInstruction.innerHTML : "";
+            if (pinchInstruction) pinchInstruction.innerText = "Stop pinching";
+
+            setTimeout(() => {
+                if (pinchInstruction && originalInstructionText) {
+                    pinchInstruction.innerHTML = originalInstructionText;
+                }
+                demoTrialNumber += 1;
+                runDemoTrialCycle();
+            }, 1200); // 1.2 seconds cooldown
+        }
+    }, 1000);
+}
+
 function startDemoAnimation() {
     if (sessionNumber !== 1) return; // Only practice phase
     if (trialNumber > 0 || taskActive) return;
+    isFingerDemoAnimating = true;
+
+    resetTargetPositions();
+    const tRect = topTarget.getBoundingClientRect();
+    const bRect = bottomTarget.getBoundingClientRect();
+    baselineTopCenterX = tRect.left + tRect.width / 2;
+    baselineTopCenterY = tRect.top + tRect.height / 2;
+    baselineBottomCenterX = bRect.left + bRect.width / 2;
+    baselineBottomCenterY = bRect.top + bRect.height / 2;
 
     if (!demoPointer1) {
         demoPointer1 = document.createElement("div");
@@ -150,7 +320,12 @@ function startDemoAnimation() {
         demoPointer1.style.pointerEvents = "none";
         demoPointer1.style.opacity = "0";
         demoPointer1.innerText = "👆";
+        demoPointer1.style.left = `${baselineTopCenterX - 30}px`;
+        demoPointer1.style.top = `${baselineTopCenterY}px`;
         document.body.appendChild(demoPointer1);
+    } else {
+        demoPointer1.style.left = `${baselineTopCenterX - 30}px`;
+        demoPointer1.style.top = `${baselineTopCenterY}px`;
     }
 
     if (!demoPointer2) {
@@ -166,98 +341,31 @@ function startDemoAnimation() {
         demoPointer2.style.pointerEvents = "none";
         demoPointer2.style.opacity = "0";
         demoPointer2.innerText = "👇";
+        demoPointer2.style.left = `${baselineBottomCenterX - 30}px`;
+        demoPointer2.style.top = `${baselineBottomCenterY - 54}px`;
         document.body.appendChild(demoPointer2);
+    } else {
+        demoPointer2.style.left = `${baselineBottomCenterX - 30}px`;
+        demoPointer2.style.top = `${baselineBottomCenterY - 54}px`;
     }
 
-    const tRect = topTarget.getBoundingClientRect();
-    const bRect = bottomTarget.getBoundingClientRect();
-    const tX = tRect.left + tRect.width / 2 - 30;
-    const tY = tRect.top + tRect.height / 2;
-    const bX = bRect.left + bRect.width / 2 - 30;
-    const bY = bRect.top + bRect.height / 2 - 60;
-
-    function runAnimationCycle() {
-        if (trialNumber > 0 || taskActive) {
-            stopDemoAnimation();
-            return;
-        }
-
-        // Reset positions (Instant)
-        demoPointer1.style.transition = "none";
-        demoPointer1.style.left = `${tX}px`;
-        demoPointer1.style.top = `${tY}px`;
-        demoPointer1.style.opacity = "0";
-
-        demoPointer2.style.transition = "none";
-        demoPointer2.style.left = `${bX}px`;
-        demoPointer2.style.top = `${bY}px`;
-        demoPointer2.style.opacity = "0";
-
-        topTarget.style.transition = "none";
-        topTarget.style.left = `${tRect.left + tRect.width / 2}px`;
-        topTarget.style.top = `${tRect.top + tRect.height / 2}px`;
-        topTarget.style.transform = "translate(-50%, -50%)";
-
-        bottomTarget.style.transition = "none";
-        bottomTarget.style.left = `${bRect.left + bRect.width / 2}px`;
-        bottomTarget.style.top = `${bRect.top + bRect.height / 2}px`;
-        bottomTarget.style.transform = "translate(-50%, -50%)";
-
-        // Fade in
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || !demoPointer1 || !demoPointer2) return;
-            demoPointer1.style.transition = "opacity 0.3s ease-in";
-            demoPointer1.style.opacity = "1";
-            demoPointer2.style.transition = "opacity 0.3s ease-in";
-            demoPointer2.style.opacity = "1";
-        }, 100);
-
-        // Move apart (spread fingers and follow targets)
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || !demoPointer1 || !demoPointer2) return;
-            demoPointer1.style.transition = "top 1.0s ease-out";
-            demoPointer1.style.top = `${tY - 120}px`;
-
-            topTarget.style.transition = "top 1.0s ease-out";
-            topTarget.style.top = `${tRect.top + tRect.height / 2 - 120}px`;
-
-            demoPointer2.style.transition = "top 1.0s ease-out";
-            demoPointer2.style.top = `${bY + 120}px`;
-
-            bottomTarget.style.transition = "top 1.0s ease-out";
-            bottomTarget.style.top = `${bRect.top + bRect.height / 2 + 120}px`;
-        }, 500);
-
-        // Fade out pointers
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || !demoPointer1 || !demoPointer2) return;
-            demoPointer1.style.transition = "opacity 0.3s ease-out";
-            demoPointer1.style.opacity = "0";
-            demoPointer2.style.transition = "opacity 0.3s ease-out";
-            demoPointer2.style.opacity = "0";
-        }, 1700);
-
-        // Smoothly return targets to start
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive) return;
-            topTarget.style.transition = "top 0.3s ease-in-out";
-            topTarget.style.top = `${tRect.top + tRect.height / 2}px`;
-
-            bottomTarget.style.transition = "top 0.3s ease-in-out";
-            bottomTarget.style.top = `${bRect.top + bRect.height / 2}px`;
-        }, 2050);
-    }
-
-    runAnimationCycle();
-    demoInterval = setInterval(runAnimationCycle, 2400);
+    demoTrialNumber = 1;
+    runDemoTrialCycle();
 }
 
 function stopDemoAnimation() {
+    isFingerDemoAnimating = false;
     clearDemoTimeout();
-    if (demoInterval) {
-        clearInterval(demoInterval);
-        demoInterval = null;
+    if (demoCountdownInterval) {
+        clearInterval(demoCountdownInterval);
+        demoCountdownInterval = null;
     }
+    if (demoPinchInterval) {
+        clearInterval(demoPinchInterval);
+        demoPinchInterval = null;
+    }
+    demoTimeouts.forEach(t => clearTimeout(t));
+    demoTimeouts = [];
     if (demoPointer1) {
         demoPointer1.remove();
         demoPointer1 = null;
@@ -270,12 +378,82 @@ function stopDemoAnimation() {
 }
 
 function handleTouch(e) {
-    stopDemoAnimation();
-    clearDemoTimeout();
-    // If modal is open or task is completed, do nothing
-    if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive) || isBetweenTrials) {
+    // In practice phase (trial 0): block screen and target pinch touches during demo animation or until "Start Practice" is clicked
+    if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'options_shown') {
+            const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+            const optionsContainer = document.getElementById("practiceOptionsContainer");
+            if (optionsOverlay && optionsContainer && !optionsContainer.contains(e.target)) {
+                resumeDemoAnimationFromOptions();
+                return;
+            }
+        }
+        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
+            return; // Ignore all touches on screen and targets while demo is running or options are shown
+        }
+    }
+
+    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.id === "nextTaskButton" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
         return;
     }
+
+    // If modal is open or task is completed, do nothing
+    if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive) || isBetweenTrials) {
+        e.preventDefault();
+        return;
+    }
+
+    if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
+            e.preventDefault();
+            return;
+        }
+
+        if (practiceStep === 'try_button_shown') {
+            const tryItButton = document.getElementById("tryItButton");
+            if (tryItButton && !tryItButton.contains(e.target)) {
+                tryItButton.style.display = "none";
+                const indicator = document.getElementById("watchExampleIndicator");
+                if (indicator) indicator.style.display = "none";
+
+                practiceStep = 'waiting_for_touch';
+                if (inactivityTimer) clearTimeout(inactivityTimer);
+                inactivityTimer = setTimeout(() => {
+                    if (practiceStep === 'waiting_for_touch') {
+                        practiceStep = 'help_banner_shown';
+                        const helpBanner = document.getElementById("helpBanner");
+                        if (helpBanner) helpBanner.style.display = "flex";
+                    }
+                }, 7000);
+
+                e.preventDefault();
+                return;
+            }
+        }
+
+        if (practiceStep === 'help_banner_shown') {
+            const helpBanner = document.getElementById("helpBanner");
+            if (helpBanner && !helpBanner.contains(e.target)) {
+                helpBanner.style.display = "none";
+
+                practiceStep = 'waiting_for_touch';
+                if (inactivityTimer) clearTimeout(inactivityTimer);
+                inactivityTimer = setTimeout(() => {
+                    if (practiceStep === 'waiting_for_touch') {
+                        practiceStep = 'help_banner_shown';
+                        if (helpBanner) helpBanner.style.display = "flex";
+                    }
+                }, 7000);
+
+                e.preventDefault();
+                return;
+            }
+        }
+    }
+
+    // Enforce stopping demo only on actual active trial start or main session
+    stopDemoAnimation();
+    clearDemoTimeout();
 
     // Prevent any native browser scrolling, panning, or gestures immediately
     e.preventDefault();
@@ -331,6 +509,10 @@ function handleTouch(e) {
                 const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
 
                 if (oneInTop && oneInBottom) {
+                    if (sessionNumber === 1 && trialNumber === 0) {
+                        practiceStep = 'active_practice';
+                        if (inactivityTimer) clearTimeout(inactivityTimer);
+                    }
                     requiresReset = false;
                     maxStrokeDistance = distPx;
                     startPinchTrial(now);
@@ -543,25 +725,191 @@ function handleTouch(e) {
     }
 }
 
+function updateInstructions(showTimeRemaining, secondsLeft = 10) {
+    const indicator = document.getElementById("watchExampleIndicator");
+    if (indicator) {
+        indicator.style.display = (sessionNumber === 1 && !showTimeRemaining && trialNumber === 0) ? "inline-block" : "none";
+    }
+    if (timerLine) {
+        timerLine.style.display = showTimeRemaining ? "block" : "none";
+        if (showTimeRemaining && timerBadge) {
+            timerBadge.innerText = secondsLeft;
+        }
+    }
+    if (attemptsCounter) {
+        const isDemoPlaying = (sessionNumber === 1 && trialNumber === 0);
+        const displayTrial = taskActive ? trialNumber : Math.min(trialNumber + 1, TRIAL_LIMIT);
+        if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoPlaying) {
+            attemptsCounter.style.display = "block";
+            attemptsCounter.innerText = `${displayTrial} of ${TRIAL_LIMIT}`;
+        } else {
+            attemptsCounter.style.display = "none";
+        }
+    }
+}
+
+function resumeDemoAnimationFromOptions() {
+    const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+    if (optionsOverlay) optionsOverlay.style.display = "none";
+    const optionsContainer = document.getElementById("practiceOptionsContainer");
+    if (optionsContainer) optionsContainer.style.display = "none";
+
+    // Un-dim background elements
+    ['taskHeader', 'pinchArea'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove("dimmed");
+    });
+
+    const indicator = document.getElementById("watchExampleIndicator");
+    if (indicator) indicator.style.display = "inline-block";
+
+    practiceStep = 'initial_demo';
+    demoTrialNumber = 1;
+    scheduleDemoAnimation(300);
+}
+
+function setupProgressiveDisclosure() {
+    const tryItButton = document.getElementById("tryItButton");
+    const watchVideoBtn = document.getElementById("watchVideoBtn");
+    const helpBanner = document.getElementById("helpBanner");
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    const gifModal = document.getElementById("gifModal");
+    const gifBtnYes = document.getElementById("gifBtnYes");
+    const gifBtnAgain = document.getElementById("gifBtnAgain");
+    const gifPromptTitle = document.getElementById("gifPromptTitle");
+    const gifBtnGroup = document.getElementById("gifBtnGroup");
+    const gifDemoImage = document.getElementById("gifDemoImage");
+    const optionsContainer = document.getElementById("practiceOptionsContainer");
+
+    const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+    if (optionsOverlay) {
+        optionsOverlay.addEventListener("click", (e) => {
+            if (e.target === optionsOverlay || !e.target.closest("#practiceOptionsContainer")) {
+                e.stopPropagation();
+                resumeDemoAnimationFromOptions();
+            }
+        });
+    }
+
+    const openGifModal = () => {
+        const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+        if (optionsOverlay) optionsOverlay.style.display = "none";
+        if (optionsContainer) optionsContainer.style.display = "none";
+        if (helpBanner) helpBanner.style.display = "none";
+
+        // Un-dim background elements
+        ['taskHeader', 'pinchArea'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove("dimmed");
+        });
+        practiceStep = 'detailed_demo';
+
+        if (gifModal) {
+            gifModal.style.display = "block";
+            gifModal.classList.add("show");
+        }
+        window.isModalOpen = true;
+
+        if (gifDemoImage) {
+            const currentSrc = gifDemoImage.src;
+            gifDemoImage.src = "";
+            gifDemoImage.src = currentSrc.split('?')[0] + '?v=' + Date.now();
+        }
+
+        if (gifPromptTitle) gifPromptTitle.style.display = "none";
+        if (gifBtnGroup) gifBtnGroup.style.display = "none";
+
+        if (gifTimer) clearTimeout(gifTimer);
+        gifTimer = setTimeout(() => {
+            practiceStep = 'gif_ready_prompt';
+            if (gifPromptTitle) gifPromptTitle.style.display = "block";
+            if (gifBtnGroup) gifBtnGroup.style.display = "flex";
+        }, 6000);
+    };
+
+    if (tryItButton) {
+        tryItButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            stopDemoAnimation();
+            const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+            if (optionsOverlay) optionsOverlay.style.display = "none";
+            if (optionsContainer) optionsContainer.style.display = "none";
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "none";
+
+            // Un-dim background elements
+            ['taskHeader', 'pinchArea'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove("dimmed");
+            });
+
+            practiceStep = 'waiting_for_touch';
+        });
+    }
+
+    if (watchVideoBtn) {
+        watchVideoBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openGifModal();
+        });
+    }
+
+    if (helpBanner) {
+        helpBanner.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openGifModal();
+        });
+    }
+
+    if (watchExampleBtn) {
+        watchExampleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openGifModal();
+        });
+    }
+
+    if (gifBtnYes) {
+        gifBtnYes.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (gifTimer) clearTimeout(gifTimer);
+            if (gifModal) {
+                gifModal.style.display = "none";
+                gifModal.classList.remove("show");
+            }
+            window.isModalOpen = false;
+
+            practiceStep = 'waiting_for_touch';
+        });
+    }
+
+    if (gifBtnAgain) {
+        gifBtnAgain.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openGifModal();
+        });
+    }
+}
+
 // Start Trial
 function startPinchTrial(now) {
     taskActive = true;
     trialNumber += 1;
     trialStartTime = now;
     trajectory = [];
-    timeRemaining = 10;
+    timeRemaining = (sessionNumber === 1) ? 5 : 10;
     requiresReset = false;
     lastIndexX = null;
     lastIndexY = null;
     lastThumbX = null;
     lastThumbY = null;
 
-    // Keep instruction text visible, show countdown timer separately
-    instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-    instructionEl.style.display = "block";
+    // Explicitly hide overlays
+    const tryItButton = document.getElementById("tryItButton");
+    if (tryItButton) tryItButton.style.display = "none";
+    const helpBanner = document.getElementById("helpBanner");
+    if (helpBanner) helpBanner.style.display = "none";
 
-    timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
-    timerEl.style.display = "block";
+    updateInstructions(true, timeRemaining);
 
     // Countdown Timer
     countdownTimer = setInterval(() => {
@@ -569,7 +917,7 @@ function startPinchTrial(now) {
         if (timeRemaining <= 0) {
             stopPinchTrial();
         } else {
-            timerEl.innerHTML = `Time remaining: <span class="timer-badge">${timeRemaining}</span> seconds`;
+            updateInstructions(true, timeRemaining);
         }
     }, 1000);
 
@@ -597,7 +945,8 @@ async function stopPinchTrial() {
     isBetweenTrials = true;
     instructionEl.textContent = "Stop pinching";
     instructionEl.style.display = "block";
-    timerEl.style.display = "none";
+    if (timerLine) timerLine.style.display = "none";
+    if (attemptsCounter) attemptsCounter.style.display = "none";
 
     console.log(`Pinch trial ${trialNumber} ended. Recorded frames:`, trajectory.length);
 
@@ -617,8 +966,7 @@ async function stopPinchTrial() {
         } else {
             isBetweenTrials = false;
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-            timerEl.innerHTML = `Time remaining: <span class="timer-badge">10</span> seconds`;
-            timerEl.style.display = "block";
+            updateInstructions(false);
             firstTouchTime = null;
             sessionStorage.setItem("pinch_page_load", String(Date.now()));
         }
@@ -662,6 +1010,7 @@ async function savePinchTrial(startTime, endTime) {
 
 // End Task
 function endPinchTask() {
+    taskCompleted = true;
     // Save state
     sessionStorage.setItem("pinch_completed", "true");
 
@@ -677,13 +1026,43 @@ function endPinchTask() {
         warningTimeout = null;
     }
 
-    // Visual completes
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    if (gifTimer) clearTimeout(gifTimer);
+
+    // Dim background elements strictly to opacity 0.05
+    const taskHeader = document.getElementById("taskHeader");
+    if (taskHeader) taskHeader.classList.add("dimmed");
+    const pinchArea = document.getElementById("pinchArea");
+    if (pinchArea) pinchArea.classList.add("dimmed");
+
     topTarget.style.display = "none";
     bottomTarget.style.display = "none";
     liveDistanceLabel.style.display = "none";
     instructionEl.style.display = "none";
 
     completionBox.style.display = "flex";
+
+    // Setup inactivity continue pointer after 5 seconds of inactivity on completion box
+    if (sessionNumber === 1) {
+        continueInactivityTimer = setTimeout(() => {
+            const nextButton = document.getElementById("nextTaskButton");
+            if (nextButton && completionBox.style.display === "flex") {
+                const pointer = document.createElement("div");
+                pointer.id = "continuePointer";
+                pointer.innerText = "👆";
+                pointer.style.position = "absolute";
+                pointer.style.fontSize = "54px";
+                pointer.style.zIndex = "3000";
+                pointer.style.pointerEvents = "none";
+                pointer.classList.add("continue-pointer-animate");
+
+                const rect = nextButton.getBoundingClientRect();
+                pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+                pointer.style.top = `${rect.bottom + 15}px`;
+                document.body.appendChild(pointer);
+            }
+        }, 5000);
+    }
 }
 
 // Page load initialization

@@ -8,7 +8,7 @@ let sessionId = null;
 let trialNumber = 0;
 const TASK_TYPE = "tap";
 let TRIAL_LIMIT = 3;
-const TASK_DURATION = 10000;
+let TASK_DURATION = 10000;
 const INTER_TRIAL_COOLDOWN = 1500;
 
 let taskActive = false;
@@ -21,6 +21,19 @@ let taskCompleted = false;
 let sessionNumber = null;
 let savingInProgress = false;
 
+// Progressive disclosure practice states
+let practiceStep = 'initial_demo'; // 'initial_demo', 'try_button_shown', 'waiting_for_touch', 'help_banner_shown', 'detailed_demo', 'gif_ready_prompt', 'active_practice'
+let demoLoopCount = 0;
+let isFingerDemoAnimating = false;
+let demoCountdownInterval = null;
+let demoTapInterval = null;
+let demoTrialNumber = 1;
+let inactivityTimer = null;
+let gifTimer = null;
+let continueInactivityTimer = null;
+let demoPointer = null;
+
+
 let trialStartTime = null;
 
 let topTarget = null;
@@ -29,6 +42,9 @@ let expectedTarget = "top"; // Alternates: "top" or "bottom"
 let nextButton = null;
 let tapInstruction = null;
 let countdown = null;
+let timerLine = null;
+let timerBadge = null;
+let attemptsCounter = null;
 
 let pageLoadTime = Date.now();
 let lastTrialEndTime = pageLoadTime;
@@ -71,13 +87,136 @@ function toggleExpectedTarget() {
 
 // attach handler reference so we can remove it later
 
-// ---------------- DEMO ANIMATION FOR TAP TASK ----------------
-let demoInterval = null;
-let demoPointer = null;
+function runDemoTrialCycle() {
+    if (trialNumber > 0 || taskActive || taskCompleted) {
+        stopDemoAnimation();
+        return;
+    }
+
+    if (demoTrialNumber > 2) {
+        stopDemoAnimation();
+        practiceStep = 'options_shown';
+        const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+        if (optionsOverlay) optionsOverlay.style.display = "flex";
+        const optionsContainer = document.getElementById("practiceOptionsContainer");
+        if (optionsContainer) optionsContainer.style.display = "flex";
+        const tryItButton = document.getElementById("tryItButton");
+        if (tryItButton) tryItButton.style.display = "block";
+        const indicator = document.getElementById("watchExampleIndicator");
+        if (indicator) indicator.style.display = "none";
+
+        // Dim background elements
+        ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add("dimmed");
+        });
+        return;
+    }
+
+    // Start a 5-second trial simulation
+    const timerLine = document.getElementById("timerLine");
+    if (timerLine) timerLine.style.display = "none"; // Hide timer badge and label during initial demo
+    const countdown = document.getElementById("countdown");
+    let remainingTime = 5;
+    if (countdown) countdown.innerText = remainingTime;
+
+    // Show demo pointer
+    if (demoPointer) demoPointer.style.opacity = "1";
+
+    let tapStep = 0; // 0 = tap top, 1 = tap bottom
+
+    // Animate pointer tapping back and forth every 500ms
+    demoTapInterval = setInterval(() => {
+        if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) {
+            clearInterval(demoTapInterval);
+            return;
+        }
+
+        const tRect = topTarget.getBoundingClientRect();
+        const bRect = bottomTarget.getBoundingClientRect();
+        const tX = tRect.left + tRect.width / 2 - 30;
+        const tY = tRect.top + tRect.height / 2;
+        const bX = bRect.left + bRect.width / 2 - 30;
+        const bY = bRect.top + bRect.height / 2;
+
+        if (tapStep === 0) {
+            // Tap top target
+            expectedTarget = "top";
+            if (topTarget) {
+                topTarget.classList.remove("inactive");
+                topTarget.classList.add("active");
+            }
+            if (bottomTarget) {
+                bottomTarget.classList.remove("active");
+                bottomTarget.classList.add("inactive");
+            }
+            demoPointer.style.transition = "none";
+            demoPointer.style.left = `${tX}px`;
+            demoPointer.style.top = `${tY}px`;
+            demoPointer.style.transform = "scale(0.75)";
+            setTimeout(() => {
+                if (demoPointer) demoPointer.style.transform = "scale(1.0)";
+            }, 100);
+            tapStep = 1;
+        } else {
+            // Tap bottom target
+            expectedTarget = "bottom";
+            if (bottomTarget) {
+                bottomTarget.classList.remove("inactive");
+                bottomTarget.classList.add("active");
+            }
+            if (topTarget) {
+                topTarget.classList.remove("active");
+                topTarget.classList.add("inactive");
+            }
+            demoPointer.style.transition = "none";
+            demoPointer.style.left = `${bX}px`;
+            demoPointer.style.top = `${bY}px`;
+            demoPointer.style.transform = "scale(0.75)";
+            setTimeout(() => {
+                if (demoPointer) demoPointer.style.transform = "scale(1.0)";
+            }, 100);
+            tapStep = 0;
+        }
+    }, 500);
+
+    // Countdown interval (every 1 second)
+    demoCountdownInterval = setInterval(() => {
+        remainingTime -= 1;
+        if (countdown) countdown.innerText = Math.max(0, remainingTime);
+
+        if (remainingTime <= 0) {
+            // End of this 5-second demo trial
+            clearInterval(demoCountdownInterval);
+            clearInterval(demoTapInterval);
+
+            if (demoPointer) demoPointer.style.opacity = "0";
+
+            // Briefly show "Stop tapping" just like a real trial end!
+            const tapInstruction = document.getElementById("tapInstruction");
+            const originalInstructionText = tapInstruction ? tapInstruction.innerHTML : "";
+            if (tapInstruction) tapInstruction.innerText = "Stop tapping";
+            if (timerLine) timerLine.style.display = "none";
+
+            setTimeout(() => {
+                if (tapInstruction && originalInstructionText) {
+                    tapInstruction.innerHTML = originalInstructionText;
+                }
+                demoTrialNumber += 1;
+                runDemoTrialCycle();
+            }, 1200); // 1.2 seconds cooldown
+        }
+    }, 1000);
+}
 
 function startDemoAnimation() {
     if (sessionNumber !== 1) return; // Only practice phase
     if (trialNumber > 0 || taskActive || taskCompleted) return;
+    isFingerDemoAnimating = true;
+
+    const tRect = topTarget.getBoundingClientRect();
+    const tX = tRect.left + tRect.width / 2 - 30;
+    const tY = tRect.top + tRect.height / 2;
 
     if (!demoPointer) {
         demoPointer = document.createElement("div");
@@ -91,112 +230,115 @@ function startDemoAnimation() {
         demoPointer.style.zIndex = "1000";
         demoPointer.style.pointerEvents = "none";
         demoPointer.innerText = "👆";
-        document.body.appendChild(demoPointer);
-    }
-
-    const tRect = topTarget.getBoundingClientRect();
-    const bRect = bottomTarget.getBoundingClientRect();
-    const tX = tRect.left + tRect.width / 2 - 30;
-    const tY = tRect.top + tRect.height / 2;
-    const bX = bRect.left + bRect.width / 2 - 30;
-    const bY = bRect.top + bRect.height / 2;
-
-    function runAnimationCycle() {
-        if (trialNumber > 0 || taskActive || taskCompleted) {
-            stopDemoAnimation();
-            return;
-        }
-
-        // Force Top Target active initially at the start of the demo cycle
-        expectedTarget = "top";
-        if (topTarget) {
-            topTarget.classList.remove("inactive");
-            topTarget.classList.add("active");
-        }
-        if (bottomTarget) {
-            bottomTarget.classList.remove("active");
-            bottomTarget.classList.add("inactive");
-        }
-
-        // 1. Position at Top Target (opacity 0)
-        demoPointer.style.transition = "none";
-        demoPointer.style.transform = "scale(1.0)";
+        demoPointer.style.opacity = "0";
         demoPointer.style.left = `${tX}px`;
         demoPointer.style.top = `${tY}px`;
-        demoPointer.style.opacity = "0";
-
-        // Fade in
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
-            demoPointer.style.transition = "opacity 0.2s ease-in";
-            demoPointer.style.opacity = "1";
-        }, 100);
-
-        // Tap Top Target (shrink)
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
-            demoPointer.style.transition = "transform 0.08s ease-out";
-            demoPointer.style.transform = "scale(0.75)";
-        }, 400);
-
-        // Restore scale and toggle target highlight (Top -> Bottom)
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
-            demoPointer.style.transition = "transform 0.08s ease-in";
-            demoPointer.style.transform = "scale(1.0)";
-            toggleExpectedTarget(); // Toggles bottom target active, top inactive
-        }, 480);
-
-        // Jump to Bottom Target instantly (no slide)
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
-            demoPointer.style.transition = "none";
-            demoPointer.style.left = `${bX}px`;
-            demoPointer.style.top = `${bY}px`;
-        }, 900);
-
-        // Tap Bottom Target (shrink)
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
-            demoPointer.style.transition = "transform 0.08s ease-out";
-            demoPointer.style.transform = "scale(0.75)";
-        }, 1200);
-
-        // Restore scale and toggle target highlight back (Bottom -> Top)
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
-            demoPointer.style.transition = "transform 0.08s ease-in";
-            demoPointer.style.transform = "scale(1.0)";
-            toggleExpectedTarget(); // Toggles top target active, bottom inactive
-        }, 1280);
-
-        // Fade out
-        setTimeout(() => {
-            if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer) return;
-            demoPointer.style.transition = "opacity 0.2s ease-out";
-            demoPointer.style.opacity = "0";
-        }, 1600);
+        document.body.appendChild(demoPointer);
+    } else {
+        demoPointer.style.left = `${tX}px`;
+        demoPointer.style.top = `${tY}px`;
     }
 
-    runAnimationCycle();
-    demoInterval = setInterval(runAnimationCycle, 2000);
+    demoTrialNumber = 1;
+    runDemoTrialCycle();
 }
 
 function stopDemoAnimation() {
-    if (demoInterval) {
-        clearInterval(demoInterval);
-        demoInterval = null;
+    isFingerDemoAnimating = false;
+    if (demoCountdownInterval) {
+        clearInterval(demoCountdownInterval);
+        demoCountdownInterval = null;
+    }
+    if (demoTapInterval) {
+        clearInterval(demoTapInterval);
+        demoTapInterval = null;
     }
     if (demoPointer) {
         demoPointer.remove();
         demoPointer = null;
     }
+    if (topTarget) {
+        topTarget.classList.remove("active");
+        topTarget.classList.add("inactive");
+    }
+    if (bottomTarget) {
+        bottomTarget.classList.remove("active");
+        bottomTarget.classList.add("inactive");
+    }
+
+    // Clear progressive timers
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+    }
+    if (gifTimer) {
+        clearTimeout(gifTimer);
+        gifTimer = null;
+    }
+    if (continueInactivityTimer) {
+        clearTimeout(continueInactivityTimer);
+        continueInactivityTimer = null;
+    }
+    const continuePointer = document.getElementById("continuePointer");
+    if (continuePointer) continuePointer.remove();
+
+    // Hide progressive disclosure helper UI
+    const tryItButton = document.getElementById("tryItButton");
+    if (tryItButton) tryItButton.style.display = "none";
+    const helpBanner = document.getElementById("helpBanner");
+    if (helpBanner) helpBanner.style.display = "none";
+    const gifModal = document.getElementById("gifModal");
+    if (gifModal) {
+        gifModal.style.display = "none";
+        gifModal.classList.remove("show");
+    }
+    const watchExampleIndicator = document.getElementById("watchExampleIndicator");
+    if (watchExampleIndicator) watchExampleIndicator.style.display = "none";
 }
 
 function handleTouchStart(e) {
+    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
+        return; // Let custom button click handlers capture the action
+    }
+
+    // In practice phase (trial 0): block target dots and screen taps during demo animation or until "Start Practice" is clicked
+    if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'options_shown') {
+            const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+            const optionsContainer = document.getElementById("practiceOptionsContainer");
+            if (optionsOverlay && optionsContainer && !optionsContainer.contains(e.target)) {
+                resumeDemoAnimationFromOptions();
+                return;
+            }
+        }
+        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
+            return; // Ignore all touches on dots and screen while demo is running or options are shown
+        }
+    }
+
+    if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'help_banner_shown') {
+            const helpBanner = document.getElementById("helpBanner");
+            if (helpBanner && !helpBanner.contains(e.target)) {
+                helpBanner.style.display = "none";
+                practiceStep = 'waiting_for_touch';
+                updateInstructions(true);
+
+                // Setup inactivity timer when dismissing the help banner
+                if (inactivityTimer) clearTimeout(inactivityTimer);
+                inactivityTimer = setTimeout(() => {
+                    if (practiceStep === 'waiting_for_touch') {
+                        practiceStep = 'help_banner_shown';
+                        const banner = document.getElementById("helpBanner");
+                        if (banner) banner.style.display = "flex";
+                    }
+                }, 7000);
+            }
+        }
+    }
+
     stopDemoAnimation();
-    if (window.isModalOpen) return;
-    if (taskCompleted) return;
+    if (taskCompleted) return;  // prevent further trials
 
     // block starts while saving is in progress to prevent race
     if (savingInProgress) return;
@@ -213,6 +355,42 @@ function handleTouchStart(e) {
 
     const isInsideTop = isTouchInsideTarget(touch, topTarget);
     const isInsideBottom = isTouchInsideTarget(touch, bottomTarget);
+    const isInsideAnyTarget = isInsideTop || isInsideBottom;
+
+    if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'help_banner_shown' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
+            return; // Lock task interaction during dialog phases
+        }
+        if (practiceStep === 'initial_demo' || practiceStep === 'try_button_shown' || practiceStep === 'waiting_for_touch') {
+            const tryItButton = document.getElementById("tryItButton");
+            if (tryItButton) tryItButton.style.display = "none";
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "none";
+
+            if (inactivityTimer) {
+                clearTimeout(inactivityTimer);
+                inactivityTimer = null;
+            }
+
+            if (isInsideAnyTarget) {
+                // Touched either target: start trial immediately
+                practiceStep = 'active_practice';
+                updateInstructions(true);
+            } else {
+                // Touched outside targets: transition to waiting_for_touch and set inactivity timer
+                practiceStep = 'waiting_for_touch';
+                updateInstructions(true);
+
+                inactivityTimer = setTimeout(() => {
+                    if (practiceStep === 'waiting_for_touch') {
+                        practiceStep = 'help_banner_shown';
+                        const helpBanner = document.getElementById("helpBanner");
+                        if (helpBanner) helpBanner.style.display = "flex";
+                    }
+                }, 7000);
+            }
+        }
+    }
 
     // If we're BETWEEN trials, a touch starts the trial ONLY if it hits one of the targets
     if (!taskActive && isBetweenTrials) {
@@ -235,7 +413,7 @@ function handleTouchStart(e) {
         startTapTrial(now);
         recordTapEvent(touch, now, expectedTarget, true);
         recordTrajectoryPoint(touch, now, 'start');
-        
+
         toggleExpectedTarget();
         return;
     }
@@ -251,10 +429,42 @@ function handleTouchStart(e) {
 
         recordTapEvent(touch, now, expectedTarget, isHit);
         recordTrajectoryPoint(touch, now, 'start');
-        
+
         if (isHit) {
             toggleExpectedTarget();
         }
+    }
+}
+
+function updateInstructions(showTimeRemaining, secondsLeft) {
+    if (tapInstruction) {
+        tapInstruction.innerHTML = `Use your index finger to tap the highlighted circle<br>alternatively <strong class="highlight-instruction">as fast as possible</strong>!`;
+    }
+
+    const indicator = document.getElementById("watchExampleIndicator");
+
+    if (timerLine) {
+        timerLine.style.display = showTimeRemaining ? "block" : "none";
+        if (showTimeRemaining && timerBadge) {
+            timerBadge.innerText = (secondsLeft !== undefined) ? secondsLeft : (TASK_DURATION / 1000);
+        }
+    }
+
+    if (attemptsCounter) {
+        const isDemoPlaying = (sessionNumber === 1 && trialNumber === 0);
+        const displayTrial = taskActive ? trialNumber : Math.min(trialNumber + 1, TRIAL_LIMIT);
+        if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoPlaying) {
+            attemptsCounter.style.display = "block";
+            attemptsCounter.innerText = `${displayTrial} of ${TRIAL_LIMIT}`;
+        } else {
+            attemptsCounter.style.display = "none";
+        }
+    }
+
+    if (sessionNumber === 1 && trialNumber === 0 && !showTimeRemaining && (practiceStep === 'initial_demo' || practiceStep === 'try_button_shown')) {
+        if (indicator) indicator.style.display = "inline-block";
+    } else {
+        if (indicator) indicator.style.display = "none";
     }
 }
 
@@ -287,9 +497,11 @@ function handleTouchStart(e) {
         }
 
         if (sessionNumber === 1) {
-            TRIAL_LIMIT = 1;   // practice
+            TRIAL_LIMIT = 2;   // 2 practice trials
+            TASK_DURATION = 5000; // 5-second practice duration
         } else {
-            TRIAL_LIMIT = 3;   // real
+            TRIAL_LIMIT = 3;   // 3 real trials
+            TASK_DURATION = 10000; // 10-second real duration
         }
 
         console.log("Tap task started");
@@ -306,6 +518,9 @@ function handleTouchStart(e) {
     nextButton = document.getElementById("nextTaskButton");
     tapInstruction = document.getElementById("tapInstruction");
     countdown = document.getElementById("countdownTimer");
+    timerLine = document.getElementById("timerLine");
+    timerBadge = document.getElementById("timerBadge");
+    attemptsCounter = document.getElementById("attemptsCounter");
 
     if (!topTarget || !bottomTarget) {
         console.error("Target elements topTarget/bottomTarget not found in DOM.");
@@ -314,9 +529,13 @@ function handleTouchStart(e) {
 
     topTarget.style.touchAction = 'none';
     bottomTarget.style.touchAction = 'none';
-    
-    if (tapInstruction) tapInstruction.innerHTML = 'Use your index finger to tap the highlighted circle alternatively <strong class="highlight-instruction">as fast as possible</strong>!<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
-    
+
+    if (sessionNumber === 1) {
+        updateInstructions(false);
+    } else {
+        updateInstructions(true);
+    }
+
     expectedTarget = "top";
     if (topTarget) {
         topTarget.classList.remove("inactive");
@@ -330,6 +549,7 @@ function handleTouchStart(e) {
     document.addEventListener("touchstart", handleTouchStart, { passive: false });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd, { passive: false });
+    initProgressiveDisclosure();
     setTimeout(startDemoAnimation, 500);
 })();
 
@@ -358,12 +578,13 @@ function startTapTrial(startTs) {
     // countdown UI
     if (countdown) countdown.style.display = "none";
     let timeLeft = Math.ceil(TASK_DURATION / 1000);
+    updateInstructions(true, timeLeft);
 
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => {
         timeLeft--;
-        if (tapInstruction && timeLeft > 0) {
-            tapInstruction.innerHTML = `Use your index finger to tap the highlighted circle alternatively <strong class="highlight-instruction">as fast as possible</strong>!<br><span class="timer-line">Time remaining: <span class="timer-badge">${timeLeft}</span> seconds</span>`;
+        if (timeLeft > 0) {
+            updateInstructions(true, timeLeft);
         }
         if (timeLeft <= 0 && timerInterval) {
             clearInterval(timerInterval);
@@ -383,9 +604,12 @@ function startTapTrial(startTs) {
         if (tapInstruction) {
             tapInstruction.innerText = "Stop tapping";
         }
-
-        if (topTarget) topTarget.style.backgroundColor = "green";
-        if (bottomTarget) bottomTarget.style.backgroundColor = "green";
+        if (attemptsCounter) {
+            attemptsCounter.style.display = "none";
+        }
+        if (timerLine) {
+            timerLine.style.display = "none";
+        }
 
         if (timerInterval) {
             clearInterval(timerInterval);
@@ -396,7 +620,7 @@ function startTapTrial(startTs) {
         // Block any touch-based starts now (immediate)
         if (topTarget) topTarget.style.pointerEvents = 'none';
         if (bottomTarget) bottomTarget.style.pointerEvents = 'none';
-        
+
         // mark save in progress
         savingInProgress = true;
 
@@ -429,19 +653,65 @@ function startTapTrial(startTs) {
                     document.removeEventListener("touchstart", handleTouchStart);
                     document.removeEventListener("touchmove", handleTouchMove);
                     document.removeEventListener("touchend", handleTouchEnd);
-                } catch (er) {}
+                } catch (er) { }
             }
             if (topTarget) topTarget.style.pointerEvents = 'none';
             if (bottomTarget) bottomTarget.style.pointerEvents = 'none';
-            if (nextButton) nextButton.style.display = "block";
-            document.getElementById("completionBox").style.display = "flex";
-            nextButton.style.display = "block";
-            tapInstruction.style.display = "none"; 
-            if (countdown) countdown.style.display = "none";
+
+            // Allow "Stop tapping" to display clearly for 1.2s before completion modal appears
+            setTimeout(() => {
+                const completionText = document.getElementById("completionText");
+                if (completionText) {
+                    if (sessionNumber === 1) {
+                        completionText.innerText = "✅ Practice Complete";
+                    } else {
+                        completionText.innerText = "✅ Task Complete";
+                    }
+                }
+
+                // Dim background task elements during task completion (practice and main phase)
+                const elementsToDim = ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'];
+                elementsToDim.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add("dimmed");
+                });
+
+                const nextButton = document.getElementById('nextTaskButton');
+                if (nextButton) {
+                    nextButton.innerText = "Continue ➔";
+                    nextButton.style.display = 'block';
+                }
+                document.getElementById("completionBox").style.display = "flex";
+                if (tapInstruction) tapInstruction.style.display = "none";
+                if (countdown) countdown.style.display = "none";
+            }, 1200);
+
+            // Show clicking hand animation if they are inactive for 5 seconds on completion screen
+            if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
+            continueInactivityTimer = setTimeout(() => {
+                const completionBox = document.getElementById("completionBox");
+                if (nextButton && completionBox && completionBox.style.display === "flex" && !document.getElementById("continuePointer")) {
+                    const pointer = document.createElement("div");
+                    pointer.id = "continuePointer";
+                    pointer.innerText = "👆";
+                    pointer.style.position = "absolute";
+                    pointer.style.fontSize = "54px";
+                    pointer.style.zIndex = "3000";
+                    pointer.style.pointerEvents = "none";
+                    pointer.classList.add("continue-pointer-animate");
+
+                    const rect = nextButton.getBoundingClientRect();
+                    pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+                    pointer.style.top = `${rect.bottom + 15}px`;
+                    document.body.appendChild(pointer);
+                }
+            }, 5000);
         } else {
             // non-final: wait cooldown then re-enable start
-            if (tapInstruction) tapInstruction.innerText = "Stop tapping";
-            
+            if (tapInstruction) {
+                tapInstruction.innerText = "Stop tapping";
+            }
+
             setTimeout(() => {
                 isBetweenTrials = true;
                 if (topTarget) {
@@ -457,7 +727,7 @@ function startTapTrial(startTs) {
                     bottomTarget.classList.add("inactive");
                 }
                 expectedTarget = "top";
-                if (tapInstruction) tapInstruction.innerHTML = 'Use your index finger to tap the highlighted circle alternatively <strong class="highlight-instruction">as fast as possible</strong>!<br><span class="timer-line">Time remaining: <span class="timer-badge">10</span> seconds</span>';
+                updateInstructions(true);
                 if (countdown) countdown.style.display = "none";
             }, INTER_TRIAL_COOLDOWN);
         }
@@ -559,7 +829,7 @@ function recordTrajectoryPoint(touch, ts, type) {
 // ---------- Persist raw taps ----------
 async function saveTapTrial(startTime, endTime) {
     const totalTaps = tapEvents.length;
-    
+
     // Store top target in target_x, target_y, target_radius for backward schema compatibility
     let tX = null, tY = null, tR = null;
     if (topTarget) {
@@ -568,7 +838,7 @@ async function saveTapTrial(startTime, endTime) {
         tY = rect.top + rect.height / 2;
         tR = rect.width / 2;
     }
-    
+
     const payload = {
         participant_id: participantId,
         session_id: sessionId,
@@ -606,3 +876,150 @@ async function saveTapTrial(startTime, endTime) {
 
 // Prevent long-press context menu globally
 document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+function resumeDemoAnimationFromOptions() {
+    const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+    if (optionsOverlay) optionsOverlay.style.display = "none";
+    const optionsContainer = document.getElementById("practiceOptionsContainer");
+    if (optionsContainer) optionsContainer.style.display = "none";
+
+    // Un-dim background elements
+    ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove("dimmed");
+    });
+
+    const indicator = document.getElementById("watchExampleIndicator");
+    if (indicator) indicator.style.display = "inline-block";
+
+    practiceStep = 'initial_demo';
+    demoTrialNumber = 1;
+    setTimeout(startDemoAnimation, 300);
+}
+
+function initProgressiveDisclosure() {
+    const tryItButton = document.getElementById("tryItButton");
+    const watchVideoBtn = document.getElementById("watchVideoBtn");
+    const gifBtnYes = document.getElementById("gifBtnYes");
+    const gifBtnAgain = document.getElementById("gifBtnAgain");
+    const optionsContainer = document.getElementById("practiceOptionsContainer");
+
+    const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+    if (optionsOverlay) {
+        optionsOverlay.addEventListener("click", (e) => {
+            if (e.target === optionsOverlay || !e.target.closest("#practiceOptionsContainer")) {
+                e.stopPropagation();
+                resumeDemoAnimationFromOptions();
+            }
+        });
+    }
+
+    const openGifModal = () => {
+        const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+        if (optionsOverlay) optionsOverlay.style.display = "none";
+        if (optionsContainer) optionsContainer.style.display = "none";
+
+        // Un-dim background elements
+        ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove("dimmed");
+        });
+        practiceStep = 'detailed_demo';
+        const gifModal = document.getElementById("gifModal");
+        if (gifModal) {
+            gifModal.style.display = "block";
+            gifModal.classList.add("show");
+        }
+        window.isModalOpen = true;
+
+        const promptTitle = document.getElementById("gifPromptTitle");
+        const btnGroup = document.getElementById("gifBtnGroup");
+        if (promptTitle) promptTitle.style.display = "none";
+        if (btnGroup) btnGroup.style.display = "none";
+
+        const img = document.getElementById("gifDemoImage");
+        if (img) {
+            const currentSrc = img.src;
+            img.src = "";
+            img.src = currentSrc.split('?')[0] + '?v=' + Date.now();
+        }
+
+        if (gifTimer) clearTimeout(gifTimer);
+        gifTimer = setTimeout(() => {
+            practiceStep = 'gif_ready_prompt';
+            if (promptTitle) promptTitle.style.display = "block";
+            if (btnGroup) btnGroup.style.display = "flex";
+        }, 6000);
+    };
+
+    if (tryItButton) {
+        tryItButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            stopDemoAnimation();
+            const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+            if (optionsOverlay) optionsOverlay.style.display = "none";
+            if (optionsContainer) optionsContainer.style.display = "none";
+            const indicator = document.getElementById("watchExampleIndicator");
+            if (indicator) indicator.style.display = "none";
+
+            // Un-dim background elements
+            ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove("dimmed");
+            });
+
+            expectedTarget = "top";
+            if (topTarget) {
+                topTarget.classList.remove("inactive");
+                topTarget.classList.add("active");
+            }
+            if (bottomTarget) {
+                bottomTarget.classList.remove("active");
+                bottomTarget.classList.add("inactive");
+            }
+
+            practiceStep = 'waiting_for_touch';
+            updateInstructions(true);
+        });
+    }
+
+    if (watchVideoBtn) {
+        watchVideoBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openGifModal();
+        });
+    }
+
+    if (gifBtnYes) {
+        gifBtnYes.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (gifTimer) clearTimeout(gifTimer);
+            const gifModal = document.getElementById("gifModal");
+            if (gifModal) {
+                gifModal.style.display = "none";
+                gifModal.classList.remove("show");
+            }
+            window.isModalOpen = false;
+
+            expectedTarget = "top";
+            if (topTarget) {
+                topTarget.classList.remove("inactive");
+                topTarget.classList.add("active");
+            }
+            if (bottomTarget) {
+                bottomTarget.classList.remove("active");
+                bottomTarget.classList.add("inactive");
+            }
+
+            practiceStep = 'waiting_for_touch';
+            updateInstructions(true);
+        });
+    }
+
+    if (gifBtnAgain) {
+        gifBtnAgain.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openGifModal();
+        });
+    }
+}
