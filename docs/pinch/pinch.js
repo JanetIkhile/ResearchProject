@@ -1044,6 +1044,15 @@ function endPinchTask() {
     liveDistanceLabel.style.display = "none";
     instructionEl.style.display = "none";
 
+    const completionText = document.getElementById("completionText");
+    if (completionText) {
+        if (sessionNumber === 1) {
+            completionText.innerText = "✅ Practice Complete";
+        } else {
+            completionText.innerText = "✅ Task Complete";
+        }
+    }
+
     completionBox.style.display = "flex";
 
     // Setup inactivity continue pointer after 5 seconds of inactivity on completion box
