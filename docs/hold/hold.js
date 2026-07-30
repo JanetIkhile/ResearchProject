@@ -90,7 +90,7 @@ function startDemoAnimation() {
                 if (indicator) indicator.style.display = "none";
 
                 // Dim background elements
-                ['taskHeader', 'holdArea'].forEach(id => {
+                ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.classList.add("dimmed");
                 });
@@ -590,11 +590,12 @@ function beginHold(touch) {
 
     if (holdDisplayInterval) clearInterval(holdDisplayInterval);
     holdDisplayInterval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft > 0 && holdInstruction) {
-            holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${timeLeft}</span> seconds...`;
+        const elapsed = Date.now() - holdStartTime;
+        const remainingSeconds = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+        if (remainingSeconds > 0 && holdInstruction) {
+            holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${remainingSeconds}</span> seconds...`;
         }
-    }, 1000);
+    }, 100);
 
     // schedule allowed-release marker
     if (holdTimer) clearTimeout(holdTimer);
@@ -623,6 +624,80 @@ async function handleEarlyRelease(touch) {
         force: (touch && typeof touch.force === "number") ? touch.force : null
     });
 
+    await endHoldTrialEarly(releaseTime);
+}
+
+function showEarlyReleaseModal() {
+    if (document.getElementById("earlyReleaseModal")) return;
+
+    const modalDiv = document.createElement("div");
+    modalDiv.id = "earlyReleaseModal";
+    modalDiv.style.position = "fixed";
+    modalDiv.style.top = "0";
+    modalDiv.style.left = "0";
+    modalDiv.style.width = "100%";
+    modalDiv.style.height = "100%";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.display = "flex";
+    modalDiv.style.justifyContent = "center";
+    modalDiv.style.alignItems = "center";
+    modalDiv.style.zIndex = "9999";
+
+    // Stop all touch and click events from bubbling up to document background
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+        modalDiv.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+    
+    const contentDiv = document.createElement("div");
+    contentDiv.style.backgroundColor = "white";
+    contentDiv.style.padding = "32px 40px";
+    contentDiv.style.borderRadius = "16px";
+    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
+    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.width = "85%";
+    contentDiv.style.textAlign = "center";
+    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+    
+    const title = document.createElement("h3");
+    title.innerText = "⚠️ Early Release";
+    title.style.margin = "0 0 16px 0";
+    title.style.color = "#ea580c";
+    title.style.fontSize = "26px";
+    
+    const msg = document.createElement("p");
+    msg.innerText = "Released early. You should keep holding until the timer is up.";
+    msg.style.margin = "0 0 24px 0";
+    msg.style.fontSize = "19px";
+    msg.style.lineHeight = "1.6";
+    msg.style.color = "#374151";
+    
+    const btn = document.createElement("button");
+    btn.innerText = "Okay";
+    btn.style.backgroundColor = "#003366";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "14px 28px";
+    btn.style.fontSize = "18px";
+    btn.style.fontWeight = "bold";
+    btn.style.borderRadius = "8px";
+    btn.style.cursor = "pointer";
+    btn.style.width = "100%";
+    
+    btn.addEventListener("click", () => {
+        modalDiv.remove();
+        resetTrial();
+    });
+    
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(msg);
+    contentDiv.appendChild(btn);
+    modalDiv.appendChild(contentDiv);
+    document.body.appendChild(modalDiv);
+}
+
+async function endHoldTrialEarly(releaseTime) {
     if (holdPollingInterval) {
         clearInterval(holdPollingInterval);
         holdPollingInterval = null;
@@ -700,10 +775,6 @@ async function handleEarlyRelease(touch) {
     }
 
     // ---------- FEEDBACK ----------
-    if (holdInstruction) {
-        holdInstruction.innerText = "⚠️ Released too early. Try again.";
-    }
-
     if (holdTarget && !isFinalTrial) {
         holdTarget.style.backgroundColor = "red";
     }
@@ -713,9 +784,7 @@ async function handleEarlyRelease(touch) {
 
     // ---------- DELAY BEFORE RESET ----------
     if (!taskCompleted && !isFinalTrial) {
-        setTimeout(() => {
-            resetTrial();
-        }, 1500);  // 🔥 1.5 seconds feedback window
+        showEarlyReleaseModal();
     }
 }
 
@@ -832,8 +901,12 @@ async function maybeFinishSession() {
         // Dim background elements
         const holdArea = document.getElementById("holdArea");
         const taskHeader = document.getElementById("taskHeader");
+        const holdInstruction = document.getElementById("holdInstruction");
+        const attemptsCounter = document.getElementById("attemptsCounter");
         if (holdArea) holdArea.classList.add("dimmed");
         if (taskHeader) taskHeader.classList.add("dimmed");
+        if (holdInstruction) holdInstruction.classList.add("dimmed");
+        if (attemptsCounter) attemptsCounter.classList.add("dimmed");
 
         if (holdDisplayInterval) {
             clearInterval(holdDisplayInterval);
@@ -909,23 +982,20 @@ async function maybeFinishSession() {
 // Progressive Disclosure & Touch Handling Helpers
 
 function handleTouch(e) {
+    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.id === "nextTaskButton" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
+        return;
+    }
+
     // In practice phase (trial 0): block screen and target touches during demo animation or until "Start Practice" is clicked
     if (sessionNumber === 1 && trialCount === 0) {
         if (practiceStep === 'options_shown') {
-            const optionsOverlay = document.getElementById("practiceOptionsOverlay");
-            const optionsContainer = document.getElementById("practiceOptionsContainer");
-            if (optionsOverlay && optionsContainer && !optionsContainer.contains(e.target)) {
-                resumeDemoAnimationFromOptions();
-                return;
-            }
+            e.stopPropagation();
+            e.preventDefault();
+            return;
         }
         if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
             return; // Ignore all touches while demo is running or options are shown
         }
-    }
-
-    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.id === "nextTaskButton" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
-        return;
     }
 
     if (window.isModalOpen || taskCompleted || trialCount >= TRIAL_LIMIT) {
@@ -997,7 +1067,7 @@ function resumeDemoAnimationFromOptions() {
     if (optionsContainer) optionsContainer.style.display = "none";
 
     // Un-dim background elements
-    ['taskHeader', 'holdArea'].forEach(id => {
+    ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove("dimmed");
     });
@@ -1024,10 +1094,8 @@ function setupProgressiveDisclosure() {
     const optionsOverlay = document.getElementById("practiceOptionsOverlay");
     if (optionsOverlay) {
         optionsOverlay.addEventListener("click", (e) => {
-            if (e.target === optionsOverlay || !e.target.closest("#practiceOptionsContainer")) {
-                e.stopPropagation();
-                resumeDemoAnimationFromOptions();
-            }
+            e.stopPropagation();
+            e.preventDefault();
         });
     }
 
@@ -1038,7 +1106,7 @@ function setupProgressiveDisclosure() {
         if (helpBanner) helpBanner.style.display = "none";
 
         // Un-dim background elements
-        ['taskHeader', 'holdArea'].forEach(id => {
+        ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.remove("dimmed");
         });
@@ -1078,7 +1146,7 @@ function setupProgressiveDisclosure() {
             if (indicator) indicator.style.display = "none";
 
             // Un-dim background elements
-            ['taskHeader', 'holdArea'].forEach(id => {
+            ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.remove("dimmed");
             });

@@ -106,7 +106,7 @@ function runDemoTrialCycle() {
         if (indicator) indicator.style.display = "none";
 
         // Dim background elements
-        ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+        ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.add("dimmed");
         });
@@ -305,12 +305,9 @@ function handleTouchStart(e) {
     // In practice phase (trial 0): block target dots and screen taps during demo animation or until "Start Practice" is clicked
     if (sessionNumber === 1 && trialNumber === 0) {
         if (practiceStep === 'options_shown') {
-            const optionsOverlay = document.getElementById("practiceOptionsOverlay");
-            const optionsContainer = document.getElementById("practiceOptionsContainer");
-            if (optionsOverlay && optionsContainer && !optionsContainer.contains(e.target)) {
-                resumeDemoAnimationFromOptions();
-                return;
-            }
+            e.stopPropagation();
+            e.preventDefault();
+            return;
         }
         if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
             return; // Ignore all touches on dots and screen while demo is running or options are shown
@@ -671,7 +668,7 @@ function startTapTrial(startTs) {
                 }
 
                 // Dim background task elements during task completion (practice and main phase)
-                const elementsToDim = ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'];
+                const elementsToDim = ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget', 'attemptsCounter'];
                 elementsToDim.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.classList.add("dimmed");
@@ -885,7 +882,7 @@ function resumeDemoAnimationFromOptions() {
     if (optionsContainer) optionsContainer.style.display = "none";
 
     // Un-dim background elements
-    ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+    ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove("dimmed");
     });
@@ -908,10 +905,8 @@ function initProgressiveDisclosure() {
     const optionsOverlay = document.getElementById("practiceOptionsOverlay");
     if (optionsOverlay) {
         optionsOverlay.addEventListener("click", (e) => {
-            if (e.target === optionsOverlay || !e.target.closest("#practiceOptionsContainer")) {
-                e.stopPropagation();
-                resumeDemoAnimationFromOptions();
-            }
+            e.stopPropagation();
+            e.preventDefault();
         });
     }
 
@@ -921,7 +916,7 @@ function initProgressiveDisclosure() {
         if (optionsContainer) optionsContainer.style.display = "none";
 
         // Un-dim background elements
-        ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+        ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.remove("dimmed");
         });
@@ -964,7 +959,7 @@ function initProgressiveDisclosure() {
             if (indicator) indicator.style.display = "none";
 
             // Un-dim background elements
-            ['taskHeader', 'mainContainer', 'topTarget', 'bottomTarget', 'tapInstruction'].forEach(id => {
+            ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.remove("dimmed");
             });

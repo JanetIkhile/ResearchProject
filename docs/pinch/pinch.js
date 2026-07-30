@@ -381,23 +381,20 @@ function stopDemoAnimation() {
 }
 
 function handleTouch(e) {
+    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.id === "nextTaskButton" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
+        return;
+    }
+
     // In practice phase (trial 0): block screen and target pinch touches during demo animation or until "Start Practice" is clicked
     if (sessionNumber === 1 && trialNumber === 0) {
         if (practiceStep === 'options_shown') {
-            const optionsOverlay = document.getElementById("practiceOptionsOverlay");
-            const optionsContainer = document.getElementById("practiceOptionsContainer");
-            if (optionsOverlay && optionsContainer && !optionsContainer.contains(e.target)) {
-                resumeDemoAnimationFromOptions();
-                return;
-            }
+            e.stopPropagation();
+            e.preventDefault();
+            return;
         }
         if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
             return; // Ignore all touches on screen and targets while demo is running or options are shown
         }
-    }
-
-    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.id === "nextTaskButton" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
-        return;
     }
 
     // If modal is open or task is completed, do nothing
@@ -789,10 +786,8 @@ function setupProgressiveDisclosure() {
     const optionsOverlay = document.getElementById("practiceOptionsOverlay");
     if (optionsOverlay) {
         optionsOverlay.addEventListener("click", (e) => {
-            if (e.target === optionsOverlay || !e.target.closest("#practiceOptionsContainer")) {
-                e.stopPropagation();
-                resumeDemoAnimationFromOptions();
-            }
+            e.stopPropagation();
+            e.preventDefault();
         });
     }
 
@@ -1041,6 +1036,8 @@ function endPinchTask() {
     if (taskHeader) taskHeader.classList.add("dimmed");
     const pinchArea = document.getElementById("pinchArea");
     if (pinchArea) pinchArea.classList.add("dimmed");
+    const attemptsCounter = document.getElementById("attemptsCounter");
+    if (attemptsCounter) attemptsCounter.classList.add("dimmed");
 
     topTarget.style.display = "none";
     bottomTarget.style.display = "none";

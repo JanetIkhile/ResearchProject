@@ -342,6 +342,10 @@ function stopDemoAnimation() {
 
 // ---------- Named touch handlers (so we can remove them) ----------
 function handleTouchStart(e) {
+    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#practiceOptionsContainer")) {
+        return; // Let custom button click handlers capture the action
+    }
+
     if (e.target.id === "watchExampleIndicator" || e.target.closest("#instructionBox")) {
         return;
     }
@@ -351,16 +355,9 @@ function handleTouchStart(e) {
     }
 
     if (sessionNumber === 1 && trialNumber === 0 && practiceStep === 'options_shown') {
-        const optionsOverlay = document.getElementById("practiceOptionsOverlay");
-        const optionsContainer = document.getElementById("practiceOptionsContainer");
-        if (optionsOverlay && optionsContainer && !optionsContainer.contains(e.target)) {
-            resumeDemoAnimationFromOptions();
-            return;
-        }
-    }
-
-    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#practiceOptionsContainer")) {
-        return; // Let custom button click handlers capture the action
+        e.stopPropagation();
+        e.preventDefault();
+        return;
     }
 
     if (sessionNumber === 1 && trialNumber === 0) {
@@ -757,10 +754,8 @@ function resumeDemoAnimationFromOptions() {
     const optionsOverlay = document.getElementById("practiceOptionsOverlay");
     if (optionsOverlay) {
         optionsOverlay.addEventListener("click", (e) => {
-            if (e.target === optionsOverlay || !e.target.closest("#practiceOptionsContainer")) {
-                e.stopPropagation();
-                resumeDemoAnimationFromOptions();
-            }
+            e.stopPropagation();
+            e.preventDefault();
         });
     }
 

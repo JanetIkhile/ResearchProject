@@ -95,38 +95,22 @@ export async function initSession({ dashboardPath = "/dashboard/dashboard.html" 
     }
 
     // -----------------------------
-    // 4) if completed → create new session
+    // 4) if completed → do NOT create new session on task pages
     // -----------------------------
     if (sessionRow.completed) {
-        console.info("Session already completed → creating new one");
-
-        const newSessionId = await createNewSession();
-
-        const { data: newRow } = await supabase
-            .from("sessions")
-            .select("*")
-            .eq("id", newSessionId)
-            .single();
-
-        // -----------------------------
-        // GET SESSION NUMBER
-        // -----------------------------
         const { data: sessions } = await supabase
             .from("sessions")
             .select("id, started_at")
             .eq("participant_id", participantId)
             .order("started_at", { ascending: true });
 
-        // session index (1-based)
-        let sessionNumber = sessions.findIndex(s => s.id === newSessionId) + 1;
-
-        // fallback
+        let sessionNumber = sessions.findIndex(s => s.id === sessionRow.id) + 1;
         if (sessionNumber === 0) sessionNumber = sessions.length;
 
         return {
             participantId,
-            sessionId: newSessionId,
-            sessionRow: newRow,
+            sessionId: sessionRow.id,
+            sessionRow,
             sessionNumber
         };
     }
