@@ -81,6 +81,14 @@ async function startSession() {
         timerBadge = document.getElementById("timerBadge");
         attemptsCounter = document.getElementById("attemptsCounter");
 
+        // Calculate coordinate baselines on session start
+        const tRect = topTarget.getBoundingClientRect();
+        const bRect = bottomTarget.getBoundingClientRect();
+        baselineTopCenterX = tRect.left + tRect.width / 2;
+        baselineTopCenterY = tRect.top + tRect.height / 2;
+        baselineBottomCenterX = bRect.left + bRect.width / 2;
+        baselineBottomCenterY = bRect.top + bRect.height / 2;
+
         const header = document.getElementById("taskHeader");
         if (header) {
             const existing = header.querySelector(".session-label");

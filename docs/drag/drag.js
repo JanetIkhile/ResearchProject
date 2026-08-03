@@ -845,7 +845,7 @@ function resumeDemoAnimationFromOptions() {
     }
 })();
 
-// Programmatic zoom and multi-touch prevention
+// Programmatic zoom, multi-touch, and scrolling prevention
 document.addEventListener('gesturestart', function(e) {
     e.preventDefault();
 }, { passive: false });
@@ -859,4 +859,11 @@ document.addEventListener('touchstart', function(e) {
     if (e.touches.length > 1) {
         e.preventDefault();
     }
+}, { passive: false });
+document.addEventListener('touchmove', function(e) {
+    // Prevent default scroll/bounce completely during drag task touch movements
+    if (e.target.closest("#gifModal") || e.target.closest("#practiceOptionsContainer")) {
+        return;
+    }
+    e.preventDefault();
 }, { passive: false });
