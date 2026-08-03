@@ -77,14 +77,9 @@ const startBtn = document.getElementById("startBtn");
         }
     }
 
-    // Set instruction
-    if (dominantArm) {
-        instructionEl.innerHTML =
-            `Please use the <span class="highlight">index finger</span> (or thumb/index fingers for pinch) of your <span class="highlight">${dominantArm} hand</span> to perform the following tasks.`;;
-    } else {
-        instructionEl.innerHTML =
-            "Please use your index finger (or thumb/index fingers for pinch) to perform the following tasks.";
-    }
+    // Set instruction dynamically
+    instructionEl.innerHTML =
+        `This assessment includes four short motor tasks. Use your <span class="highlight">${dominantArm || 'dominant'} hand</span> throughout the assessment. Follow the instructions for each task.`;
     // -----------------------------
     // 3. Dynamic Task Routing on startBtn Click
     // -----------------------------

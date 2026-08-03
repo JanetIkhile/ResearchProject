@@ -45,7 +45,7 @@ let gifTimer = null;
 let continueInactivityTimer = null;
 let practiceStep = 'initial_demo'; // initial_demo -> try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
 
-const ORIGINAL_INSTRUCTION = "Place your index finger and thumb<br>on the guide circles. Open them<br><strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible!";
+const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles. Open your fingers apart <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible, then lift both fingers and repeat";
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -204,7 +204,7 @@ function runDemoTrialCycle() {
     function doPinchAnimationCycle() {
         if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer1 || !demoPointer2) return;
 
-        // Reset pointers & targets to initial center positions
+        // Reset pointers & targets to initial center positions instantly and make them visible
         demoPointer1.style.transition = "none";
         demoPointer1.style.left = `${baselineTopCenterX - 30}px`;
         demoPointer1.style.top = `${baselineTopCenterY}px`;
@@ -219,11 +219,13 @@ function runDemoTrialCycle() {
         topTarget.style.left = `${baselineTopCenterX}px`;
         topTarget.style.top = `${baselineTopCenterY}px`;
         topTarget.style.transform = "translate(-50%, -50%)";
+        topTarget.style.opacity = "0.8";
 
         bottomTarget.style.transition = "none";
         bottomTarget.style.left = `${baselineBottomCenterX}px`;
         bottomTarget.style.top = `${baselineBottomCenterY}px`;
         bottomTarget.style.transform = "translate(-50%, -50%)";
+        bottomTarget.style.opacity = "0.8";
 
         // Move apart (spread fingers and guide targets together in lockstep)
         demoTimeouts.push(setTimeout(() => {
@@ -241,22 +243,27 @@ function runDemoTrialCycle() {
             bottomTarget.style.top = `${baselineBottomCenterY + 120}px`;
         }, 200));
 
-        // Fade out pointers
+        // Fade out pointers and target guides (simulating lifting fingers)
         demoTimeouts.push(setTimeout(() => {
             if (trialNumber > 0 || taskActive || taskCompleted || !demoPointer1 || !demoPointer2) return;
             demoPointer1.style.transition = "opacity 0.2s ease-out";
             demoPointer1.style.opacity = "0";
             demoPointer2.style.transition = "opacity 0.2s ease-out";
             demoPointer2.style.opacity = "0";
+
+            topTarget.style.transition = "opacity 0.2s ease-out";
+            topTarget.style.opacity = "0";
+            bottomTarget.style.transition = "opacity 0.2s ease-out";
+            bottomTarget.style.opacity = "0";
         }, 850));
 
-        // Smoothly return target circles together back to center
+        // Reset target positions back to center instantly while invisible (preventing returning animation)
         demoTimeouts.push(setTimeout(() => {
             if (trialNumber > 0 || taskActive || taskCompleted) return;
-            topTarget.style.transition = "top 0.3s ease-in-out";
+            topTarget.style.transition = "none";
             topTarget.style.top = `${baselineTopCenterY}px`;
 
-            bottomTarget.style.transition = "top 0.3s ease-in-out";
+            bottomTarget.style.transition = "none";
             bottomTarget.style.top = `${baselineBottomCenterY}px`;
         }, 1100));
     }
@@ -277,8 +284,14 @@ function runDemoTrialCycle() {
             if (demoPointer1) demoPointer1.style.opacity = "0";
             if (demoPointer2) demoPointer2.style.opacity = "0";
 
-            // Restore target circles back to baseline CSS instantly during Stop pinching break
-            resetTargetPositions();
+            // Place target circles apart during Stop pinching break (so user doesn't pinch back inward)
+            topTarget.style.transition = "none";
+            topTarget.style.top = `${baselineTopCenterY - 120}px`;
+            topTarget.style.opacity = "0.8";
+
+            bottomTarget.style.transition = "none";
+            bottomTarget.style.top = `${baselineBottomCenterY + 120}px`;
+            bottomTarget.style.opacity = "0.8";
 
             // Briefly show "Stop pinching" just like a real trial end!
             const pinchInstruction = document.getElementById("pinchInstruction");
@@ -289,6 +302,7 @@ function runDemoTrialCycle() {
                 if (pinchInstruction && originalInstructionText) {
                     pinchInstruction.innerHTML = originalInstructionText;
                 }
+                resetTargetPositions(); // Reset back to center now for the next trial
                 demoTrialNumber += 1;
                 runDemoTrialCycle();
             }, 1200); // 1.2 seconds cooldown
@@ -940,8 +954,14 @@ async function stopPinchTrial() {
     // Hide tracking overlays immediately
     liveDistanceLabel.style.display = "none";
 
-    // Reset guide target positions back to baseline
-    resetTargetPositions();
+    // Keep target circles apart during Stop pinching cooldown (so user doesn't pinch back inward)
+    topTarget.style.transition = "top 0.3s ease-out";
+    topTarget.style.top = `${baselineTopCenterY - 120}px`;
+    topTarget.style.opacity = "0.8";
+
+    bottomTarget.style.transition = "top 0.3s ease-out";
+    bottomTarget.style.top = `${baselineBottomCenterY + 120}px`;
+    bottomTarget.style.opacity = "0.8";
 
     // Synchronously update screen to disabled transition state at start of stopPinchTrial
     isBetweenTrials = true;
@@ -967,6 +987,7 @@ async function stopPinchTrial() {
             endPinchTask();
         } else {
             isBetweenTrials = false;
+            resetTargetPositions(); // Reset back to center now for the next trial
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
             updateInstructions(false);
             firstTouchTime = null;
@@ -1081,3 +1102,14 @@ function endPinchTask() {
 // Page load initialization
 sessionStorage.setItem("pinch_page_load", String(Date.now()));
 startSession();
+
+// Programmatic zoom prevention (Pinch task requires multi-touch, so gesturestart blocker is used)
+document.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+}, { passive: false });
+document.addEventListener('gesturechange', function(e) {
+    e.preventDefault();
+}, { passive: false });
+document.addEventListener('gestureend', function(e) {
+    e.preventDefault();
+}, { passive: false });

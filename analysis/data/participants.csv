@@ -1,3 +1,5 @@
 id,participant_code,created_at,participant_group,dominant_arm
 7d36b6ba-b140-4742-ab9d-83cffd5a3b21,P03,2026-07-23 19:50:51.586068+00,parkinsons,right
 ffa27ff7-98ef-4dcf-a5c6-8ca82fd54a78,P04,2026-07-27 21:26:45.662445+00,parkinsons,right
+b20226a8-b263-44ef-9ff3-aad04b5546bd,P05,2026-07-29 18:29:59.086063+00,parkinsons,right
+f35b8eec-860f-4bcc-a9ab-ea090b501553,P06,2026-07-30 17:24:44.678623+00,parkinsons,right
