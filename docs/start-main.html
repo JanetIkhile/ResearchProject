@@ -2,6 +2,7 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <title>Start Main Session</title>
     <style>
         body, * {
@@ -55,6 +56,39 @@
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
             cursor: pointer;
         }
+
+        @keyframes tapContinue {
+            0% {
+                transform: translateY(0) scale(1);
+            }
+            40% {
+                transform: translateY(-32px) scale(1);
+            }
+            50% {
+                transform: translateY(-28px) scale(0.8);
+            }
+            60% {
+                transform: translateY(-32px) scale(1);
+            }
+            100% {
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .continue-pointer-animate {
+            animation: tapContinue 2s infinite ease-in-out;
+        }
+
+        .hint-pointer {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            font-size: 54px;
+            text-align: center;
+            line-height: 60px;
+            z-index: 3000;
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -78,6 +112,23 @@
 
         // Prevent long-press context menu globally
         document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
+
+        // Show animated helper hand pointing to the button after 5 seconds of inactivity
+        window.addEventListener("load", () => {
+            setTimeout(() => {
+                const btn = document.querySelector("button");
+                if (!btn) return;
+                const rect = btn.getBoundingClientRect();
+                
+                const pointer = document.createElement("div");
+                pointer.id = "continuePointer";
+                pointer.className = "hint-pointer continue-pointer-animate";
+                pointer.innerText = "👆";
+                pointer.style.left = `${rect.left + rect.width / 2 - 30}px`;
+                pointer.style.top = `${rect.top + rect.height / 2 + 15}px`;
+                document.body.appendChild(pointer);
+            }, 5000);
+        });
     </script>
 </body>
 
