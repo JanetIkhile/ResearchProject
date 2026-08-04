@@ -147,8 +147,8 @@ body.modal-open #holdInstruction {
     transform: translateX(-50%);
 
     /* 🔥 responsive size */
-    font-size: clamp(1.4rem, 3vw, 2rem);
-    padding: clamp(16px, 3vw, 26px) clamp(28px, 5vw, 50px);
+    font-size: clamp(1.7rem, 3.5vw, 2.3rem);
+    padding: clamp(20px, 3.5vw, 30px) clamp(38px, 6vw, 65px);
 
     font-weight: bold;
 
@@ -159,9 +159,17 @@ body.modal-open #holdInstruction {
 
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     cursor: pointer;
+    transition: background-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 #startTaskButton:hover {
+    background-color: #15803d;
+}
+
+#startTaskButton:active,
+#startTaskButton.pressed {
+    transform: translateX(-50%) scale(0.82);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     background-color: #15803d;
 }
 
@@ -263,8 +271,8 @@ body.modal-open #holdInstruction {
     }
 
     #startTaskButton {
-        font-size: 1.8rem;
-        padding: 22px 48px;
+        font-size: 2.1rem;
+        padding: 26px 58px;
     }
 
 }
@@ -584,4 +592,45 @@ body.modal-open #holdInstruction {
 
 .continue-pointer-animate {
     animation: tapContinue 1.5s infinite ease-in-out;
+}
+
+@keyframes buttonPulsePress {
+    0%, 100% {
+        transform: translateX(-50%) scale(1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        background-color: #16a34a;
+    }
+    50% {
+        transform: translateX(-50%) scale(0.82);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        background-color: #15803d;
+    }
+}
+
+#startTaskButton.pulse-pressed {
+    animation: buttonPulsePress 1.5s infinite ease-in-out;
+}
+
+.highlight-instruction {
+    background-color: #fef08a;
+    /* Yellow highlight marker */
+    font-weight: bold;
+    /* Bold text */
+    color: inherit;
+    /* Inherit normal text color */
+    padding: 0 4px;
+    border-radius: 4px;
+}
+
+.hint-pointer {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    font-size: 54px;
+    text-align: center;
+    line-height: 60px;
+    z-index: 3000;
+    pointer-events: none;
+    transition: top 0.2s ease-out, transform 0.2s ease-out, opacity 0.2s ease-out;
+    opacity: 0;
 }

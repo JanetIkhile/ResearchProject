@@ -111,8 +111,8 @@ function startDemoAnimation() {
         holdTarget.style.backgroundColor = "blue";
         holdTarget.style.transform = "translateX(-50%) scale(1)";
 
-        holdInstruction.innerHTML = "Press Start and immediately hold the blue circle with your index finger";
-        startButton.style.transition = "opacity 0.2s ease";
+        holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
+        startButton.style.transition = "opacity 0.2s ease, transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease";
         startButton.style.opacity = "1";
 
         // 2. Fade in and slide to Start button (0.2s)
@@ -130,13 +130,14 @@ function startDemoAnimation() {
             demoPointer.style.transform = "scale(0.85)";
             
             // Simulates start button click visually
-            startButton.style.opacity = "0.2";
+            startButton.classList.add("pressed");
         }, 800));
 
         // 4. Shrink/Press animation release, Start button disappears (1.0s)
         demoTimeouts.push(setTimeout(() => {
             if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
             demoPointer.style.transform = "scale(1)";
+            startButton.classList.remove("pressed");
             startButton.style.opacity = "0";
         }, 1000));
 
@@ -206,12 +207,177 @@ function startDemoAnimation() {
             holdTarget.style.backgroundColor = "blue";
             holdTarget.style.transform = "translateX(-50%) scale(1)";
             startButton.style.opacity = "1";
-            holdInstruction.innerHTML = "Press Start and immediately hold the blue circle with your index finger";
+            holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
         }, 8280));
     }
 
     runAnimationCycle();
     demoInterval = setInterval(runAnimationCycle, 9000);
+}
+
+let hintTimeouts = [];
+function clearHintTimeouts() {
+    hintTimeouts.forEach(t => clearTimeout(t));
+    hintTimeouts = [];
+}
+
+function showStartHint() {
+    // If hint is already visible, don't duplicate
+    if (document.getElementById("startHintPointer")) return;
+
+    const startBtn = document.getElementById("startTaskButton");
+    if (!startBtn || startBtn.style.display === "none" || startBtn.style.opacity === "0") return;
+
+    const hintPointer = document.createElement("div");
+    hintPointer.id = "startHintPointer";
+    hintPointer.innerText = "👆";
+    hintPointer.className = "hint-pointer";
+
+    const rect = startBtn.getBoundingClientRect();
+    const targetLeft = rect.left + rect.width / 2 - 30;
+    const targetTop = rect.top + rect.height / 2;
+
+    // Initial state: 60px below the target, transparent (matching demoPointer initial state)
+    hintPointer.style.left = `${targetLeft}px`;
+    hintPointer.style.top = `${targetTop + 60}px`;
+
+    document.body.appendChild(hintPointer);
+
+    clearHintTimeouts();
+
+    // 1. Fade in and slide to target immediately
+    hintTimeouts.push(setTimeout(() => {
+        hintPointer.style.opacity = "1";
+        hintPointer.style.top = `${targetTop + 15}px`;
+    }, 50));
+
+    // 2. Press 1 (300ms)
+    hintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop}px`;
+        hintPointer.style.transform = "scale(0.85)";
+        startBtn.classList.add("pressed");
+    }, 300));
+
+    // 3. Release 1 (700ms)
+    hintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop + 15}px`;
+        hintPointer.style.transform = "scale(1)";
+        startBtn.classList.remove("pressed");
+    }, 700));
+
+    // 4. Press 2 (1300ms)
+    hintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop}px`;
+        hintPointer.style.transform = "scale(0.85)";
+        startBtn.classList.add("pressed");
+    }, 1300));
+
+    // 5. Release 2 (1700ms)
+    hintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop + 15}px`;
+        hintPointer.style.transform = "scale(1)";
+        startBtn.classList.remove("pressed");
+    }, 1700));
+
+    // 6. Fade out and clean up (2250ms)
+    hintTimeouts.push(setTimeout(() => {
+        hintPointer.style.opacity = "0";
+        hintTimeouts.push(setTimeout(() => {
+            hintPointer.remove();
+            clearHintTimeouts();
+        }, 200));
+    }, 2250));
+}
+
+let holdInactivityTimer = null;
+let holdHintTimeouts = [];
+
+function clearHoldInactivityTimer() {
+    if (holdInactivityTimer) {
+        clearTimeout(holdInactivityTimer);
+        holdInactivityTimer = null;
+    }
+}
+
+function clearHoldHintTimeouts() {
+    holdHintTimeouts.forEach(t => clearTimeout(t));
+    holdHintTimeouts = [];
+}
+
+function removeHoldTargetHint() {
+    const hint = document.getElementById("holdTargetHintPointer");
+    if (hint) hint.remove();
+    clearHoldHintTimeouts();
+    if (holdTarget) {
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
+    }
+}
+
+function showHoldTargetHint() {
+    // If already visible, don't duplicate
+    if (document.getElementById("holdTargetHintPointer")) return;
+    if (!holdTarget) return;
+
+    const hintPointer = document.createElement("div");
+    hintPointer.id = "holdTargetHintPointer";
+    hintPointer.innerText = "👆";
+    hintPointer.className = "hint-pointer";
+
+    const targetRect = holdTarget.getBoundingClientRect();
+    const targetLeft = targetRect.left + targetRect.width / 2 - 30;
+    const targetTop = targetRect.top + targetRect.height / 2;
+
+    // Initial state: 60px below target center, transparent
+    hintPointer.style.left = `${targetLeft}px`;
+    hintPointer.style.top = `${targetTop + 60}px`;
+
+    document.body.appendChild(hintPointer);
+
+    clearHoldHintTimeouts();
+
+    // 1. Fade in and slide to target immediately
+    holdHintTimeouts.push(setTimeout(() => {
+        hintPointer.style.opacity = "1";
+        hintPointer.style.top = `${targetTop + 15}px`;
+    }, 50));
+
+    // 2. Press 1 (300ms)
+    holdHintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop}px`;
+        hintPointer.style.transform = "scale(0.85)";
+        holdTarget.style.transition = "transform 0.15s ease";
+        holdTarget.style.transform = "translateX(-50%) scale(0.92)"; // scale down circle
+    }, 300));
+
+    // 3. Release 1 (700ms)
+    holdHintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop + 15}px`;
+        hintPointer.style.transform = "scale(1)";
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
+    }, 700));
+
+    // 4. Press 2 (1300ms)
+    holdHintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop}px`;
+        hintPointer.style.transform = "scale(0.85)";
+        holdTarget.style.transform = "translateX(-50%) scale(0.92)";
+    }, 1300));
+
+    // 5. Release 2 (1700ms)
+    holdHintTimeouts.push(setTimeout(() => {
+        hintPointer.style.top = `${targetTop + 15}px`;
+        hintPointer.style.transform = "scale(1)";
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
+    }, 1700));
+
+    // 6. Fade out and clean up (2250ms)
+    holdHintTimeouts.push(setTimeout(() => {
+        hintPointer.style.opacity = "0";
+        holdHintTimeouts.push(setTimeout(() => {
+            hintPointer.remove();
+            clearHoldHintTimeouts();
+        }, 200));
+    }, 2250));
 }
 
 function stopDemoAnimation() {
@@ -244,9 +410,11 @@ function stopDemoAnimation() {
     }
     if (startButton) {
         startButton.style.opacity = "1";
+        startButton.classList.remove("pressed");
+        startButton.classList.remove("pulse-pressed");
     }
     if (holdInstruction) {
-        holdInstruction.innerHTML = "Press Start and immediately hold the blue circle with your index finger";
+        holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
     }
 }
 
@@ -358,8 +526,8 @@ let initiationDelay = null;
         return;
     }
 
-    // Disable pointer events until Start clicked
-    holdTarget.style.pointerEvents = 'none';
+    // Disable pointer events until Start clicked (but keep touchable for hint)
+    holdTarget.style.pointerEvents = 'auto';
     holdTarget.style.backgroundColor = "blue";
 
     // Start button listener
@@ -372,6 +540,15 @@ let initiationDelay = null;
             // don't start if we've already finished all trials
             if (taskCompleted || trialCount >= TRIAL_LIMIT) return;
 
+            // Remove hint pointer if active
+            const existingHint = document.getElementById("startHintPointer");
+            if (existingHint) {
+                existingHint.remove();
+            }
+            clearHintTimeouts();
+            startButton.classList.remove("pressed");
+            startButton.classList.remove("pulse-pressed");
+
             const now = Date.now();
             initiationDelay = now - lastTrialEndTime;
             stopDemoAnimation();
@@ -383,7 +560,25 @@ let initiationDelay = null;
         e.preventDefault();
         if (taskCompleted) return;
         if (trialCount >= TRIAL_LIMIT) return;
-        if (!trialActive) return; // won't register touches before Start
+        if (!trialActive) {
+            // User touched the blue circle before clicking "Start"!
+            // Determine if we should show the helper hint
+            let shouldShowHint = false;
+            if (sessionNumber === 1) {
+                // In practice phase: only show after clicking "Start Practice"
+                if (practiceStep === 'waiting_for_touch') {
+                    shouldShowHint = true;
+                }
+            } else {
+                // In main phase: always show if touched before starting
+                shouldShowHint = true;
+            }
+
+            if (shouldShowHint) {
+                showStartHint();
+            }
+            return;
+        }
 
         const touch = e.changedTouches[0];
         stopDemoAnimation();
@@ -515,12 +710,25 @@ function startHoldTrial() {
 
     playBeep(); // cue sound
     // wait for user to touch; HOLD_DURATION applies once holding begins
+
+    // In practice phase: show a helper hint if they don't press the dot within 5 seconds
+    if (sessionNumber === 1) {
+        clearHoldInactivityTimer();
+        holdInactivityTimer = setTimeout(() => {
+            if (trialActive && !isHolding) {
+                showHoldTargetHint();
+            }
+        }, 5000);
+    }
 }
 
 function beginHold(touch) {
     // require that cue already happened
     if (!readyTime) return;
     if (isHolding) return;
+
+    clearHoldInactivityTimer();
+    removeHoldTargetHint();
 
     holdStartTime = Date.now();
     akineticDelay = holdStartTime - readyTime;
@@ -872,19 +1080,22 @@ async function endHold(touch) {
 }
 
 function resetTrial() {
+    clearHoldInactivityTimer();
+    removeHoldTargetHint();
+
     if (holdDisplayInterval) {
         clearInterval(holdDisplayInterval);
         holdDisplayInterval = null;
     }
-    if (holdInstruction) holdInstruction.innerHTML = "Press Start and immediately hold the blue circle with your index finger";
+    if (holdInstruction) holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
     if (pressureGaugeContainer) pressureGaugeContainer.style.display = "none";
     if (holdTarget) {
         holdTarget.style.backgroundColor = "blue";
         holdTarget.style.transform = "translateX(-50%) scale(1)";
     }
     if (startButton) startButton.style.display = "block";
-    // after resetting UI, prevent touches until next Start (user must click Start again)
-    if (holdTarget) holdTarget.style.pointerEvents = 'none';
+    // after resetting UI, allow touches for the Start hint helper
+    if (holdTarget) holdTarget.style.pointerEvents = 'auto';
     trialActive = false;
     readyToRelease = false;
     readyTime = 0;
@@ -896,6 +1107,8 @@ function resetTrial() {
 
 async function maybeFinishSession() {
     if (trialCount >= TRIAL_LIMIT) {
+        clearHoldInactivityTimer();
+        removeHoldTargetHint();
         updateInstructions(false);
         
         // Dim background elements
