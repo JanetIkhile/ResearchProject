@@ -536,7 +536,7 @@ let initiationDelay = null;
         if (sessionNumber === 1) {
             startButton.style.pointerEvents = 'none'; // Lock until Now Try It clicked
         }
-        startButton.addEventListener("click", () => {
+        startButton.addEventListener("pointerdown", (e) => {
             // don't start if we've already finished all trials
             if (taskCompleted || trialCount >= TRIAL_LIMIT) return;
 
