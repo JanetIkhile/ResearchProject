@@ -963,12 +963,7 @@ async function stopPinchTrial() {
     liveDistanceLabel.style.display = "none";
 
     // Keep target circles apart during Stop pinching cooldown (so user doesn't pinch back inward)
-    topTarget.style.transition = "top 0.3s ease-out";
-    topTarget.style.top = `${baselineTopCenterY - 120}px`;
     topTarget.style.opacity = "0.8";
-
-    bottomTarget.style.transition = "top 0.3s ease-out";
-    bottomTarget.style.top = `${baselineBottomCenterY + 120}px`;
     bottomTarget.style.opacity = "0.8";
 
     // Synchronously update screen to disabled transition state at start of stopPinchTrial
