@@ -992,7 +992,7 @@ async function stopPinchTrial() {
             isBetweenTrials = false;
             resetTargetPositions(); // Reset back to center now for the next trial
             instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-            updateInstructions(false);
+            updateInstructions(true, (sessionNumber === 1) ? 5 : 10);
             firstTouchTime = null;
             sessionStorage.setItem("pinch_page_load", String(Date.now()));
         }
