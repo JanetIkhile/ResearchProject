@@ -761,9 +761,21 @@ function updateInstructions(showTimeRemaining, secondsLeft = 10) {
         }
     }
     if (attemptsCounter) {
-        const isDemoPlaying = (sessionNumber === 1 && trialNumber === 0);
+        let showAttempts = false;
+        if (sessionNumber === 1) {
+            // Practice phase: only show once they started practice (waiting for touch) or during trials
+            if ((practiceStep === 'waiting_for_touch' || trialNumber > 0) && !taskCompleted) {
+                showAttempts = true;
+            }
+        } else {
+            // Main phase: show during active session
+            if (!taskCompleted) {
+                showAttempts = true;
+            }
+        }
+
         const displayTrial = taskActive ? trialNumber : Math.min(trialNumber + 1, TRIAL_LIMIT);
-        if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoPlaying) {
+        if (showAttempts && displayTrial <= TRIAL_LIMIT) {
             attemptsCounter.style.display = "block";
             attemptsCounter.innerText = `${displayTrial} of ${TRIAL_LIMIT}`;
         } else {
