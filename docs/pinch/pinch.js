@@ -19,6 +19,7 @@ let trajectory = []; // list of { t, x_index, y_index, x_thumb, y_thumb, distanc
 let initiationDelay = null;
 let firstTouchTime = null;
 let isBetweenTrials = false;
+let transitionStartDistance = 0;
 let warningTimeout = null;
 let indexTouchId = null;
 let thumbTouchId = null;
@@ -421,6 +422,18 @@ function handleTouch(e) {
 
     // If modal is open or task is completed, do nothing
     if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive) || isBetweenTrials) {
+        if (isBetweenTrials && sessionNumber === 1 && e.touches.length === 2) {
+            const t1 = e.touches[0];
+            const t2 = e.touches[1];
+            const dx = t1.clientX - t2.clientX;
+            const dy = t1.clientY - t2.clientY;
+            const distPx = Math.sqrt(dx * dx + dy * dy);
+
+            // If the user pinches inward (distance decreases below their end-of-trial pinch distance minus a tolerance)
+            if (transitionStartDistance > 0 && distPx < transitionStartDistance - 25) {
+                instructionEl.innerHTML = 'Stop pinching.<br><span style="font-size: 1.4rem; font-weight: normal; color: #dc2626;">No need to pinch back in. Please release your fingers.</span>';
+            }
+        }
         e.preventDefault();
         return;
     }
@@ -968,6 +981,7 @@ async function stopPinchTrial() {
 
     // Synchronously update screen to disabled transition state at start of stopPinchTrial
     isBetweenTrials = true;
+    transitionStartDistance = maxStrokeDistance;
     instructionEl.textContent = "Stop pinching";
     instructionEl.style.display = "block";
     if (timerLine) timerLine.style.display = "none";
