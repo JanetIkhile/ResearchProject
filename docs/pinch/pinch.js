@@ -422,18 +422,6 @@ function handleTouch(e) {
 
     // If modal is open or task is completed, do nothing
     if (window.isModalOpen || (trialNumber >= TRIAL_LIMIT && !taskActive) || isBetweenTrials) {
-        if (isBetweenTrials && sessionNumber === 1 && e.touches.length === 2) {
-            const t1 = e.touches[0];
-            const t2 = e.touches[1];
-            const dx = t1.clientX - t2.clientX;
-            const dy = t1.clientY - t2.clientY;
-            const distPx = Math.sqrt(dx * dx + dy * dy);
-
-            // If the user pinches inward (distance decreases below their end-of-trial pinch distance minus a tolerance)
-            if (transitionStartDistance > 0 && distPx < transitionStartDistance - 25) {
-                instructionEl.innerHTML = 'Stop pinching.<br><span style="font-size: 1.4rem; font-weight: normal; color: #dc2626;">No need to pinch back in. Please release your fingers.</span>';
-            }
-        }
         e.preventDefault();
         return;
     }
@@ -586,6 +574,13 @@ function handleTouch(e) {
             // Check if this is the start of a stroke (maxStrokeDistance is 0 or uninitialized)
             if (maxStrokeDistance === 0) {
                 maxStrokeDistance = distPx;
+            }
+
+            // In the practice phase, if they try to pinch back in during the active trial, show the warning modal
+            if (sessionNumber === 1 && taskActive && distPx < maxStrokeDistance - 25) {
+                showPinchInwardWarningModal();
+                e.preventDefault();
+                return;
             }
 
             // Lock circles to monotonically non-decreasing distance during active pinching
@@ -1130,3 +1125,98 @@ document.addEventListener('gesturechange', function(e) {
 document.addEventListener('gestureend', function(e) {
     e.preventDefault();
 }, { passive: false });
+
+function showPinchInwardWarningModal() {
+    if (document.getElementById("pinchInwardModal")) return;
+
+    // Pause/reset active trial state
+    taskActive = false;
+    clearInterval(countdownTimer);
+    if (timerLine) timerLine.style.display = "none";
+
+    window.isModalOpen = true;
+
+    const modalDiv = document.createElement("div");
+    modalDiv.id = "pinchInwardModal";
+    modalDiv.style.position = "fixed";
+    modalDiv.style.top = "0";
+    modalDiv.style.left = "0";
+    modalDiv.style.width = "100%";
+    modalDiv.style.height = "100%";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.display = "flex";
+    modalDiv.style.justifyContent = "center";
+    modalDiv.style.alignItems = "center";
+    modalDiv.style.zIndex = "9999";
+
+    // Prevent touch propagation
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+        modalDiv.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    const contentDiv = document.createElement("div");
+    contentDiv.style.backgroundColor = "white";
+    contentDiv.style.padding = "32px 40px";
+    contentDiv.style.borderRadius = "16px";
+    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
+    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.width = "85%";
+    contentDiv.style.textAlign = "center";
+    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+
+    const title = document.createElement("h3");
+    title.innerText = "⚠️ Pinch Outward Only";
+    title.style.margin = "0 0 16px 0";
+    title.style.color = "#ea580c";
+    title.style.fontSize = "26px";
+
+    const msg = document.createElement("p");
+    msg.innerText = "You only need to pinch out. There is no need to pinch back in.";
+    msg.style.margin = "0 0 24px 0";
+    msg.style.fontSize = "19px";
+    msg.style.lineHeight = "1.6";
+    msg.style.color = "#374151";
+
+    const btn = document.createElement("button");
+    btn.innerText = "Okay";
+    btn.style.backgroundColor = "#003366";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "14px 28px";
+    btn.style.fontSize = "18px";
+    btn.style.fontWeight = "bold";
+    btn.style.borderRadius = "8px";
+    btn.style.cursor = "pointer";
+    btn.style.width = "100%";
+
+    btn.addEventListener("click", () => {
+        modalDiv.remove();
+        window.isModalOpen = false;
+        resetTrialForPinchInward();
+    });
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(msg);
+    contentDiv.appendChild(btn);
+    modalDiv.appendChild(contentDiv);
+    document.body.appendChild(modalDiv);
+}
+
+function resetTrialForPinchInward() {
+    taskActive = false;
+    isBetweenTrials = false;
+    requiresReset = false;
+    firstTouchTime = null;
+    maxStrokeDistance = 0;
+    resetTargetPositions();
+    
+    // Decrement trialNumber so this attempt is retried
+    if (trialNumber > 0) {
+        trialNumber -= 1;
+    }
+    
+    updateInstructions(false);
+    sessionStorage.setItem("pinch_page_load", String(Date.now()));
+}
