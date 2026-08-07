@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 .dot {
     background-color: black;
     width: 2.5rem;
@@ -21,7 +19,7 @@
 body {
     margin: 0;
     background-color: gray;
-    font-family: 'Inter', sans-serif;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 #startPoint {
@@ -66,7 +64,7 @@ body {
 }
 
 .label {
-    font-family: 'Inter', sans-serif;
+    font-family: Arial, sans-serif;
     font-size: 16px;
     color: black;
     position: absolute;
