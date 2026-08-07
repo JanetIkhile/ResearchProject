@@ -11,10 +11,57 @@ const loginBtn = document.getElementById("loginBtn");
 const errorEl = document.getElementById("error");
 let allParticipants = [];
 
+function showPointerOnButton(btn) {
+    if (document.getElementById("continuePointer")) return;
+    const rect = btn.getBoundingClientRect();
+    const pointer = document.createElement("div");
+    pointer.id = "continuePointer";
+    pointer.className = "hint-pointer continue-pointer-animate";
+    pointer.innerText = "👆";
+    pointer.style.position = "absolute";
+    pointer.style.left = `${rect.left + rect.width / 2 - 30}px`;
+    pointer.style.top = `${rect.top + rect.height / 2 + 15}px`;
+    document.body.appendChild(pointer);
+}
+
+function removePointer() {
+    const pointer = document.getElementById("continuePointer");
+    if (pointer) {
+        pointer.remove();
+    }
+}
+
+function checkAllFieldsFilled() {
+    const username = participantInput.value.trim();
+    const identity = document.querySelector('input[name="identity"]:checked');
+    const dominantArm = document.querySelector('input[name="dominant_arm"]:checked');
+    const loginBtn = document.getElementById("loginBtn");
+
+    if (username && identity && dominantArm) {
+        showPointerOnButton(loginBtn);
+    } else {
+        removePointer();
+    }
+}
+
+function updateFilledStatus() {
+    const val = participantInput.value.trim();
+    const lockBadge = document.getElementById("lockBadge");
+    if (val) {
+        participantInput.classList.add("is-filled");
+        if (lockBadge) lockBadge.style.display = "block";
+    } else {
+        participantInput.classList.remove("is-filled");
+        if (lockBadge) lockBadge.style.display = "none";
+    }
+    checkAllFieldsFilled();
+}
+
 // -----------------------------
 // INIT
 // -----------------------------
 populateParticipants();
+updateFilledStatus();
 
 // -----------------------------
 // Populate dropdown + disable completed
@@ -84,12 +131,18 @@ async function populateParticipants() {
         participantInput.addEventListener("input", (e) => {
             participantDropdown.style.display = "block";
             renderDropdown(e.target.value);
+            updateFilledStatus();
         });
 
         document.addEventListener("click", (e) => {
             if (!participantInput.contains(e.target) && !participantDropdown.contains(e.target)) {
                 participantDropdown.style.display = "none";
             }
+        });
+
+        // Listen to radio changes to trigger pointer checks
+        document.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.addEventListener("change", checkAllFieldsFilled);
         });
 
     } catch (err) {
@@ -118,6 +171,7 @@ function renderDropdown(filterText = "") {
         div.onclick = () => {
             participantInput.value = opt.code;
             participantDropdown.style.display = "none";
+            updateFilledStatus();
         };
         participantDropdown.appendChild(div);
     });

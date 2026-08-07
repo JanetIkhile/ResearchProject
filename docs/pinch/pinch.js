@@ -45,7 +45,95 @@ let gifTimer = null;
 let continueInactivityTimer = null;
 let practiceStep = 'initial_demo'; // initial_demo -> try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
 
-const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles. Open your fingers apart <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible, then lift both fingers and repeat";
+const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles.<br>Open them <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.<br>Then lift both fingers and repeat.";
+
+function showPinchPracticeErrorModal(message) {
+    if (sessionNumber !== 1) return; // Only in practice phase
+    if (document.getElementById("practiceErrorModal")) return;
+
+    // Abort active trial if active
+    if (taskActive) {
+        clearInterval(countdownTimer);
+        taskActive = false;
+        trialNumber--; // decrement so they repeat this trial
+        
+        // Reset target positions back to default baseline
+        resetTargetPositions();
+        
+        // Reset screen state
+        if (liveDistanceLabel) liveDistanceLabel.style.display = "none";
+        
+        updateInstructions(true, (sessionNumber === 1) ? 5 : 10);
+    }
+
+    const modalDiv = document.createElement("div");
+    modalDiv.id = "practiceErrorModal";
+    modalDiv.style.position = "fixed";
+    modalDiv.style.top = "0";
+    modalDiv.style.left = "0";
+    modalDiv.style.width = "100%";
+    modalDiv.style.height = "100%";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.display = "flex";
+    modalDiv.style.justifyContent = "center";
+    modalDiv.style.alignItems = "center";
+    modalDiv.style.zIndex = "9999";
+
+    // Stop all touch and click events from bubbling up to document background
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+        modalDiv.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    const contentDiv = document.createElement("div");
+    contentDiv.style.backgroundColor = "white";
+    contentDiv.style.padding = "32px 40px";
+    contentDiv.style.borderRadius = "16px";
+    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
+    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.width = "85%";
+    contentDiv.style.textAlign = "center";
+    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+
+    const title = document.createElement("h3");
+    title.innerText = "⚠️ Practice Tip";
+    title.style.margin = "0 0 16px 0";
+    title.style.color = "#ea580c";
+    title.style.fontSize = "26px";
+
+    const msg = document.createElement("p");
+    msg.innerText = message;
+    msg.style.margin = "0 0 24px 0";
+    msg.style.fontSize = "19px";
+    msg.style.lineHeight = "1.6";
+    msg.style.color = "#374151";
+
+    const btn = document.createElement("button");
+    btn.innerText = "Okay";
+    btn.style.backgroundColor = "#003366";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "14px 28px";
+    btn.style.fontSize = "18px";
+    btn.style.fontWeight = "bold";
+    btn.style.borderRadius = "8px";
+    btn.style.cursor = "pointer";
+    btn.style.width = "100%";
+
+    btn.addEventListener("click", () => {
+        modalDiv.remove();
+        // Allow restarting
+        firstTouchTime = null;
+        sessionStorage.setItem("pinch_page_load", String(Date.now()));
+    });
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(msg);
+    contentDiv.appendChild(btn);
+    modalDiv.appendChild(contentDiv);
+    document.body.appendChild(modalDiv);
+}
 
 // DOM Elements
 const topTarget = document.getElementById("topTarget");
@@ -64,7 +152,7 @@ const PX_TO_MM = 25.4 / 96.0;
 async function startSession() {
     try {
         const sessionData = await initSession({ dashboardPath: "../dashboard/dashboard.html" });
-        sessionNumber = sessionData.sessionNumber;
+        sessionNumber = (sessionStorage.getItem("session_type") === "practice") ? 1 : sessionData.sessionNumber;
         participantId = sessionData.participantId;
         sessionId = sessionData.sessionId;
         sessionType = sessionStorage.getItem("session_type") || "main";
@@ -573,6 +661,21 @@ function handleTouch(e) {
             // Check if this is the start of a stroke (maxStrokeDistance is 0 or uninitialized)
             if (maxStrokeDistance === 0) {
                 maxStrokeDistance = distPx;
+            }
+
+            // Practice phase validations
+            if (sessionNumber === 1) {
+                // 1) Pinch in check (with 15px tolerance)
+                if (distPx < maxStrokeDistance - 15) {
+                    showPinchPracticeErrorModal("Please do not bring your fingers back together.");
+                    return;
+                }
+                // 2) Orientation change check (allow generous deviation from vertical line)
+                const isAcceptablyVertical = Math.abs(dy) * 2 > Math.abs(dx);
+                if (!isAcceptablyVertical) {
+                    showPinchPracticeErrorModal("Please keep your fingers vertical while pinching out.");
+                    return;
+                }
             }
 
             // Lock circles to monotonically non-decreasing distance during active pinching

@@ -33,6 +33,102 @@ let gifTimer = null;
 let continueInactivityTimer = null;
 let demoPointer = null;
 
+function showTapPracticeErrorModal(message) {
+    if (sessionNumber !== 1) return; // Only in practice phase
+    if (document.getElementById("practiceErrorModal")) return;
+
+    // Abort active trial if active
+    if (taskActive) {
+        clearTimers();
+        taskActive = false;
+        isBetweenTrials = true;
+        trialNumber--; // decrement so they repeat this trial
+
+        // Reset targets back to default initial state (top active, bottom inactive)
+        expectedTarget = "top";
+        if (topTarget) {
+            topTarget.classList.remove("inactive");
+            topTarget.classList.add("active");
+            topTarget.style.pointerEvents = 'auto';
+        }
+        if (bottomTarget) {
+            bottomTarget.classList.remove("active");
+            bottomTarget.classList.add("inactive");
+            bottomTarget.style.pointerEvents = 'auto';
+        }
+
+        updateInstructions(false);
+    }
+
+    const modalDiv = document.createElement("div");
+    modalDiv.id = "practiceErrorModal";
+    modalDiv.style.position = "fixed";
+    modalDiv.style.top = "0";
+    modalDiv.style.left = "0";
+    modalDiv.style.width = "100%";
+    modalDiv.style.height = "100%";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.display = "flex";
+    modalDiv.style.justifyContent = "center";
+    modalDiv.style.alignItems = "center";
+    modalDiv.style.zIndex = "9999";
+
+    // Stop all touch and click events from bubbling up to document background
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+        modalDiv.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    const contentDiv = document.createElement("div");
+    contentDiv.style.backgroundColor = "white";
+    contentDiv.style.padding = "32px 40px";
+    contentDiv.style.borderRadius = "16px";
+    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
+    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.width = "85%";
+    contentDiv.style.textAlign = "center";
+    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+
+    const title = document.createElement("h3");
+    title.innerText = "⚠️ Practice Tip";
+    title.style.margin = "0 0 16px 0";
+    title.style.color = "#ea580c";
+    title.style.fontSize = "26px";
+
+    const msg = document.createElement("p");
+    msg.innerText = message;
+    msg.style.margin = "0 0 24px 0";
+    msg.style.fontSize = "19px";
+    msg.style.lineHeight = "1.6";
+    msg.style.color = "#374151";
+
+    const btn = document.createElement("button");
+    btn.innerText = "Okay";
+    btn.style.backgroundColor = "#003366";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "14px 28px";
+    btn.style.fontSize = "18px";
+    btn.style.fontWeight = "bold";
+    btn.style.borderRadius = "8px";
+    btn.style.cursor = "pointer";
+    btn.style.width = "100%";
+
+    btn.addEventListener("click", () => {
+        modalDiv.remove();
+        // Allow restarting
+        isBetweenTrials = true;
+        lastTrialEndTime = Date.now();
+    });
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(msg);
+    contentDiv.appendChild(btn);
+    modalDiv.appendChild(contentDiv);
+    document.body.appendChild(modalDiv);
+}
+
 
 let trialStartTime = null;
 
@@ -392,7 +488,16 @@ function handleTouchStart(e) {
 
     // If we're BETWEEN trials, a touch starts the trial ONLY if it hits one of the targets
     if (!taskActive && isBetweenTrials) {
-        if (!isInsideTop && !isInsideBottom) return; // Must hit target to start
+        if (!isInsideTop && !isInsideBottom) {
+            showTapPracticeErrorModal("Please tap inside the blue circle.");
+            return; // Must hit target to start
+        }
+
+        // For practice phase, they MUST start by tapping the highlighted blue circle (topTarget)
+        if (sessionNumber === 1 && !isInsideTop) {
+            showTapPracticeErrorModal("Please tap the highlighted blue circle.");
+            return; // Must hit correct target to start in practice
+        }
         if (trialNumber >= TRIAL_LIMIT) return;
 
         // prevent race double-starts
@@ -430,6 +535,12 @@ function handleTouchStart(e) {
 
         if (isHit) {
             toggleExpectedTarget();
+        } else {
+            if (isInsideTop || isInsideBottom) {
+                showTapPracticeErrorModal("Please tap the highlighted blue circle.");
+            } else {
+                showTapPracticeErrorModal("Please tap inside the blue circles.");
+            }
         }
     }
 }
@@ -449,7 +560,7 @@ function updateInstructions(showTimeRemaining, secondsLeft) {
     }
 
     if (attemptsCounter) {
-        const isDemoPlaying = (sessionNumber === 1 && trialNumber === 0);
+        const isDemoPlaying = (sessionNumber === 1 && (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'options_shown'));
         const displayTrial = taskActive ? trialNumber : Math.min(trialNumber + 1, TRIAL_LIMIT);
         if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoPlaying) {
             attemptsCounter.style.display = "block";
@@ -473,7 +584,7 @@ function updateInstructions(showTimeRemaining, secondsLeft) {
         sessionId = result.sessionId;
         console.log("Session verified:", sessionId, result.sessionRow);
 
-        sessionNumber = result.sessionNumber;
+        sessionNumber = (sessionStorage.getItem("session_type") === "practice") ? 1 : result.sessionNumber;
 
         const header = document.getElementById("taskHeader");
         if (header) {
@@ -1021,16 +1132,16 @@ function initProgressiveDisclosure() {
 }
 
 // Programmatic zoom and multi-touch prevention
-document.addEventListener('gesturestart', function(e) {
+document.addEventListener('gesturestart', function (e) {
     e.preventDefault();
 }, { passive: false });
-document.addEventListener('gesturechange', function(e) {
+document.addEventListener('gesturechange', function (e) {
     e.preventDefault();
 }, { passive: false });
-document.addEventListener('gestureend', function(e) {
+document.addEventListener('gestureend', function (e) {
     e.preventDefault();
 }, { passive: false });
-document.addEventListener('touchstart', function(e) {
+document.addEventListener('touchstart', function (e) {
     if (e.touches.length > 1) {
         e.preventDefault();
     }

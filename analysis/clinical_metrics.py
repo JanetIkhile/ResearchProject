@@ -650,11 +650,17 @@ def extract_features_from_trial(row):
                 user_axis = end_pt - start_center
                 projection = np.dot(user_axis, task_axis) / task_mag
                 endpoint_abs_deviation_error = projection - task_mag  # + is Overshoot, - is Undershoot
+                drag_terminal_overshoot_px = endpoint_abs_deviation_error if endpoint_abs_deviation_error > 0 else 0.0
+                drag_terminal_undershoot_px = -endpoint_abs_deviation_error if endpoint_abs_deviation_error < 0 else 0.0
             else:
                 endpoint_abs_deviation_error = np.nan
+                drag_terminal_overshoot_px = np.nan
+                drag_terminal_undershoot_px = np.nan
         else:
             endpoint_deviation_error = np.nan
             endpoint_abs_deviation_error = np.nan
+            drag_terminal_overshoot_px = np.nan
+            drag_terminal_undershoot_px = np.nan
             target_reached = np.nan
 
         return pd.Series({
@@ -688,6 +694,8 @@ def extract_features_from_trial(row):
             'initial_targeting_error': initial_targeting_error,
             'endpoint_deviation_error': endpoint_deviation_error,
             'endpoint_abs_deviation_error': endpoint_abs_deviation_error,
+            'drag_terminal_overshoot_px': drag_terminal_overshoot_px,
+            'drag_terminal_undershoot_px': drag_terminal_undershoot_px,
             'target_reached': target_reached,
             'mean_speed': mean_speed,
             'median_speed': median_speed,
@@ -712,6 +720,19 @@ def extract_features_from_trial(row):
     elif task == 'tap':
         taps = row.get('taps', [])
         if not isinstance(taps, list) or len(taps) == 0:
+            return pd.Series({'tap_count': 0})
+            
+        # Debounce double-trigger taps (interval < 100ms)
+        filtered_taps = []
+        last_t = -9999.0
+        for pt in taps:
+            if 't' in pt and pt['t'] is not None:
+                if pt['t'] - last_t >= 100.0:  # 100ms human physical limit
+                    filtered_taps.append(pt)
+                    last_t = pt['t']
+        taps = filtered_taps
+        
+        if len(taps) == 0:
             return pd.Series({'tap_count': 0})
             
         times = np.array([pt['t'] for pt in taps])
@@ -799,6 +820,8 @@ def extract_features_from_trial(row):
         halts_duration = 0.0
         # 3. Hesitations & Halts (Dynamic rhythm-based, relative to subject's own median)
         med_intertap = np.median(intertap) if len(intertap) > 0 else np.nan
+        max_intertap = np.max(intertap) if len(intertap) > 0 else np.nan
+        tap_halt_ratio = med_intertap / max_intertap if (pd.notna(med_intertap) and max_intertap > 0) else np.nan
         if len(intertap) > 0 and pd.notna(med_intertap) and med_intertap > 0:
             for iti in intertap:
                 if iti > 2.0 * med_intertap:
@@ -860,6 +883,7 @@ def extract_features_from_trial(row):
             'hesitations_duration_ms': hesitations_duration,
             'halts_count': halts,
             'halts_duration_ms': halts_duration,
+            'tap_halt_ratio': tap_halt_ratio,
             'double_taps_count': double_taps,
             'interruptions_count': interruptions,
             'tap_tremor_frequency_hz': k_freq,
@@ -1017,20 +1041,26 @@ def extract_features_from_trial(row):
         cv_interval = (np.std(cycle_intervals) / mean_interval) if mean_interval > 0 else np.nan
         median_amplitude = np.median(cycle_amplitudes) if len(cycle_amplitudes) > 0 else np.nan
         
-        # Decrement
-        if len(cycle_amplitudes) > 1:
-            amplitude_slope = np.polyfit(np.arange(len(cycle_amplitudes)), cycle_amplitudes, 1)[0]
+        # Peak opening distances (amplitude of fingers being apart)
+        peak_distances_px = [distances_smooth[p] for p in peaks] if len(peaks) > 0 else []
+        peak_distances_mm = [d * (25.4 / 96.0) for d in peak_distances_px]
+        pinch_max_opening_distance_mm = np.max(peak_distances_mm) if len(peak_distances_mm) > 0 else np.nan
+        pinch_median_opening_distance_mm = np.median(peak_distances_mm) if len(peak_distances_mm) > 0 else np.nan
+        
+        # Decrement (using peak opening distances in mm)
+        if len(peak_distances_mm) > 1:
+            opening_distance_slope = np.polyfit(np.arange(len(peak_distances_mm)), peak_distances_mm, 1)[0]
         else:
-            amplitude_slope = 0.0
+            opening_distance_slope = 0.0
             
-        if len(cycle_amplitudes) >= 6:
-            first_3 = np.median(cycle_amplitudes[:3])
-            last_3 = np.median(cycle_amplitudes[-3:])
-            amplitude_decrement_ratio = last_3 / first_3 if first_3 > 0 else np.nan
-        elif len(cycle_amplitudes) >= 2:
-            amplitude_decrement_ratio = cycle_amplitudes[-1] / cycle_amplitudes[0] if cycle_amplitudes[0] > 0 else np.nan
+        if len(peak_distances_mm) >= 6:
+            first_3 = np.median(peak_distances_mm[:3])
+            last_3 = np.median(peak_distances_mm[-3:])
+            opening_distance_decrement_ratio = last_3 / first_3 if first_3 > 0 else np.nan
+        elif len(peak_distances_mm) >= 2:
+            opening_distance_decrement_ratio = peak_distances_mm[-1] / peak_distances_mm[0] if peak_distances_mm[0] > 0 else np.nan
         else:
-            amplitude_decrement_ratio = np.nan
+            opening_distance_decrement_ratio = np.nan
 
         # Speed Decrement (progressive inter-cycle slowing)
         if len(cycle_intervals) > 1:
@@ -1109,9 +1139,10 @@ def extract_features_from_trial(row):
             'cv_pinch_interval': cv_interval,
             'median_pinch_amplitude_px': median_amplitude,
             'median_pinch_amplitude_mm': median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan,
-            'pinch_amplitude_slope': amplitude_slope,
-            'pinch_amplitude_slope_mm': amplitude_slope * (25.4 / 96.0) if pd.notna(amplitude_slope) else np.nan,
-            'pinch_amplitude_decrement_ratio': amplitude_decrement_ratio,
+            'pinch_max_opening_distance_mm': pinch_max_opening_distance_mm,
+            'pinch_median_opening_distance_mm': pinch_median_opening_distance_mm,
+            'pinch_opening_distance_slope_mm': opening_distance_slope,
+            'pinch_opening_distance_decrement_ratio': opening_distance_decrement_ratio,
             'pinch_speed_slope': pinch_speed_slope,
             'pinch_speed_decrement_ratio': pinch_speed_decrement_ratio,
             'pinch_hesitations_count': hesitations,
@@ -1127,7 +1158,7 @@ def extract_features_from_trial(row):
             'pinch_median_opening_speed_mm_s': median_opening_speed_mm,
             'pinch_max_opening_velocity_mm_s': max_opening_velocity_mm,
             'initiation_delay': row.get('initiation_delay', 0),
-            'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, 0, hesitations, median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan, is_pinch=True)
+            'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, opening_distance_decrement_ratio, halts, 0, hesitations, pinch_median_opening_distance_mm, is_pinch=True)
         })
         
     return pd.Series(dtype=float)

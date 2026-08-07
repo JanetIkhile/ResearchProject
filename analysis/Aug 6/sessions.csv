@@ -1,0 +1,3 @@
+id,participant_id,started_at,drag_completed,tap_completed,hold_completed,completed,completed_at,device_info,notes,session_type
+05ab333b-5b28-46b3-a4d0-fcd6dd860eeb,cd927a3f-7d55-4686-bb63-48013c7bf84d,2026-08-06 17:35:18.275+00,true,true,true,true,2026-08-06 17:37:52.075+00,,,main
+c40667d4-242c-4b7a-8e3a-c24b72279e1e,cd927a3f-7d55-4686-bb63-48013c7bf84d,2026-08-06 17:32:23.699+00,true,true,true,true,2026-08-06 17:35:12.801+00,,,practice

@@ -33,7 +33,7 @@ let continueInactivityTimer = null;
         participantId = result.participantId;
         sessionId = result.sessionId;
 
-        sessionNumber = result.sessionNumber;
+        sessionNumber = (sessionStorage.getItem("session_type") === "practice") ? 1 : result.sessionNumber;
         const header = document.getElementById("taskHeader");
 
         if (header) {

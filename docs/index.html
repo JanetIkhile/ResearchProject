@@ -49,15 +49,24 @@
             padding: 18px;
             font-size: clamp(1.2rem, 2vw, 1.6rem);
             border-radius: 12px;
-            border: none;
+            border: 2px solid transparent;
             background: #f3f4f6;
             box-sizing: border-box;
             transition: 0.2s;
         }
 
         select:focus, input[type="text"]:focus {
-            outline: 2px solid #16a34a;
+            outline: none;
+            border-color: #16a34a;
             background: #e5e7eb;
+        }
+
+        input[type="text"].is-filled {
+            background-color: #f0fdf4 !important;
+            border-color: #16a34a !important;
+            color: #166534 !important;
+            font-weight: bold;
+            padding-right: 110px; /* Make room for the lock badge */
         }
 
         .custom-dropdown {
@@ -97,6 +106,7 @@
             margin-bottom: 12px;
             border-radius: 12px;
             background: #f3f4f6;
+            border: 2px solid transparent;
             cursor: pointer;
 
             font-size: clamp(1.2rem, 2vw, 1.6rem);
@@ -111,8 +121,13 @@
             background: #e5e7eb;
         }
 
-        .option-card input:checked+span {
-            color: #16a34a;
+        .option-card:has(input:checked) {
+            border-color: #16a34a !important;
+            background-color: #f0fdf4 !important;
+        }
+
+        .option-card:has(input:checked) span {
+            color: #166534 !important;
             font-weight: bold;
         }
 
@@ -152,6 +167,39 @@
                 width: 100%;
             }
         }
+
+        .continue-pointer-animate {
+            animation: tapContinue 2s infinite ease-in-out;
+        }
+
+        .hint-pointer {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            font-size: 54px;
+            text-align: center;
+            line-height: 60px;
+            z-index: 3000;
+            pointer-events: none;
+        }
+
+        @keyframes tapContinue {
+            0% {
+                transform: translateY(0) scale(1);
+            }
+            40% {
+                transform: translateY(-32px) scale(1);
+            }
+            50% {
+                transform: translateY(-28px) scale(0.8);
+            }
+            60% {
+                transform: translateY(-32px) scale(1);
+            }
+            100% {
+                transform: translateY(0) scale(1);
+            }
+        }
     </style>
 </head>
 
@@ -163,8 +211,11 @@
         <!-- Participant -->
         <div class="form-group" style="position: relative;">
             <p class="question">Participant ID</p>
-            <input type="text" id="username" placeholder="Type or select ID (e.g. P01)" autocomplete="off">
-            <div id="participantDropdown" class="custom-dropdown"></div>
+            <div style="position: relative; display: flex; align-items: center;">
+                <input type="text" id="username" placeholder="Type or select ID (e.g. P01)" autocomplete="off">
+                <span id="lockBadge" style="display: none; position: absolute; right: 15px; color: #16a34a; font-weight: bold; font-size: clamp(1rem, 2vw, 1.3rem); pointer-events: none;">✅ Entered</span>
+            </div>
+            <div id="participantDropdown" class="custom-dropdown" style="position: absolute;"></div>
         </div>
 
         <!-- Identity -->

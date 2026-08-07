@@ -48,8 +48,10 @@ body {
 .instruction-container {
     position: absolute;
     top: 140px;
-    width: 90%;
-    left: 5%;
+    width: fit-content;
+    max-width: 90%;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -60,11 +62,13 @@ body {
 
 #pinchInstruction {
     margin: 0;
-    font-size: clamp(1.4rem, 5.0vw, 2.1rem);
+    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
     font-weight: 600;
     color: #111;
     /* Match dark instruction text of other tasks */
     line-height: 1.4;
+    white-space: nowrap; /* Forces each sentence to be exactly one line */
+    text-align: left; /* Left align sentences relative to each other */
 }
 
 #countdownTimer {
@@ -96,8 +100,8 @@ body {
     border-radius: 50%;
     background-color: transparent;
     /* Outlined guide, transparent center */
-    border: 3.5px dashed rgba(255, 255, 255, 0.85);
-    /* Dashed soft white border placement guide */
+    border: 3.5px dashed rgba(0, 0, 0, 0.85);
+    /* Dashed black border placement guide */
     opacity: 0.8;
     touch-action: none;
     z-index: 3;
@@ -272,7 +276,7 @@ body {
 
 @media (min-width: 600px) {
     #pinchInstruction {
-        font-size: clamp(1.6rem, 4.0vw, 2.3rem);
+        font-size: 1.7rem;
     }
 
     .session-label {

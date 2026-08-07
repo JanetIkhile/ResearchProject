@@ -22,26 +22,39 @@
       align-items: center;
       height: 100vh;
       margin: 0;
-      text-align: center;
+    }
+
+    .dashboard-content {
+      width: fit-content;
+      max-width: 90%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
     }
 
     h1 {
-      font-size: 2em;
-      margin-bottom: 0.3em;
+      font-size: 2.2em;
+      margin-bottom: 0.5em;
       color: #003366;
+      margin-top: 0;
+      white-space: nowrap;
     }
 
-    p {
-      color: #444;
-      max-width: 420px;
-      margin-bottom: 2em;
+    #instructionText {
+      font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      white-space: nowrap; /* Forces each sentence to be exactly one line */
     }
 
     .task-buttons {
       display: flex;
       flex-direction: column;
       gap: 15px;
-      width: clamp(260px, 40vw, 420px);
+      width: clamp(200px, 30vw, 280px);
+      margin-top: 1.2em;
     }
 
     .task-btn {
@@ -49,7 +62,7 @@
       border: none;
       color: white;
       font-size: clamp(1.3rem, 3vw, 1.8rem);
-      padding: clamp(16px, 3vw, 28px);
+      padding: clamp(16px, 3vw, 24px);
       font-weight: bold;
       border-radius: 12px;
       cursor: pointer;
@@ -68,16 +81,42 @@
       opacity: 0.7;
     }
 
-    #instructionText {
-      font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-      max-width: 700px;
-      margin: 0 auto 16px;
-      line-height: 1.4;
-    }
-
     .highlight {
       color: #dc2626;
       font-weight: bold;
+    }
+
+    .continue-pointer-animate {
+      animation: tapContinue 2s infinite ease-in-out;
+    }
+
+    .hint-pointer {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      font-size: 54px;
+      text-align: center;
+      line-height: 60px;
+      z-index: 3000;
+      pointer-events: none;
+    }
+
+    @keyframes tapContinue {
+      0% {
+        transform: translateY(0) scale(1);
+      }
+      40% {
+        transform: translateY(-32px) scale(1);
+      }
+      50% {
+        transform: translateY(-28px) scale(0.8);
+      }
+      60% {
+        transform: translateY(-32px) scale(1);
+      }
+      100% {
+        transform: translateY(0) scale(1);
+      }
     }
 
     @media (min-width: 600px) {
@@ -96,10 +135,12 @@
 </head>
 
 <body>
-  <h1>Motor Performance Assessment</h1>
-  <p id="instructionText"></p>
-  <div class="task-buttons">
-    <button id="startBtn" class="task-btn">Begin Tasks</button>
+  <div class="dashboard-content">
+    <h1>Motor Performance Tasks</h1>
+    <p id="instructionText"></p>
+    <div class="task-buttons">
+      <button id="startBtn" class="task-btn">Begin Tasks</button>
+    </div>
   </div>
 
   <script>

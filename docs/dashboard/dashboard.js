@@ -79,12 +79,32 @@ const startBtn = document.getElementById("startBtn");
 
     // Set instruction dynamically
     instructionEl.innerHTML =
-        `This assessment includes four short motor tasks. Use your <span class="highlight">${dominantArm || 'dominant'} hand</span> throughout the assessment. Follow the instructions for each task.`;
+        `Complete four short motor tasks.<br>` +
+        `Use your <span class="highlight">${dominantArm || 'dominant'} hand</span> throughout.<br>` +
+        `Follow the instructions for each task.`;
+
+    // Show animated helper hand pointing to the button after 5 seconds of inactivity
+    const pointerTimeout = setTimeout(() => {
+        if (!startBtn || startBtn.style.display === "none" || startBtn.disabled) return;
+        const rect = startBtn.getBoundingClientRect();
+        
+        const pointer = document.createElement("div");
+        pointer.id = "continuePointer";
+        pointer.className = "hint-pointer continue-pointer-animate";
+        pointer.innerText = "👆";
+        pointer.style.left = `${rect.left + rect.width / 2 - 30}px`;
+        pointer.style.top = `${rect.top + rect.height / 2 + 15}px`;
+        document.body.appendChild(pointer);
+    }, 5000);
+
     // -----------------------------
     // 3. Dynamic Task Routing on startBtn Click
     // -----------------------------
     if (startBtn) {
         startBtn.onclick = async () => {
+            clearTimeout(pointerTimeout);
+            const pointer = document.getElementById("continuePointer");
+            if (pointer) pointer.remove();
             startBtn.disabled = true;
             let nextPath = "../drag/drag.html"; // Default start path
             

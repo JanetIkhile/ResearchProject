@@ -9,7 +9,8 @@ canvas,
     touch-action: none;
 }
 
-html, body {
+html,
+body {
     overflow: hidden;
     height: 100%;
     width: 100%;
@@ -25,9 +26,12 @@ body {
 }
 
 #mainContainer {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
-    max-width: 900px;
-    margin: 0 auto;
+    height: 100%;
+    pointer-events: none;
 }
 
 #taskHeader {
@@ -79,14 +83,27 @@ body {
     right: 120%;
 }
 
-#instructionBox {
+.instruction-container {
+    position: absolute;
+    top: 105px;
+    width: fit-content;
+    max-width: 90%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
+    z-index: 5;
+    pointer-events: auto;
 }
 
 #instructionMain {
-    font-size: clamp(1.2rem, 4.2vw, 2.0rem);
+    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
     font-weight: 600;
     margin-bottom: 10px;
+    white-space: nowrap;
+    text-align: left;
 }
 
 #instructionSub {
@@ -283,7 +300,7 @@ canvas {
 @media (min-width: 600px) {
 
     #instructionMain {
-        font-size: 2.0rem;
+        font-size: 1.7rem;
     }
 
     #instructionSub {
@@ -342,9 +359,12 @@ canvas {
 }
 
 .highlight-instruction {
-    background-color: #fef08a; /* Yellow highlight marker */
-    font-weight: bold;         /* Bold text */
-    color: inherit;            /* Inherit normal text color */
+    background-color: #fef08a;
+    /* Yellow highlight marker */
+    font-weight: bold;
+    /* Bold text */
+    color: inherit;
+    /* Inherit normal text color */
     padding: 0 4px;
     border-radius: 4px;
 }
@@ -458,7 +478,7 @@ canvas {
     font-size: clamp(1.2rem, 2.2vw, 1.6rem);
     padding: 16px 32px;
     cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     transition: background-color 0.2s, transform 0.1s;
 }
 
@@ -575,15 +595,20 @@ canvas {
     0% {
         transform: translateY(0) scale(1);
     }
+
     40% {
         transform: translateY(-32px) scale(1);
     }
+
     50% {
-        transform: translateY(-28px) scale(0.8); /* Click scale */
+        transform: translateY(-28px) scale(0.8);
+        /* Click scale */
     }
+
     60% {
         transform: translateY(-32px) scale(1);
     }
+
     100% {
         transform: translateY(0) scale(1);
     }

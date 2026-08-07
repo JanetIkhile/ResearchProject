@@ -9,7 +9,6 @@ REGISTRY = {
     'bradykinesia': [
         {'col': 'tap_tap_frequency', 'display_name': 'Tapping Frequency (Hz)'},
         {'col': 'tap_mean_intertap_interval_ms', 'display_name': 'Mean Intertap Interval (ms)'},
-        {'col': 'tap_cv_intertap_interval', 'display_name': 'Tapping Rhythm CV'},
         {'col': 'drag_mean_speed', 'display_name': 'Drag Mean Speed (px/s)'},
         {'col': 'drag_median_speed', 'display_name': 'Drag Median Speed (px/s)'},
         {'col': 'drag_peak_speed_ms', 'display_name': 'Drag Peak Speed (px/s)'},
@@ -25,11 +24,10 @@ REGISTRY = {
         {'col': 'hold_initiation_delay', 'display_name': 'Hold Initiation Delay (ms)'}
     ],
     'hypokinesia': [
-        {'col': 'tap_median_amplitude_mm', 'display_name': 'Median Tapping Amplitude (mm)'},
-        {'col': 'tap_tap_spatial_sd', 'display_name': 'Tapping Spatial Spread (px)'},
-        {'col': 'drag_endpoint_abs_deviation_error', 'display_name': 'Drag Terminal Overshoot/Undershoot (px)'},
-        {'col': 'drag_target_reached', 'display_name': 'Drag Target Reached Rate'},
-        {'col': 'pinch_median_pinch_amplitude_mm', 'display_name': 'Median Pinch Amplitude (mm)'}
+        {'col': 'drag_drag_terminal_overshoot_px', 'display_name': 'Drag Terminal Overshoot (px)'},
+        {'col': 'drag_drag_terminal_undershoot_px', 'display_name': 'Drag Terminal Undershoot (px)'},
+        {'col': 'pinch_pinch_max_opening_distance_mm', 'display_name': 'Pinch Max Opening Distance (mm)'},
+        {'col': 'pinch_pinch_median_opening_distance_mm', 'display_name': 'Pinch Median Opening Distance (mm)'}
     ],
     'sequence_effect': [
         {'col': 'tap_amplitude_decrement_ratio', 'display_name': 'Tapping Amplitude Decrement Ratio'},
@@ -46,27 +44,31 @@ REGISTRY = {
         {'col': 'drag_across_trial_amplitude_slope', 'display_name': 'Drag Across-Trial Amplitude Slope'},
         {'col': 'drag_across_trial_deviation_decrement_ratio', 'display_name': 'Drag Across-Trial Path Deviation Decrement Ratio'},
         {'col': 'drag_across_trial_deviation_slope', 'display_name': 'Drag Across-Trial Path Deviation Slope'},
-        {'col': 'drag_across_trial_within_speed_decay_decrement_ratio', 'display_name': 'Drag Across-Trial Within-Trial Speed Decay Ratio'},
+        {'col': 'drag_across_trial_within_speed_decay_decrement_ratio', 'display_name': 'Drag Sequence Effect (Speed Ratio)'},
         {'col': 'drag_across_trial_within_speed_decay_slope', 'display_name': 'Drag Across-Trial Within-Trial Speed Decay Slope'},
         {'col': 'drag_across_trial_within_deviation_decay_decrement_ratio', 'display_name': 'Drag Across-Trial Within-Trial Deviation Decay Ratio'},
         {'col': 'drag_across_trial_within_deviation_decay_slope', 'display_name': 'Drag Across-Trial Within-Trial Deviation Decay Slope'},
-        {'col': 'pinch_pinch_amplitude_decrement_ratio', 'display_name': 'Pinch Amplitude Decrement Ratio'},
-        {'col': 'pinch_pinch_amplitude_slope_mm', 'display_name': 'Pinch Amplitude Slope (mm/cycle)'},
+        {'col': 'pinch_pinch_opening_distance_decrement_ratio', 'display_name': 'Pinch Opening Distance Decrement Ratio'},
+        {'col': 'pinch_pinch_opening_distance_slope_mm', 'display_name': 'Pinch Opening Distance Slope (mm/cycle)'},
         {'col': 'pinch_pinch_speed_decrement_ratio', 'display_name': 'Pinch Speed Decrement Ratio'},
         {'col': 'pinch_pinch_speed_slope', 'display_name': 'Pinch Speed Slope (ms/cycle)'}
     ],
     'hesitations_halts': [
         {'col': 'tap_hesitations_count', 'display_name': 'Tapping Hesitations Count'},
         {'col': 'tap_hesitations_duration_ms', 'display_name': 'Tapping Hesitations Duration (ms)'},
-        {'col': 'tap_halts_count', 'display_name': 'Tapping Halts Count'},
-        {'col': 'tap_halts_duration_ms', 'display_name': 'Tapping Halts Duration (ms)'},
+        {'col': 'tap_total_halts_count', 'display_name': 'Tapping Total Halts Count'},
+        {'col': 'tap_total_halts_duration_ms', 'display_name': 'Tapping Total Halts Duration (ms)'},
+        {'col': 'tap_mean_halt_duration_ms', 'display_name': 'Tapping Mean Halt Duration (ms)'},
+        {'col': 'tap_tap_halt_ratio', 'display_name': 'Tapping Median Halt Ratio'},
+        {'col': 'tap_min_halt_ratio', 'display_name': 'Tapping Minimum Halt Ratio'},
         {'col': 'tap_cv_intertap_interval', 'display_name': 'Tapping Rhythm CV'},
         {'col': 'tap_double_taps_count', 'display_name': 'Tapping Double Taps Count'},
         {'col': 'tap_interruptions_count', 'display_name': 'Tapping Interruptions Count'},
         {'col': 'drag_drag_hesitations_count', 'display_name': 'Drag Hesitations Count'},
         {'col': 'drag_drag_hesitations_duration_ms', 'display_name': 'Drag Hesitations Duration (ms)'},
-        {'col': 'drag_drag_halts_count', 'display_name': 'Drag Halts Count'},
-        {'col': 'drag_drag_halts_duration_ms', 'display_name': 'Drag Halts Duration (ms)'},
+        {'col': 'drag_total_halts_count', 'display_name': 'Drag Total Halts Count'},
+        {'col': 'drag_total_halts_duration_ms', 'display_name': 'Drag Total Halts Duration (ms)'},
+        {'col': 'drag_mean_halt_duration_ms', 'display_name': 'Drag Mean Halt Duration (ms)'},
         {'col': 'drag_drag_speed_cv', 'display_name': 'Drag Speed CV'},
         {'col': 'drag_pause_count', 'display_name': 'Drag Pause Count'},
         {'col': 'drag_longest_pause_duration', 'display_name': 'Drag Longest Pause (ms)'},
@@ -74,8 +76,9 @@ REGISTRY = {
         {'col': 'drag_across_trial_hesitations_slope', 'display_name': 'Drag Across-Trial Hesitations Slope'},
         {'col': 'pinch_pinch_hesitations_count', 'display_name': 'Pinch Hesitations Count'},
         {'col': 'pinch_pinch_hesitations_duration_ms', 'display_name': 'Pinch Hesitations Duration (ms)'},
-        {'col': 'pinch_pinch_halts_count', 'display_name': 'Pinch Halts Count'},
-        {'col': 'pinch_pinch_halts_duration_ms', 'display_name': 'Pinch Halts Duration (ms)'},
+        {'col': 'pinch_total_halts_count', 'display_name': 'Pinch Total Halts Count'},
+        {'col': 'pinch_total_halts_duration_ms', 'display_name': 'Pinch Total Halts Duration (ms)'},
+        {'col': 'pinch_mean_halt_duration_ms', 'display_name': 'Pinch Mean Halt Duration (ms)'},
         {'col': 'pinch_cv_pinch_interval', 'display_name': 'Pinch Rhythm CV'},
         {'col': 'pinch_pinch_lifts_count', 'display_name': 'Pinch Screen Lifts Count'},
         {'col': 'pinch_pinch_lifts_duration_ms', 'display_name': 'Pinch Screen Lifts Duration (ms)'},
@@ -211,6 +214,57 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
         rename_dict = {col: f"{task}_{col}" for col in raw_feature_cols if col in task_df.columns}
         task_piv = task_df[['participant_code'] + list(rename_dict.keys())].rename(columns=rename_dict)
         flat_subject_df = flat_subject_df.merge(task_piv, on='participant_code', how='left')
+
+    # 2.3 Compute custom halt metrics (since median is not robust to intermittent halts)
+    halt_metrics = []
+    for participant in flat_subject_df['participant_code']:
+        p_metrics = {'participant_code': participant, 'tap_min_halt_ratio': np.nan}
+        for task in ['tap', 'drag', 'pinch']:
+            # Define raw columns for halts count and halts duration
+            if task == 'tap':
+                count_col = 'halts_count'
+                dur_col = 'halts_duration_ms'
+            elif task == 'drag':
+                count_col = 'drag_halts_count'
+                dur_col = 'drag_halts_duration_ms'
+            elif task == 'pinch':
+                count_col = 'pinch_halts_count'
+                dur_col = 'pinch_halts_duration_ms'
+            else:
+                continue
+
+            p_trials = merged[(merged['participant_code'] == participant) & (merged['task_type'] == task)]
+            if p_trials.empty or count_col not in p_trials.columns or dur_col not in p_trials.columns:
+                p_metrics[f"{task}_total_halts_count"] = np.nan
+                p_metrics[f"{task}_total_halts_duration_ms"] = np.nan
+                p_metrics[f"{task}_mean_halt_duration_ms"] = np.nan
+                continue
+
+            counts = pd.to_numeric(p_trials[count_col], errors='coerce').dropna().values
+            durations = pd.to_numeric(p_trials[dur_col], errors='coerce').dropna().values
+
+            if len(counts) > 0 and len(durations) > 0:
+                tot_count = np.sum(counts)
+                tot_dur = np.sum(durations)
+                mean_dur = tot_dur / tot_count if tot_count > 0 else 0.0
+            else:
+                tot_count = np.nan
+                tot_dur = np.nan
+                mean_dur = np.nan
+
+            p_metrics[f"{task}_total_halts_count"] = tot_count
+            p_metrics[f"{task}_total_halts_duration_ms"] = tot_dur
+            p_metrics[f"{task}_mean_halt_duration_ms"] = mean_dur
+            
+            if task == 'tap' and 'tap_halt_ratio' in p_trials.columns:
+                ratios = pd.to_numeric(p_trials['tap_halt_ratio'], errors='coerce').dropna().values
+                p_metrics['tap_min_halt_ratio'] = np.min(ratios) if len(ratios) > 0 else np.nan
+
+        halt_metrics.append(p_metrics)
+
+    if halt_metrics:
+        halt_df = pd.DataFrame(halt_metrics)
+        flat_subject_df = flat_subject_df.merge(halt_df, on='participant_code', how='left')
 
     # 2.5 Compute Across-Trial Drag sequence effect metrics
     drag_across_metrics = []

@@ -18,7 +18,7 @@ let gifTimer = null;
 let continueInactivityTimer = null;
 let practiceStep = 'initial_demo'; // initial_demo -> try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
 
-const ORIGINAL_INSTRUCTION = "Press Start and immediately hold the blue circle with your index finger";
+const ORIGINAL_INSTRUCTION = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
 
 // DOM Refs for progressive disclosure
 let tryItButton = null;
@@ -111,7 +111,7 @@ function startDemoAnimation() {
         holdTarget.style.backgroundColor = "blue";
         holdTarget.style.transform = "translateX(-50%) scale(1)";
 
-        holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
+        holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
         startButton.style.transition = "opacity 0.2s ease, transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease";
         startButton.style.opacity = "1";
 
@@ -207,7 +207,7 @@ function startDemoAnimation() {
             holdTarget.style.backgroundColor = "blue";
             holdTarget.style.transform = "translateX(-50%) scale(1)";
             startButton.style.opacity = "1";
-            holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
+            holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
         }, 8280));
     }
 
@@ -414,7 +414,7 @@ function stopDemoAnimation() {
         startButton.classList.remove("pulse-pressed");
     }
     if (holdInstruction) {
-        holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
+        holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
     }
 }
 
@@ -467,7 +467,7 @@ let initiationDelay = null;
         sessionId = result.sessionId;
         console.log("Session verified:", sessionId, result.sessionRow);
 
-        sessionNumber = result.sessionNumber;
+        sessionNumber = (sessionStorage.getItem("session_type") === "practice") ? 1 : result.sessionNumber;
 
         const header = document.getElementById("taskHeader");
         if (header) {
@@ -511,12 +511,15 @@ let initiationDelay = null;
     pressureGaugeContainer = document.getElementById("pressureGaugeContainer");
     pressureGaugeFill = document.getElementById("pressureGaugeFill");
     pressureFeedbackText = document.getElementById("pressureFeedbackText");
+    attemptsCounter = document.getElementById("attemptsCounter");
 
     if (sessionNumber === 1) {
         updateInstructions(false);
         const indicator = document.getElementById("watchExampleIndicator");
         if (indicator) indicator.style.display = "inline-block";
         setupProgressiveDisclosure();
+    } else {
+        updateInstructions(false);
     }
 
     setTimeout(startDemoAnimation, 500);
@@ -768,6 +771,14 @@ function beginHold(touch) {
     holdPollingInterval = setInterval(() => {
         if (!isHolding || currentTouchX === null) return;
 
+        // Drift check only during practice phase
+        if (sessionNumber === 1) {
+            if (!isPointInsideTargetWithTolerance(currentTouchX, currentTouchY, 0)) {
+                handleDriftError();
+                return;
+            }
+        }
+
         let forceVal = currentTouchForce || 0; // fallback
 
         // Update UI
@@ -925,8 +936,14 @@ async function endHoldTrialEarly(releaseTime) {
 
     isHolding = false;
     trialActive = false;
-    trialCount++;
-    trialNumber++;
+    if (sessionNumber === 1) {
+        // In practice phase, failed holds do not count towards the successful trial limit.
+        // We do NOT increment trialCount, so they repeat this trial.
+        trialNumber++;
+    } else {
+        trialCount++;
+        trialNumber++;
+    }
 
     const isFinalTrial = (trialCount >= TRIAL_LIMIT);
 
@@ -1087,7 +1104,7 @@ function resetTrial() {
         clearInterval(holdDisplayInterval);
         holdDisplayInterval = null;
     }
-    if (holdInstruction) holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle with your index finger";
+    if (holdInstruction) holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
     if (pressureGaugeContainer) pressureGaugeContainer.style.display = "none";
     if (holdTarget) {
         holdTarget.style.backgroundColor = "blue";
@@ -1366,6 +1383,7 @@ function setupProgressiveDisclosure() {
 
             practiceStep = 'waiting_for_touch';
             if (startButton) startButton.style.pointerEvents = 'auto';
+            updateInstructions(false);
         });
     }
 
@@ -1403,11 +1421,12 @@ function setupProgressiveDisclosure() {
 
 function updateInstructions(showAttempts) {
     const indicator = document.getElementById("watchExampleIndicator");
+    const isDemoPlaying = (sessionNumber === 1 && (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo'));
+    
     if (indicator) {
-        indicator.style.display = (sessionNumber === 1 && !showAttempts && trialCount === 0) ? "inline-block" : "none";
+        indicator.style.display = (sessionNumber === 1 && isDemoPlaying && trialCount === 0) ? "inline-block" : "none";
     }
     if (attemptsCounter) {
-        const isDemoPlaying = (sessionNumber === 1 && trialCount === 0 && !showAttempts);
         const displayTrial = Math.min(trialCount + 1, TRIAL_LIMIT);
         if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoPlaying) {
             attemptsCounter.style.display = "block";
@@ -1440,3 +1459,139 @@ document.addEventListener('touchstart', function(e) {
         e.preventDefault();
     }
 }, { passive: false });
+
+
+function isPointInsideTargetWithTolerance(x, y, tolerance = 0) {
+    if (!holdTarget) return false;
+    const rect = holdTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2 + window.scrollX;
+    const centerY = rect.top + rect.height / 2 + window.scrollY;
+    const radius = rect.width / 2 + tolerance;
+    
+    const dx = x - centerX;
+    const dy = y - centerY;
+    return (dx * dx + dy * dy) <= (radius * radius);
+}
+
+async function handleDriftError() {
+    if (holdPollingInterval) {
+        clearInterval(holdPollingInterval);
+        holdPollingInterval = null;
+    }
+    if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+    }
+    if (holdDisplayInterval) {
+        clearInterval(holdDisplayInterval);
+        holdDisplayInterval = null;
+    }
+
+    const totalHoldTime = holdStartTime ? (Date.now() - holdStartTime) : 0;
+    const akinetic = holdStartTime ? (holdStartTime - readyTime) : null;
+
+    isHolding = false;
+    trialActive = false;
+    trialNumber++; // increment absolute counter, but NOT trialCount!
+
+    if (holdTarget) {
+        holdTarget.style.transform = "translateX(-50%) scale(1)";
+        holdTarget.style.backgroundColor = "red";
+    }
+
+    const trialPayload = {
+        participant_id: participantId,
+        session_id: sessionId,
+        task_type: TASK_TYPE,
+        trial_number: trialNumber,
+        timestamp: new Date().toISOString(),
+        initiation_delay: initiationDelay,
+        akinetic_delay_hold: akinetic,
+        total_hold_time_ms: totalHoldTime,
+        release_delay_ms: null,
+        released_early: true,
+        hold_target_duration_ms: HOLD_DURATION,
+        viewport_width: window.innerWidth,
+        viewport_height: window.innerHeight,
+        device_pixel_ratio: window.devicePixelRatio,
+        hold_events: holdEvents
+    };
+
+    try {
+        await supabase.from("trial_results").insert(trialPayload);
+    } catch (err) {
+        console.error("Failed to save hold trial (drift):", err);
+    }
+
+    showHoldPracticeDriftModal();
+}
+
+function showHoldPracticeDriftModal() {
+    if (document.getElementById("practiceDriftModal")) return;
+
+    const modalDiv = document.createElement("div");
+    modalDiv.id = "practiceDriftModal";
+    modalDiv.style.position = "fixed";
+    modalDiv.style.top = "0";
+    modalDiv.style.left = "0";
+    modalDiv.style.width = "100%";
+    modalDiv.style.height = "100%";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.display = "flex";
+    modalDiv.style.justifyContent = "center";
+    modalDiv.style.alignItems = "center";
+    modalDiv.style.zIndex = "9999";
+
+    // Stop all touch and click events from bubbling up to document background
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+        modalDiv.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    const contentDiv = document.createElement("div");
+    contentDiv.style.backgroundColor = "white";
+    contentDiv.style.padding = "32px 40px";
+    contentDiv.style.borderRadius = "16px";
+    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
+    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.width = "85%";
+    contentDiv.style.textAlign = "center";
+    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+
+    const title = document.createElement("h3");
+    title.innerText = "⚠️ Practice Tip";
+    title.style.margin = "0 0 16px 0";
+    title.style.color = "#ea580c";
+    title.style.fontSize = "26px";
+
+    const msg = document.createElement("p");
+    msg.innerText = "Please try keeping your finger on the dot.";
+    msg.style.margin = "0 0 24px 0";
+    msg.style.fontSize = "19px";
+    msg.style.lineHeight = "1.6";
+    msg.style.color = "#374151";
+
+    const btn = document.createElement("button");
+    btn.innerText = "Okay";
+    btn.style.backgroundColor = "#003366";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "14px 28px";
+    btn.style.fontSize = "18px";
+    btn.style.fontWeight = "bold";
+    btn.style.borderRadius = "8px";
+    btn.style.cursor = "pointer";
+    btn.style.width = "100%";
+
+    btn.addEventListener("click", () => {
+        modalDiv.remove();
+        resetTrial();
+    });
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(msg);
+    contentDiv.appendChild(btn);
+    modalDiv.appendChild(contentDiv);
+    document.body.appendChild(modalDiv);
+}
