@@ -51,6 +51,8 @@ function showPinchPracticeErrorModal(message) {
     if (sessionNumber !== 1) return; // Only in practice phase
     if (document.getElementById("practiceErrorModal")) return;
 
+    stopDemoAnimation(); // Stop any running demo animations and clear timeouts!
+
     // Abort active trial if active
     if (taskActive) {
         clearInterval(countdownTimer);
@@ -252,6 +254,7 @@ let demoPointer2 = null;
 
 function scheduleDemoAnimation(delay = 1000) {
     clearDemoTimeout();
+    if (document.getElementById("practiceErrorModal")) return; // Don't run demo while error modal is open!
     if (sessionNumber === 1 && trialNumber === 0 && !taskActive) {
         demoTimeout = setTimeout(startDemoAnimation, delay);
     }
@@ -665,13 +668,13 @@ function handleTouch(e) {
 
             // Practice phase validations
             if (sessionNumber === 1) {
-                // 1) Pinch in check (with 15px tolerance)
-                if (distPx < maxStrokeDistance - 15) {
-                    showPinchPracticeErrorModal("Please do not bring your fingers back together.");
+                // 1) Pinch in check (with 5px tolerance)
+                if (distPx < maxStrokeDistance - 5) {
+                    showPinchPracticeErrorModal("Please keep your fingers apart and do not pinch back in.");
                     return;
                 }
                 // 2) Orientation change check (allow generous deviation from vertical line)
-                const isAcceptablyVertical = Math.abs(dy) * 2 > Math.abs(dx);
+                const isAcceptablyVertical = Math.abs(dy) > Math.abs(dx);
                 if (!isAcceptablyVertical) {
                     showPinchPracticeErrorModal("Please keep your fingers vertical while pinching out.");
                     return;
