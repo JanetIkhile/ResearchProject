@@ -666,6 +666,11 @@ function handleTouch(e) {
                 maxStrokeDistance = distPx;
             }
 
+            const debugPanel = document.getElementById("debugPanel");
+            if (debugPanel) {
+                debugPanel.innerText = `sessNum: ${sessionNumber}, sessType: ${sessionStorage.getItem("session_type")}, taskActive: ${taskActive}, dist: ${distPx.toFixed(1)}, max: ${maxStrokeDistance.toFixed(1)}, diff: ${(maxStrokeDistance - distPx).toFixed(1)}`;
+            }
+
             // Practice phase validations
             if (sessionNumber === 1) {
                 // 1) Pinch in check (with 5px tolerance)

@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pinch Task</title>
     <link rel="stylesheet" href="pinch.css?v=9">
-    <script type="module" src="pinch.js?v=7" defer></script>
+    <script type="module" src="pinch.js?v=8" defer></script>
 </head>
 
 <body>
@@ -32,6 +32,8 @@
         <!-- Live distance floating label -->
         <div id="liveDistanceLabel" style="display:none;">0 mm</div>
     </div>
+
+    <div id="debugPanel" style="position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; font-family: monospace; z-index: 10000; font-size: 14px;">Debug info here</div>
 
     <div id="practiceOptionsOverlay" class="practice-options-overlay" style="display:none;">
         <div id="practiceOptionsContainer" class="practice-options-container">
