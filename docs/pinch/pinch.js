@@ -27,7 +27,9 @@ let lastIndexX = null;
 let lastIndexY = null;
 let lastThumbX = null;
 let lastThumbY = null;
-let maxStrokeDistance = 0;
+let strokeStartDistance = 0;
+let strokePeakDistance = 0;
+let hasOpened = false;
 
 // Progressive Disclosure state variables
 let demoLoopCount = 0;
@@ -231,7 +233,9 @@ function isTouchInsideElement(touch, element) {
 
 // Helper to reset circles back to their baseline CSS positions
 function resetTargetPositions() {
-    maxStrokeDistance = 0;
+    strokeStartDistance = 0;
+    strokePeakDistance = 0;
+    hasOpened = false;
     topTarget.style.left = "";
     topTarget.style.top = "";
     topTarget.style.transform = "";
@@ -627,7 +631,9 @@ function handleTouch(e) {
                         if (inactivityTimer) clearTimeout(inactivityTimer);
                     }
                     requiresReset = false;
-                    maxStrokeDistance = distPx;
+                    strokeStartDistance = distPx;
+                    strokePeakDistance = distPx;
+                    hasOpened = false;
                     startPinchTrial(now);
                 } else {
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to start!</span>`;
@@ -643,7 +649,9 @@ function handleTouch(e) {
 
                 if (oneInTop && oneInBottom) {
                     requiresReset = false; // Recovered!
-                    maxStrokeDistance = distPx; // Initialize max distance for this new stroke!
+                    strokeStartDistance = distPx;
+                    strokePeakDistance = distPx;
+                    hasOpened = false;
                 } else {
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`;
                     instructionEl.style.display = "block";
@@ -661,15 +669,32 @@ function handleTouch(e) {
                 }
             }
 
-            // Check if this is the start of a stroke (maxStrokeDistance is 0 or uninitialized)
-            if (maxStrokeDistance === 0) {
-                maxStrokeDistance = distPx;
+            // Check if this is the start of a stroke (strokeStartDistance is 0 or uninitialized)
+            if (strokeStartDistance === 0) {
+                strokeStartDistance = distPx;
+                strokePeakDistance = distPx;
+                hasOpened = false;
+            }
+
+            // Update the peak distance reached so far
+            if (distPx > strokePeakDistance) {
+                strokePeakDistance = distPx;
+            }
+
+            // Check if they have opened their fingers clearly (by more than 15px)
+            if (!hasOpened && distPx > strokeStartDistance + 15) {
+                hasOpened = true;
             }
 
             // Practice phase validations
             if (sessionNumber === 1) {
-                // 1) Pinch in check (with 5px tolerance)
-                if (distPx < maxStrokeDistance - 5) {
+                // Case 1: They have clearly opened, then pinch back in by more than 5px
+                if (hasOpened && distPx < strokePeakDistance - 5) {
+                    showPinchPracticeErrorModal("Please keep your fingers apart and do not pinch back in.");
+                    return;
+                }
+                // Case 2: They immediately pinch in by more than 5px from start distance
+                if (!hasOpened && distPx < strokeStartDistance - 5) {
                     showPinchPracticeErrorModal("Please keep your fingers apart and do not pinch back in.");
                     return;
                 }
@@ -682,9 +707,7 @@ function handleTouch(e) {
             }
 
             // Lock circles to monotonically non-decreasing distance during active pinching
-            if (distPx >= maxStrokeDistance) {
-                maxStrokeDistance = distPx;
-
+            if (distPx >= strokePeakDistance) {
                 // Dynamically position target circles directly under the user's touch points
                 topTarget.style.transition = "none";
                 topTarget.style.left = `${x1}px`;
