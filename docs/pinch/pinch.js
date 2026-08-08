@@ -28,6 +28,7 @@ let lastIndexY = null;
 let lastThumbX = null;
 let lastThumbY = null;
 let maxStrokeDistance = 0;
+let strokeStartDistance = 0;
 
 // Progressive Disclosure state variables
 let demoLoopCount = 0;
@@ -232,6 +233,7 @@ function isTouchInsideElement(touch, element) {
 // Helper to reset circles back to their baseline CSS positions
 function resetTargetPositions() {
     maxStrokeDistance = 0;
+    strokeStartDistance = 0;
     topTarget.style.left = "";
     topTarget.style.top = "";
     topTarget.style.transform = "";
@@ -628,6 +630,7 @@ function handleTouch(e) {
                     }
                     requiresReset = false;
                     maxStrokeDistance = distPx;
+                    strokeStartDistance = distPx;
                     startPinchTrial(now);
                 } else {
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to start!</span>`;
@@ -644,6 +647,7 @@ function handleTouch(e) {
                 if (oneInTop && oneInBottom) {
                     requiresReset = false; // Recovered!
                     maxStrokeDistance = distPx; // Initialize max distance for this new stroke!
+                    strokeStartDistance = distPx;
                 } else {
                     instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`;
                     instructionEl.style.display = "block";
@@ -665,11 +669,21 @@ function handleTouch(e) {
             if (maxStrokeDistance === 0) {
                 maxStrokeDistance = distPx;
             }
-
+            if (strokeStartDistance === 0) {
+                strokeStartDistance = distPx;
+            }
+ 
             // Practice phase validations
             if (sessionNumber === 1) {
-                // 1) Pinch in check (with 5px tolerance)
-                if (distPx < maxStrokeDistance - 5) {
+                const hasOpenedEnough = (maxStrokeDistance > strokeStartDistance + 15);
+                
+                // Smart log to help track pinch-in behavior
+                if (hasOpenedEnough && distPx < maxStrokeDistance - 2) {
+                    console.log(`Pinch-in detected: dist=${distPx.toFixed(1)}, peak=${maxStrokeDistance.toFixed(1)}, diff=${(maxStrokeDistance - distPx).toFixed(1)}`);
+                }
+
+                // 1) Pinch in check (with 10px tolerance, active only after opening)
+                if (hasOpenedEnough && distPx < maxStrokeDistance - 10) {
                     showPinchPracticeErrorModal("Please keep your fingers apart and do not pinch back in.");
                     return;
                 }
