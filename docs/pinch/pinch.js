@@ -30,6 +30,7 @@ let lastThumbY = null;
 let strokeStartDistance = 0;
 let strokePeakDistance = 0;
 let hasOpened = false;
+const PINCH_IN_TOLERANCE = 5;
 
 // Progressive Disclosure state variables
 let demoLoopCount = 0;
@@ -687,14 +688,9 @@ function handleTouch(e) {
             }
 
             // Practice phase validations
-            if (sessionNumber === 1) {
-                // Case 1: They have clearly opened, then pinch back in by more than 5px
-                if (hasOpened && distPx < strokePeakDistance - 5) {
-                    showPinchPracticeErrorModal("Please keep your fingers apart and do not pinch back in.");
-                    return;
-                }
-                // Case 2: They immediately pinch in by more than 5px from start distance
-                if (!hasOpened && distPx < strokeStartDistance - 5) {
+            if (sessionNumber === 1 && touches.length === 2) {
+                // Check if they have opened enough and then pinched back in past tolerance
+                if (hasOpened && distPx < strokePeakDistance - PINCH_IN_TOLERANCE) {
                     showPinchPracticeErrorModal("Please keep your fingers apart and do not pinch back in.");
                     return;
                 }
