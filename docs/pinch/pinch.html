@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pinch Task</title>
     <link rel="stylesheet" href="pinch.css?v=9">
-    <script type="module" src="pinch.js?v=11" defer></script>
+    <script type="module" src="pinch.js?v=7" defer></script>
 </head>
 
 <body>
@@ -19,16 +19,20 @@
     <!-- Pinch Area -->
     <div id="pinchArea">
         <div class="instruction-container">
-            <p id="pinchInstruction">Place your index finger and thumb on the guide circles.<br>Open them <strong class="highlight-instruction">as widely</strong> and <strong class="highlight-instruction">as quickly</strong> as possible.<br>Then lift both fingers and repeat.</p>
-            <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
-            <p id="timerLine" class="timer-line" style="display:none;">Time remaining: <span id="timerBadge" class="timer-badge">10</span> seconds</p>
+            <p id="pinchInstruction">Place your index finger and thumb on the guide circles.<br>Open them <strong
+                    class="highlight-instruction">as widely</strong> and <strong class="highlight-instruction">as
+                    quickly</strong> as possible.<br>Then lift both fingers and repeat.</p>
+            <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example
+                below</div>
+            <p id="timerLine" class="timer-line" style="display:none;">Time remaining: <span id="timerBadge"
+                    class="timer-badge">10</span> seconds</p>
             <div id="attemptsCounter" class="attempts-container" style="display:none;"></div>
         </div>
-        
 
-         <div id="topTarget" class="pinch-target"></div>
+
+        <div id="topTarget" class="pinch-target"></div>
         <div id="bottomTarget" class="pinch-target"></div>
-        
+
         <!-- Live distance floating label -->
         <div id="liveDistanceLabel" style="display:none;">0 mm</div>
     </div>

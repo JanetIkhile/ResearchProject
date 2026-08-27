@@ -108,7 +108,7 @@ function startDemoAnimation() {
         demoPointer.style.transform = "scale(1)";
 
         holdTarget.style.transition = "none";
-        holdTarget.style.backgroundColor = "blue";
+        holdTarget.style.backgroundColor = "#0046FF";
         holdTarget.style.transform = "translateX(-50%) scale(1)";
 
         holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
@@ -188,7 +188,7 @@ function startDemoAnimation() {
         demoTimeouts.push(setTimeout(() => {
             if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive || !demoPointer) return;
             holdTarget.style.transition = "background-color 0.3s ease";
-            holdTarget.style.backgroundColor = "green";
+            holdTarget.style.backgroundColor = "#41A67E";
             holdInstruction.innerText = "✅ You can release now!";
         }, 6880));
 
@@ -204,10 +204,31 @@ function startDemoAnimation() {
         demoTimeouts.push(setTimeout(() => {
             if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive) return;
             holdTarget.style.transition = "background-color 0.2s ease, transform 0.2s ease";
-            holdTarget.style.backgroundColor = "blue";
+            holdTarget.style.backgroundColor = "#0046FF";
             holdTarget.style.transform = "translateX(-50%) scale(1)";
-            startButton.style.opacity = "1";
-            holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
+            
+            if (sessionNumber === 1 && trialCount === 0 && demoLoopCount >= 2) {
+                // End of the 2nd demo cycle in practice phase: show options!
+                stopDemoAnimation();
+                practiceStep = 'options_shown';
+                const optionsOverlay = document.getElementById("practiceOptionsOverlay");
+                if (optionsOverlay) optionsOverlay.style.display = "flex";
+                const optionsContainer = document.getElementById("practiceOptionsContainer");
+                if (optionsContainer) optionsContainer.style.display = "flex";
+                const tryItButton = document.getElementById("tryItButton");
+                if (tryItButton) tryItButton.style.display = "block";
+                const indicator = document.getElementById("watchExampleIndicator");
+                if (indicator) indicator.style.display = "none";
+
+                // Dim background elements
+                ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add("dimmed");
+                });
+            } else {
+                startButton.style.opacity = "1";
+                holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
+            }
         }, 8280));
     }
 
@@ -405,11 +426,17 @@ function stopDemoAnimation() {
 
     // Reset visual elements
     if (holdTarget) {
-        holdTarget.style.backgroundColor = "blue";
+        holdTarget.style.backgroundColor = "#0046FF";
         holdTarget.style.transform = "translateX(-50%) scale(1)";
     }
     if (startButton) {
-        startButton.style.opacity = "1";
+        if (sessionNumber === 1 && (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'options_shown')) {
+            startButton.style.opacity = "0";
+            startButton.style.pointerEvents = 'none';
+        } else {
+            startButton.style.opacity = "1";
+            startButton.style.pointerEvents = 'auto';
+        }
         startButton.classList.remove("pressed");
         startButton.classList.remove("pulse-pressed");
     }
@@ -439,7 +466,7 @@ let releaseTime = 0;
 let readyTime = 0;
 let trialCount = 0;
 let TRIAL_LIMIT = 3;
-const HOLD_DURATION = 5000;
+let HOLD_DURATION = 5000;
 
 let isHolding = false;
 let trialActive = false;
@@ -468,6 +495,9 @@ let initiationDelay = null;
         console.log("Session verified:", sessionId, result.sessionRow);
 
         sessionNumber = (sessionStorage.getItem("session_type") === "practice") ? 1 : result.sessionNumber;
+        if (sessionNumber !== 1) {
+            HOLD_DURATION = 10000;
+        }
 
         const header = document.getElementById("taskHeader");
         if (header) {
@@ -531,7 +561,7 @@ let initiationDelay = null;
 
     // Disable pointer events until Start clicked (but keep touchable for hint)
     holdTarget.style.pointerEvents = 'auto';
-    holdTarget.style.backgroundColor = "blue";
+    holdTarget.style.backgroundColor = "#0046FF";
 
     // Start button listener
     if (startButton) {
@@ -703,7 +733,7 @@ function startHoldTrial() {
     // Enable touches now that Start was clicked
     if (holdTarget) {
         holdTarget.style.pointerEvents = 'auto';
-        holdTarget.style.backgroundColor = "blue";
+        holdTarget.style.backgroundColor = "#0046FF";
     }
 
     // immediate cue
@@ -822,7 +852,7 @@ function beginHold(touch) {
         if (holdDisplayInterval) clearInterval(holdDisplayInterval);
         readyToRelease = true;
         if (holdInstruction) holdInstruction.innerText = "✅ You can release now!";
-        if (holdTarget) holdTarget.style.backgroundColor = "green";
+        if (holdTarget) holdTarget.style.backgroundColor = "#41A67E";
         if (navigator.vibrate) navigator.vibrate(200);
     }, HOLD_DURATION);
 }
@@ -856,14 +886,23 @@ function showEarlyReleaseModal() {
     modalDiv.style.left = "0";
     modalDiv.style.width = "100%";
     modalDiv.style.height = "100%";
-    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+    modalDiv.style.backdropFilter = "blur(8px)";
+    modalDiv.style.webkitBackdropFilter = "blur(8px)";
     modalDiv.style.display = "flex";
     modalDiv.style.justifyContent = "center";
     modalDiv.style.alignItems = "center";
     modalDiv.style.zIndex = "9999";
 
-    // Stop all touch and click events from bubbling up to document background
-    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+    const dismissModal = () => {
+        modalDiv.remove();
+        resetTrial();
+    };
+
+    modalDiv.addEventListener("click", dismissModal);
+
+    // Stop touch/pointer events from bubbling down to task elements underneath
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup"].forEach(evtName => {
         modalDiv.addEventListener(evtName, (e) => {
             e.stopPropagation();
         });
@@ -871,43 +910,58 @@ function showEarlyReleaseModal() {
     
     const contentDiv = document.createElement("div");
     contentDiv.style.backgroundColor = "white";
-    contentDiv.style.padding = "32px 40px";
-    contentDiv.style.borderRadius = "16px";
-    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
-    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.padding = "40px clamp(24px, 5vw, 40px)";
+    contentDiv.style.borderRadius = "24px";
+    contentDiv.style.boxShadow = "0 20px 40px rgba(0,0,0,0.15)";
+    contentDiv.style.maxWidth = "580px";
     contentDiv.style.width = "85%";
     contentDiv.style.textAlign = "center";
-    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+    contentDiv.style.fontFamily = "'Selawik', Arial, Helvetica, sans-serif";
+    contentDiv.style.boxSizing = "border-box";
     
     const title = document.createElement("h3");
     title.innerText = "⚠️ Early Release";
     title.style.margin = "0 0 16px 0";
     title.style.color = "#ea580c";
     title.style.fontSize = "26px";
+    title.style.fontWeight = "bold";
     
     const msg = document.createElement("p");
     msg.innerText = "Released early. You should keep holding until the timer is up.";
-    msg.style.margin = "0 0 24px 0";
-    msg.style.fontSize = "19px";
+    msg.style.margin = "0 0 28px 0";
+    msg.style.fontSize = "22px";
     msg.style.lineHeight = "1.6";
-    msg.style.color = "#374151";
+    msg.style.color = "#4b5563";
     
     const btn = document.createElement("button");
     btn.innerText = "Okay";
     btn.style.backgroundColor = "#003366";
     btn.style.color = "white";
     btn.style.border = "none";
-    btn.style.padding = "14px 28px";
-    btn.style.fontSize = "18px";
+    btn.style.padding = "16px 28px";
+    btn.style.fontSize = "20px";
     btn.style.fontWeight = "bold";
-    btn.style.borderRadius = "8px";
+    btn.style.borderRadius = "12px";
     btn.style.cursor = "pointer";
     btn.style.width = "100%";
+    btn.style.boxSizing = "border-box";
+    btn.style.boxShadow = "0 4px 12px rgba(0, 51, 102, 0.25)";
+    btn.style.transition = "background-color 0.2s, transform 0.1s";
     
-    btn.addEventListener("click", () => {
-        modalDiv.remove();
-        resetTrial();
+    btn.addEventListener("mouseenter", () => {
+        btn.style.backgroundColor = "#002244";
     });
+    btn.addEventListener("mouseleave", () => {
+        btn.style.backgroundColor = "#003366";
+    });
+    btn.addEventListener("pointerdown", () => {
+        btn.style.transform = "scale(0.97)";
+    });
+    btn.addEventListener("pointerup", () => {
+        btn.style.transform = "scale(1)";
+    });
+    
+    btn.addEventListener("click", dismissModal);
     
     contentDiv.appendChild(title);
     contentDiv.appendChild(msg);
@@ -950,9 +1004,9 @@ async function endHoldTrialEarly(releaseTime) {
     if (holdTarget) {
         holdTarget.style.transform = "translateX(-50%) scale(1)";
         if (isFinalTrial) {
-            holdTarget.style.backgroundColor = "green";
+            holdTarget.style.backgroundColor = "#41A67E";
         } else {
-            holdTarget.style.backgroundColor = "blue";
+            holdTarget.style.backgroundColor = "#0046FF";
         }
     }
 
@@ -1001,7 +1055,7 @@ async function endHoldTrialEarly(releaseTime) {
 
     // ---------- FEEDBACK ----------
     if (holdTarget && !isFinalTrial) {
-        holdTarget.style.backgroundColor = "red";
+        holdTarget.style.backgroundColor = "#CD4439";
     }
 
     // ---------- SAVE ----------
@@ -1107,7 +1161,7 @@ function resetTrial() {
     if (holdInstruction) holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
     if (pressureGaugeContainer) pressureGaugeContainer.style.display = "none";
     if (holdTarget) {
-        holdTarget.style.backgroundColor = "blue";
+        holdTarget.style.backgroundColor = "#0046FF";
         holdTarget.style.transform = "translateX(-50%) scale(1)";
     }
     if (startButton) startButton.style.display = "block";
@@ -1382,7 +1436,10 @@ function setupProgressiveDisclosure() {
             });
 
             practiceStep = 'waiting_for_touch';
-            if (startButton) startButton.style.pointerEvents = 'auto';
+            if (startButton) {
+                startButton.style.opacity = "1";
+                startButton.style.pointerEvents = 'auto';
+            }
             updateInstructions(false);
         });
     }
@@ -1406,7 +1463,10 @@ function setupProgressiveDisclosure() {
             window.isModalOpen = false;
 
             practiceStep = 'waiting_for_touch';
-            if (startButton) startButton.style.pointerEvents = 'auto';
+            if (startButton) {
+                startButton.style.opacity = "1";
+                startButton.style.pointerEvents = 'auto';
+            }
         });
     }
 
@@ -1496,7 +1556,7 @@ async function handleDriftError() {
 
     if (holdTarget) {
         holdTarget.style.transform = "translateX(-50%) scale(1)";
-        holdTarget.style.backgroundColor = "red";
+        holdTarget.style.backgroundColor = "#CD4439";
     }
 
     const trialPayload = {
@@ -1536,14 +1596,23 @@ function showHoldPracticeDriftModal() {
     modalDiv.style.left = "0";
     modalDiv.style.width = "100%";
     modalDiv.style.height = "100%";
-    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+    modalDiv.style.backdropFilter = "blur(8px)";
+    modalDiv.style.webkitBackdropFilter = "blur(8px)";
     modalDiv.style.display = "flex";
     modalDiv.style.justifyContent = "center";
     modalDiv.style.alignItems = "center";
     modalDiv.style.zIndex = "9999";
 
-    // Stop all touch and click events from bubbling up to document background
-    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+    const dismissModal = () => {
+        modalDiv.remove();
+        resetTrial();
+    };
+
+    modalDiv.addEventListener("click", dismissModal);
+
+    // Stop touch/pointer events from bubbling down to task elements underneath
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup"].forEach(evtName => {
         modalDiv.addEventListener(evtName, (e) => {
             e.stopPropagation();
         });
@@ -1551,43 +1620,58 @@ function showHoldPracticeDriftModal() {
 
     const contentDiv = document.createElement("div");
     contentDiv.style.backgroundColor = "white";
-    contentDiv.style.padding = "32px 40px";
-    contentDiv.style.borderRadius = "16px";
-    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
-    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.padding = "40px clamp(24px, 5vw, 40px)";
+    contentDiv.style.borderRadius = "24px";
+    contentDiv.style.boxShadow = "0 20px 40px rgba(0,0,0,0.15)";
+    contentDiv.style.maxWidth = "580px";
     contentDiv.style.width = "85%";
     contentDiv.style.textAlign = "center";
-    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+    contentDiv.style.fontFamily = "'Selawik', Arial, Helvetica, sans-serif";
+    contentDiv.style.boxSizing = "border-box";
 
     const title = document.createElement("h3");
     title.innerText = "⚠️ Practice Tip";
     title.style.margin = "0 0 16px 0";
     title.style.color = "#ea580c";
     title.style.fontSize = "26px";
+    title.style.fontWeight = "bold";
 
     const msg = document.createElement("p");
     msg.innerText = "Please try keeping your finger on the dot.";
-    msg.style.margin = "0 0 24px 0";
-    msg.style.fontSize = "19px";
+    msg.style.margin = "0 0 28px 0";
+    msg.style.fontSize = "22px";
     msg.style.lineHeight = "1.6";
-    msg.style.color = "#374151";
+    msg.style.color = "#4b5563";
 
     const btn = document.createElement("button");
     btn.innerText = "Okay";
     btn.style.backgroundColor = "#003366";
     btn.style.color = "white";
     btn.style.border = "none";
-    btn.style.padding = "14px 28px";
-    btn.style.fontSize = "18px";
+    btn.style.padding = "16px 28px";
+    btn.style.fontSize = "20px";
     btn.style.fontWeight = "bold";
-    btn.style.borderRadius = "8px";
+    btn.style.borderRadius = "12px";
     btn.style.cursor = "pointer";
     btn.style.width = "100%";
+    btn.style.boxSizing = "border-box";
+    btn.style.boxShadow = "0 4px 12px rgba(0, 51, 102, 0.25)";
+    btn.style.transition = "background-color 0.2s, transform 0.1s";
 
-    btn.addEventListener("click", () => {
-        modalDiv.remove();
-        resetTrial();
+    btn.addEventListener("mouseenter", () => {
+        btn.style.backgroundColor = "#002244";
     });
+    btn.addEventListener("mouseleave", () => {
+        btn.style.backgroundColor = "#003366";
+    });
+    btn.addEventListener("pointerdown", () => {
+        btn.style.transform = "scale(0.97)";
+    });
+    btn.addEventListener("pointerup", () => {
+        btn.style.transform = "scale(1)";
+    });
+
+    btn.addEventListener("click", dismissModal);
 
     contentDiv.appendChild(title);
     contentDiv.appendChild(msg);

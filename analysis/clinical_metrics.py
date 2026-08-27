@@ -445,8 +445,32 @@ def extract_features_from_trial(row):
             
         times = np.array([pt['t'] for pt in valid_pts], dtype=float)
         coords = np.array([[pt['x'], pt['y']] for pt in valid_pts], dtype=float)
-        coords = smooth_coordinates(coords)
         
+        # Trim trajectory to the active movement phase (from first movement to target arrival)
+        t_x = row.get('target_x')
+        t_y = row.get('target_y')
+        t_r = row.get('target_radius')
+        
+        # 1. Trim beginning: first point where they move > 10 pixels from starting touch point
+        dists_from_start = np.linalg.norm(coords - coords[0], axis=1)
+        start_idx_arr = np.where(dists_from_start > 10.0)[0]
+        start_idx = start_idx_arr[0] if len(start_idx_arr) > 0 else 0
+        
+        # 2. Trim end: first point where they touch/reach the target circle
+        if pd.notna(t_x) and pd.notna(t_y) and pd.notna(t_r) and t_r > 0:
+            target_pt = np.array([t_x, t_y])
+            dists_to_target = np.linalg.norm(coords - target_pt, axis=1)
+            reach_idx_arr = np.where(dists_to_target <= t_r)[0]
+            end_idx = reach_idx_arr[0] if len(reach_idx_arr) > 0 else len(coords) - 1
+        else:
+            end_idx = len(coords) - 1
+            
+        # Ensure active phase has at least 5 points for robust analysis
+        if end_idx - start_idx >= 5:
+            times = times[start_idx:end_idx+1]
+            coords = coords[start_idx:end_idx+1]
+            
+        coords = smooth_coordinates(coords)
         vel, acc, jerk = calculate_derivatives(times, coords)
         
         # Distance and Path
@@ -582,25 +606,11 @@ def extract_features_from_trial(row):
         median_speed = np.median(vel) if len(vel) > 0 else np.nan
         peak_speed = np.max(vel) if len(vel) > 0 else np.nan
         
-        # Hesitations (velocity drops below 30% of median speed for >= 100ms)
-        hesitations_count = 0
-        hesitations_duration = 0.0
-        if len(vel) > 0 and pd.notna(median_speed) and median_speed > 0:
-            hes_threshold = 0.3 * median_speed
-            hes_mask = vel < hes_threshold
-            padded_hes = np.concatenate(([False], hes_mask, [False]))
-            diffs_hes = np.diff(padded_hes.astype(int))
-            starts_hes = np.where(diffs_hes == 1)[0]
-            ends_hes = np.where(diffs_hes == -1)[0]
-            for s, e in zip(starts_hes, ends_hes):
-                duration = times[e] - times[s]
-                if duration >= 100:
-                    hesitations_count += 1
-                    hesitations_duration += duration
-                    
         # Halts (movement stops: velocity drops below 5% of median speed for >= 250ms)
         halts_count = 0
         halts_duration = 0.0
+        halt_intervals = []
+        halt_durations = []
         if len(vel) > 0 and pd.notna(median_speed) and median_speed > 0:
             halt_threshold = 0.05 * median_speed
             halt_mask = vel < halt_threshold
@@ -613,21 +623,42 @@ def extract_features_from_trial(row):
                 if duration >= 250:
                     halts_count += 1
                     halts_duration += duration
+                    halt_intervals.append((s, e))
+                    halt_durations.append(duration)
+
+        # Hesitations (velocity drops below 30% of median speed for >= 100ms)
+        # Excludes any hesitation interval that overlaps with a halt interval (halts take precedence)
+        hesitations_count = 0
+        hesitations_duration = 0.0
+        hesitation_durations = []
+        if len(vel) > 0 and pd.notna(median_speed) and median_speed > 0:
+            hes_threshold = 0.3 * median_speed
+            hes_mask = vel < hes_threshold
+            padded_hes = np.concatenate(([False], hes_mask, [False]))
+            diffs_hes = np.diff(padded_hes.astype(int))
+            starts_hes = np.where(diffs_hes == 1)[0]
+            ends_hes = np.where(diffs_hes == -1)[0]
+            for s, e in zip(starts_hes, ends_hes):
+                duration = times[e] - times[s]
+                if duration >= 100:
+                    # Check overlap with any halt interval
+                    overlaps_with_halt = False
+                    for halt_s, halt_e in halt_intervals:
+                        if max(s, halt_s) < min(e, halt_e):
+                            overlaps_with_halt = True
+                            break
+                    if not overlaps_with_halt:
+                        hesitations_count += 1
+                        hesitations_duration += duration
+                        hesitation_durations.append(duration)
 
         pause_threshold = 10.0 # arbitrary px/s threshold for halt
         pauses = vel < pause_threshold
         pause_count = np.sum(np.diff(pauses.astype(int)) == 1)
         
-        longest_pause_duration = 0.0
-        if len(vel) > 0:
-            padded = np.concatenate(([False], pauses, [False]))
-            diffs = np.diff(padded.astype(int))
-            starts = np.where(diffs == 1)[0]
-            ends = np.where(diffs == -1)[0]
-            for s, e in zip(starts, ends):
-                p_duration = times[e] - times[s]
-                if p_duration >= 100:
-                    longest_pause_duration = max(longest_pause_duration, p_duration)
+        # Calculate longest relative hesitation/halt duration
+        all_durations = halt_durations + hesitation_durations
+        longest_pause_duration = max(all_durations) if all_durations else 0.0
 
         mean_accel = np.mean(acc) if len(acc) > 0 else np.nan
         mean_abs_jerk = np.mean(np.abs(jerk)) if len(jerk) > 0 else np.nan
@@ -673,7 +704,7 @@ def extract_features_from_trial(row):
             'task_axis_crossings_count': task_axis_crossings_count,
             'kinetic_tremor_frequency_hz': k_freq,
             'kinetic_tremor_power': k_power,
-            'kinetic_tremor_amplitude': k_amp,
+            'kinetic_tremor_amplitude': k_amp * (2.54 / 96.0) * 10.0 if pd.notna(k_amp) else np.nan,
             'drag_tremor_amplitude_peak_px': k_amp_peak_px,
             'drag_tremor_amplitude_peak_cm': k_amp_peak_cm,
             'drag_tremor_clinical_grade': max(
@@ -705,12 +736,14 @@ def extract_features_from_trial(row):
             'drag_hesitations_duration_ms': hesitations_duration,
             'drag_halts_count': halts_count,
             'drag_halts_duration_ms': halts_duration,
+            'drag_hesitations_halts_count': hesitations_count + halts_count,
+            'drag_hesitations_halts_duration_ms': hesitations_duration + halts_duration,
             'mean_acceleration': mean_accel,
             'mean_abs_jerk': mean_abs_jerk,
             'peak_jerk': peak_jerk,
             'pause_count': pause_count,
-            'longest_pause_duration': longest_pause_duration,
-            'initiation_delay': row.get('initiation_delay'),
+            'longest_hesitation_halt_duration': longest_pause_duration,
+            'initiation_delay': float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else np.nan,
             'movement_time_ms': row.get('movement_time_ms'),
             'fitts_law_id': fitts_law_id,
             'fitts_law_throughput': fitts_law_throughput,
@@ -800,18 +833,31 @@ def extract_features_from_trial(row):
 
         # Speed Decrement (progressive intertap slowing)
         if len(intertap) > 1:
-            tap_speed_slope = np.polyfit(np.arange(len(intertap)), intertap, 1)[0]
+            tap_interval_slope = np.polyfit(np.arange(len(intertap)), intertap, 1)[0]
+            tap_speeds_hz = 1000.0 / intertap
+            tap_frequency_slope = np.polyfit(np.arange(len(tap_speeds_hz)), tap_speeds_hz, 1)[0]
+            
+            if len(tap_speeds_hz) >= 6:
+                first_3_sp = np.median(tap_speeds_hz[:3])
+                last_3_sp = np.median(tap_speeds_hz[-3:])
+                tap_frequency_decrement_ratio = last_3_sp / first_3_sp if first_3_sp > 0 else np.nan
+            elif len(tap_speeds_hz) >= 2:
+                tap_frequency_decrement_ratio = tap_speeds_hz[-1] / tap_speeds_hz[0] if tap_speeds_hz[0] > 0 else np.nan
+            else:
+                tap_frequency_decrement_ratio = np.nan
         else:
-            tap_speed_slope = 0.0
+            tap_interval_slope = 0.0
+            tap_frequency_slope = 0.0
+            tap_frequency_decrement_ratio = np.nan
 
         if len(intertap) >= 6:
             first_3_it = np.median(intertap[:3])
             last_3_it = np.median(intertap[-3:])
-            tap_speed_decrement_ratio = last_3_it / first_3_it if first_3_it > 0 else np.nan
+            tap_interval_decrement_ratio = last_3_it / first_3_it if first_3_it > 0 else np.nan
         elif len(intertap) >= 2:
-            tap_speed_decrement_ratio = intertap[-1] / intertap[0] if intertap[0] > 0 else np.nan
+            tap_interval_decrement_ratio = intertap[-1] / intertap[0] if intertap[0] > 0 else np.nan
         else:
-            tap_speed_decrement_ratio = np.nan
+            tap_interval_decrement_ratio = np.nan
 
         # 3. Hesitations & Halts
         hesitations = 0
@@ -822,14 +868,20 @@ def extract_features_from_trial(row):
         med_intertap = np.median(intertap) if len(intertap) > 0 else np.nan
         max_intertap = np.max(intertap) if len(intertap) > 0 else np.nan
         tap_halt_ratio = med_intertap / max_intertap if (pd.notna(med_intertap) and max_intertap > 0) else np.nan
+        
+        disruption_durations = []
         if len(intertap) > 0 and pd.notna(med_intertap) and med_intertap > 0:
             for iti in intertap:
                 if iti > 2.0 * med_intertap:
                     halts += 1
                     halts_duration += iti
+                    disruption_durations.append(iti)
                 elif iti > 1.5 * med_intertap:
                     hesitations += 1
                     hesitations_duration += iti
+                    disruption_durations.append(iti)
+                    
+        longest_hesitation_halt_duration_ms = max(disruption_durations) if disruption_durations else 0.0
 
         # 4. Double Taps (Sequence violations)
         double_taps = 0
@@ -864,6 +916,13 @@ def extract_features_from_trial(row):
             if len(traj_times) >= 10 and (traj_times[-1] - traj_times[0]) >= 2000:
                 k_freq, k_power, k_amp, k_amp_peak_px, k_amp_peak_cm, k_clinical_grade = extract_tremor(traj_times, traj_coords)
             
+        raw_init = row.get('initiation_delay')
+        trial_num = row.get('trial_number', 1)
+        if raw_init is not None:
+            initiation_delay = float(raw_init) if trial_num <= 1 else max(0.0, float(raw_init) - 2000.0)
+        else:
+            initiation_delay = np.nan
+
         return pd.Series({
             'tap_count': tap_count,
             'tap_frequency': freq,
@@ -871,18 +930,23 @@ def extract_features_from_trial(row):
             'cv_intertap_interval': cv_intertap,
             'tap_spatial_sd': spatial_sd,
             'tap_accuracy': tap_accuracy,
-            'initiation_delay': row.get('initiation_delay'),
+            'initiation_delay': initiation_delay,
             'median_amplitude_px': median_amplitude,
             'median_amplitude_mm': median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan,
             'amplitude_slope': amplitude_slope,
             'amplitude_slope_mm': amplitude_slope * (25.4 / 96.0) if pd.notna(amplitude_slope) else np.nan,
             'amplitude_decrement_ratio': amplitude_decrement_ratio,
-            'tap_speed_slope': tap_speed_slope,
-            'tap_speed_decrement_ratio': tap_speed_decrement_ratio,
+            'tap_interval_slope': tap_interval_slope,
+            'tap_frequency_slope': tap_frequency_slope,
+            'tap_interval_decrement_ratio': tap_interval_decrement_ratio,
+            'tap_frequency_decrement_ratio': tap_frequency_decrement_ratio,
             'hesitations_count': hesitations,
             'hesitations_duration_ms': hesitations_duration,
             'halts_count': halts,
             'halts_duration_ms': halts_duration,
+            'hesitations_halts_count': hesitations + halts,
+            'hesitations_halts_duration_ms': hesitations_duration + halts_duration,
+            'longest_hesitation_halt_duration_ms': float(longest_hesitation_halt_duration_ms),
             'tap_halt_ratio': tap_halt_ratio,
             'double_taps_count': double_taps,
             'interruptions_count': interruptions,
@@ -923,6 +987,13 @@ def extract_features_from_trial(row):
         
         force_valid = 1.0 if (len(forces) > 0 and np.max(forces) > 0) else 0.0
         
+        raw_init = row.get('initiation_delay')
+        trial_num = row.get('trial_number', 1)
+        if raw_init is not None:
+            initiation_delay = float(raw_init) if trial_num <= 1 else max(0.0, float(raw_init) - 2000.0)
+        else:
+            initiation_delay = np.nan
+
         return pd.Series({
             'hold_duration_ms': row.get('total_hold_time_ms'),
             'hold_drift_distance': total_drift,
@@ -931,7 +1002,7 @@ def extract_features_from_trial(row):
             'hold_mean_abs_jerk': np.mean(np.abs(jerk)) if len(jerk) > 0 else np.nan,
             'hold_tremor_frequency_hz': tremor_freq,
             'hold_tremor_power': tremor_power,
-            'hold_tremor_amplitude': tremor_amp,
+            'hold_tremor_amplitude': tremor_amp * (2.54 / 96.0) * 10.0 if pd.notna(tremor_amp) else np.nan,
             'hold_tremor_amplitude_peak_px': tremor_amp_peak_px,
             'hold_tremor_amplitude_peak_cm': tremor_amp_peak_cm,
             'hold_tremor_clinical_grade': tremor_clinical_grade,
@@ -942,7 +1013,8 @@ def extract_features_from_trial(row):
             'hold_force_median': np.median(forces) if force_valid else np.nan,
             'hold_force_valid': force_valid,
             'akinetic_delay_hold': row.get('akinetic_delay_hold'),
-            'initiation_delay': row.get('initiation_delay')
+            'initiation_delay': initiation_delay,
+            'release_delay_ms': row.get('release_delay_ms')
         })
     elif task == 'pinch':
         traj = row.get('trajectory', [])
@@ -1056,17 +1128,30 @@ def extract_features_from_trial(row):
         if len(peak_distances_mm) >= 6:
             first_3 = np.median(peak_distances_mm[:3])
             last_3 = np.median(peak_distances_mm[-3:])
-            opening_distance_decrement_ratio = last_3 / first_3 if first_3 > 0 else np.nan
+            opening_distance_decrement_ratio = 1.0 - (last_3 / first_3) if first_3 > 0 else np.nan
         elif len(peak_distances_mm) >= 2:
-            opening_distance_decrement_ratio = peak_distances_mm[-1] / peak_distances_mm[0] if peak_distances_mm[0] > 0 else np.nan
+            opening_distance_decrement_ratio = 1.0 - (peak_distances_mm[-1] / peak_distances_mm[0]) if peak_distances_mm[0] > 0 else np.nan
         else:
             opening_distance_decrement_ratio = np.nan
 
         # Speed Decrement (progressive inter-cycle slowing)
         if len(cycle_intervals) > 1:
             pinch_speed_slope = np.polyfit(np.arange(len(cycle_intervals)), cycle_intervals, 1)[0]
+            pinch_speeds_hz = 1000.0 / cycle_intervals
+            pinch_cycle_speed_slope = np.polyfit(np.arange(len(pinch_speeds_hz)), pinch_speeds_hz, 1)[0]
+            
+            if len(pinch_speeds_hz) >= 6:
+                first_3_sp = np.median(pinch_speeds_hz[:3])
+                last_3_sp = np.median(pinch_speeds_hz[-3:])
+                pinch_cycle_speed_decrement_ratio = last_3_sp / first_3_sp if first_3_sp > 0 else np.nan
+            elif len(pinch_speeds_hz) >= 2:
+                pinch_cycle_speed_decrement_ratio = pinch_speeds_hz[-1] / pinch_speeds_hz[0] if pinch_speeds_hz[0] > 0 else np.nan
+            else:
+                pinch_cycle_speed_decrement_ratio = np.nan
         else:
             pinch_speed_slope = 0.0
+            pinch_cycle_speed_slope = 0.0
+            pinch_cycle_speed_decrement_ratio = np.nan
 
         if len(cycle_intervals) >= 6:
             first_3_pi = np.median(cycle_intervals[:3])
@@ -1083,14 +1168,19 @@ def extract_features_from_trial(row):
         hesitations_duration = 0.0
         halts = 0
         halts_duration = 0.0
+        disruption_durations = []
         if len(cycle_intervals) > 0 and pd.notna(med_cycle) and med_cycle > 0:
             for iti in cycle_intervals:
                 if iti > 2.0 * med_cycle:
                     halts += 1
                     halts_duration += iti
+                    disruption_durations.append(iti)
                 elif iti > 1.5 * med_cycle:
                     hesitations += 1
                     hesitations_duration += iti
+                    disruption_durations.append(iti)
+                    
+        pinch_longest_hesitation_halt_duration_ms = max(disruption_durations) if disruption_durations else 0.0
 
         # Pinch Lift-Offs (touch interruptions)
         pinch_lifts_count = 0
@@ -1131,6 +1221,16 @@ def extract_features_from_trial(row):
             pinch_mean_orientation_deviation = np.nan
             pinch_orientation_drift_sd = np.nan
 
+        # Calculate initiation delay based on when the pinch movement actually begins (distance deviates from baseline)
+        sig_range = np.max(distances_smooth) - np.min(distances_smooth)
+        thresh = max(15.0, 0.15 * sig_range) if sig_range > 0 else 15.0
+        d_start = distances_smooth[0]
+        move_idx = np.where(np.abs(distances_smooth - d_start) > thresh)[0]
+        if len(move_idx) > 0:
+            initiation_delay = float(times[move_idx[0]])
+        else:
+            initiation_delay = 0.0
+
         return pd.Series({
             'pinch_duration_ms': row.get('total_tap_time_ms', duration_ms),
             'pinch_count': cycle_count,
@@ -1144,11 +1244,16 @@ def extract_features_from_trial(row):
             'pinch_opening_distance_slope_mm': opening_distance_slope,
             'pinch_opening_distance_decrement_ratio': opening_distance_decrement_ratio,
             'pinch_speed_slope': pinch_speed_slope,
+            'pinch_cycle_speed_slope': pinch_cycle_speed_slope,
             'pinch_speed_decrement_ratio': pinch_speed_decrement_ratio,
+            'pinch_cycle_speed_decrement_ratio': pinch_cycle_speed_decrement_ratio,
             'pinch_hesitations_count': hesitations,
             'pinch_hesitations_duration_ms': hesitations_duration,
             'pinch_halts_count': halts,
             'pinch_halts_duration_ms': halts_duration,
+            'pinch_hesitations_halts_count': hesitations + halts,
+            'pinch_hesitations_halts_duration_ms': hesitations_duration + halts_duration,
+            'pinch_longest_hesitation_halt_duration_ms': float(pinch_longest_hesitation_halt_duration_ms),
             'pinch_lifts_count': pinch_lifts_count,
             'pinch_lifts_duration_ms': pinch_lifts_duration_ms,
             'pinch_mean_lift_duration_ms': pinch_mean_lift_duration_ms,
@@ -1157,7 +1262,7 @@ def extract_features_from_trial(row):
             'pinch_mean_opening_speed_mm_s': mean_opening_speed_mm,
             'pinch_median_opening_speed_mm_s': median_opening_speed_mm,
             'pinch_max_opening_velocity_mm_s': max_opening_velocity_mm,
-            'initiation_delay': row.get('initiation_delay', 0),
+            'initiation_delay': initiation_delay,
             'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, opening_distance_decrement_ratio, halts, 0, hesitations, pinch_median_opening_distance_mm, is_pinch=True)
         })
         

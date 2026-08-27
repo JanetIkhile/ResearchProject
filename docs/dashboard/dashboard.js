@@ -83,7 +83,7 @@ const startBtn = document.getElementById("startBtn");
         `Use your <span class="highlight">${dominantArm || 'dominant'} hand</span> throughout.<br>` +
         `Follow the instructions for each task.`;
 
-    // Show animated helper hand pointing to the button after 5 seconds of inactivity
+    // Show animated helper hand pointing to the button after 2 seconds of inactivity
     const pointerTimeout = setTimeout(() => {
         if (!startBtn || startBtn.style.display === "none" || startBtn.disabled) return;
         const rect = startBtn.getBoundingClientRect();
@@ -95,7 +95,7 @@ const startBtn = document.getElementById("startBtn");
         pointer.style.left = `${rect.left + rect.width / 2 - 30}px`;
         pointer.style.top = `${rect.top + rect.height / 2 + 15}px`;
         document.body.appendChild(pointer);
-    }, 5000);
+    }, 2000);
 
     // -----------------------------
     // 3. Dynamic Task Routing on startBtn Click

@@ -7,6 +7,27 @@
     <title>Thank You</title>
 
     <style>
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawk.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawkb.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawkl.ttf') format('truetype');
+            font-weight: 300;
+            font-style: normal;
+        }
+
         body, * {
             -webkit-tap-highlight-color: transparent;
             -webkit-user-select: none;
@@ -16,19 +37,24 @@
 
         body {
             margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background-color: #f3f4f6;
+            font-family: 'Selawik', Arial, Helvetica, sans-serif;
+            background-color: #f4f7fb;
 
             display: flex;
             justify-content: center;
-            align-items: flex-start;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-            padding-top: clamp(120px, 15vh, 180px);
+        button, input, select, textarea {
+            font-family: inherit;
         }
 
         .container {
+            width: 100%;
             max-width: 600px;
             padding: 20px;
+            text-align: center;
         }
 
         .emoji {

@@ -6,6 +6,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Motor Performance System</title>
   <style>
+    @font-face {
+        font-family: 'Selawik';
+        src: url('../assets/fonts/selawk.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+    }
+
+    @font-face {
+        font-family: 'Selawik';
+        src: url('../assets/fonts/selawkb.ttf') format('truetype');
+        font-weight: bold;
+        font-style: normal;
+    }
+
+    @font-face {
+        font-family: 'Selawik';
+        src: url('../assets/fonts/selawkl.ttf') format('truetype');
+        font-weight: 300;
+        font-style: normal;
+    }
+
     body, * {
       -webkit-tap-highlight-color: transparent;
       -webkit-user-select: none;
@@ -14,7 +35,7 @@
     }
 
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Selawik', Arial, sans-serif;
       background: #f4f7fb;
       display: flex;
       flex-direction: column;
@@ -22,6 +43,10 @@
       align-items: center;
       height: 100vh;
       margin: 0;
+    }
+
+    button, input, select, textarea {
+      font-family: inherit;
     }
 
     .dashboard-content {

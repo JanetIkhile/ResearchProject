@@ -76,14 +76,25 @@ function showPinchPracticeErrorModal(message) {
     modalDiv.style.left = "0";
     modalDiv.style.width = "100%";
     modalDiv.style.height = "100%";
-    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.6)";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+    modalDiv.style.backdropFilter = "blur(8px)";
+    modalDiv.style.webkitBackdropFilter = "blur(8px)";
     modalDiv.style.display = "flex";
     modalDiv.style.justifyContent = "center";
     modalDiv.style.alignItems = "center";
     modalDiv.style.zIndex = "9999";
 
-    // Stop all touch and click events from bubbling up to document background
-    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup", "click"].forEach(evtName => {
+    const dismissModal = () => {
+        modalDiv.remove();
+        // Allow restarting
+        firstTouchTime = null;
+        sessionStorage.setItem("pinch_page_load", String(Date.now()));
+    };
+
+    modalDiv.addEventListener("click", dismissModal);
+
+    // Stop touch/pointer events from bubbling down to task elements underneath
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup"].forEach(evtName => {
         modalDiv.addEventListener(evtName, (e) => {
             e.stopPropagation();
         });
@@ -91,45 +102,58 @@ function showPinchPracticeErrorModal(message) {
 
     const contentDiv = document.createElement("div");
     contentDiv.style.backgroundColor = "white";
-    contentDiv.style.padding = "32px 40px";
-    contentDiv.style.borderRadius = "16px";
-    contentDiv.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
-    contentDiv.style.maxWidth = "460px";
+    contentDiv.style.padding = "40px clamp(24px, 5vw, 40px)";
+    contentDiv.style.borderRadius = "24px";
+    contentDiv.style.boxShadow = "0 20px 40px rgba(0,0,0,0.15)";
+    contentDiv.style.maxWidth = "580px";
     contentDiv.style.width = "85%";
     contentDiv.style.textAlign = "center";
-    contentDiv.style.fontFamily = "'Outfit', 'Inter', sans-serif";
+    contentDiv.style.fontFamily = "'Selawik', Arial, Helvetica, sans-serif";
+    contentDiv.style.boxSizing = "border-box";
 
     const title = document.createElement("h3");
     title.innerText = "⚠️ Practice Tip";
     title.style.margin = "0 0 16px 0";
     title.style.color = "#ea580c";
     title.style.fontSize = "26px";
+    title.style.fontWeight = "bold";
 
     const msg = document.createElement("p");
     msg.innerText = message;
-    msg.style.margin = "0 0 24px 0";
-    msg.style.fontSize = "19px";
+    msg.style.margin = "0 0 28px 0";
+    msg.style.fontSize = "22px";
     msg.style.lineHeight = "1.6";
-    msg.style.color = "#374151";
+    msg.style.color = "#4b5563";
 
     const btn = document.createElement("button");
     btn.innerText = "Okay";
     btn.style.backgroundColor = "#003366";
     btn.style.color = "white";
     btn.style.border = "none";
-    btn.style.padding = "14px 28px";
-    btn.style.fontSize = "18px";
+    btn.style.padding = "16px 28px";
+    btn.style.fontSize = "20px";
     btn.style.fontWeight = "bold";
-    btn.style.borderRadius = "8px";
+    btn.style.borderRadius = "12px";
     btn.style.cursor = "pointer";
     btn.style.width = "100%";
+    btn.style.boxSizing = "border-box";
+    btn.style.boxShadow = "0 4px 12px rgba(0, 51, 102, 0.25)";
+    btn.style.transition = "background-color 0.2s, transform 0.1s";
 
-    btn.addEventListener("click", () => {
-        modalDiv.remove();
-        // Allow restarting
-        firstTouchTime = null;
-        sessionStorage.setItem("pinch_page_load", String(Date.now()));
+    btn.addEventListener("mouseenter", () => {
+        btn.style.backgroundColor = "#002244";
     });
+    btn.addEventListener("mouseleave", () => {
+        btn.style.backgroundColor = "#003366";
+    });
+    btn.addEventListener("pointerdown", () => {
+        btn.style.transform = "scale(0.97)";
+    });
+    btn.addEventListener("pointerup", () => {
+        btn.style.transform = "scale(1)";
+    });
+
+    btn.addEventListener("click", dismissModal);
 
     contentDiv.appendChild(title);
     contentDiv.appendChild(msg);

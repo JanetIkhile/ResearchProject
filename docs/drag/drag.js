@@ -55,13 +55,13 @@ let continueInactivityTimer = null;
 
         if (sessionNumber === 1) {
             TRIAL_LIMIT = 3;   // practice session
-            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and <strong class=\"highlight-instruction\">accurately</strong> as possible.";
             instructionSub.style.display = "none";
             const indicator = document.getElementById("watchExampleIndicator");
             if (indicator) indicator.style.display = "inline-block";
         } else {
             TRIAL_LIMIT = 10;  // real session
-            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and <strong class=\"highlight-instruction\">accurately</strong> as possible.";
             instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
             instructionSub.style.display = "inline-block";
         }
@@ -366,7 +366,7 @@ function handleTouchStart(e) {
             if (helpBanner && !helpBanner.contains(e.target)) {
                 helpBanner.style.display = "none";
                 practiceStep = 'waiting_for_touch';
-                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and <strong class=\"highlight-instruction\">accurately</strong> as possible.";
                 instructionSub.style.display = "inline-block";
                 instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
 
@@ -418,13 +418,13 @@ function handleTouchStart(e) {
             if (distToStart <= sRad) {
                 // Touched green circle: start trial immediately
                 practiceStep = 'active_practice';
-                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and <strong class=\"highlight-instruction\">accurately</strong> as possible.";
                 instructionSub.style.display = "inline-block";
                 instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
             } else {
                 // Touched outside green circle: transition to waiting_for_touch and set inactivity timer
                 practiceStep = 'waiting_for_touch';
-                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+                instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and <strong class=\"highlight-instruction\">accurately</strong> as possible.";
                 instructionSub.style.display = "inline-block";
                 instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
 
@@ -524,6 +524,102 @@ function handleTouchMove(e) {
     }
 }
 
+function showPracticeTip(message) {
+    if (document.getElementById("practiceErrorModal")) return;
+
+    const modalDiv = document.createElement("div");
+    modalDiv.id = "practiceErrorModal";
+    modalDiv.style.position = "fixed";
+    modalDiv.style.top = "0";
+    modalDiv.style.left = "0";
+    modalDiv.style.width = "100%";
+    modalDiv.style.height = "100%";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+    modalDiv.style.backdropFilter = "blur(8px)";
+    modalDiv.style.webkitBackdropFilter = "blur(8px)";
+    modalDiv.style.display = "flex";
+    modalDiv.style.justifyContent = "center";
+    modalDiv.style.alignItems = "center";
+    modalDiv.style.zIndex = "9999";
+
+    const dismissModal = () => {
+        modalDiv.remove();
+        // Reset trial starts
+        trialStartTime = Date.now();
+        lastTrialEndTime = Date.now();
+    };
+
+    modalDiv.addEventListener("click", dismissModal);
+
+    // Stop touch/pointer events from bubbling down to task elements underneath
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup"].forEach(evtName => {
+        modalDiv.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    const contentDiv = document.createElement("div");
+    contentDiv.style.backgroundColor = "white";
+    contentDiv.style.padding = "40px clamp(24px, 5vw, 40px)";
+    contentDiv.style.borderRadius = "24px";
+    contentDiv.style.boxShadow = "0 20px 40px rgba(0,0,0,0.15)";
+    contentDiv.style.maxWidth = "580px";
+    contentDiv.style.width = "85%";
+    contentDiv.style.textAlign = "center";
+    contentDiv.style.fontFamily = "'Selawik', Arial, Helvetica, sans-serif";
+    contentDiv.style.boxSizing = "border-box";
+
+    const title = document.createElement("h3");
+    title.innerText = "⚠️ Practice Tip";
+    title.style.margin = "0 0 16px 0";
+    title.style.color = "#ea580c";
+    title.style.fontSize = "26px";
+    title.style.fontWeight = "bold";
+
+    const msg = document.createElement("p");
+    msg.innerText = message;
+    msg.style.margin = "0 0 28px 0";
+    msg.style.fontSize = "22px";
+    msg.style.lineHeight = "1.6";
+    msg.style.color = "#4b5563";
+
+    const btn = document.createElement("button");
+    btn.innerText = "Okay";
+    btn.style.backgroundColor = "#003366";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "16px 28px";
+    btn.style.fontSize = "20px";
+    btn.style.fontWeight = "bold";
+    btn.style.borderRadius = "12px";
+    btn.style.cursor = "pointer";
+    btn.style.width = "100%";
+    btn.style.boxSizing = "border-box";
+    btn.style.boxShadow = "0 4px 12px rgba(0, 51, 102, 0.25)";
+    btn.style.transition = "background-color 0.2s, transform 0.1s";
+
+    btn.addEventListener("mouseenter", () => {
+        btn.style.backgroundColor = "#002244";
+    });
+    btn.addEventListener("mouseleave", () => {
+        btn.style.backgroundColor = "#003366";
+    });
+    btn.addEventListener("pointerdown", () => {
+        btn.style.transform = "scale(0.97)";
+    });
+    btn.addEventListener("pointerup", () => {
+        btn.style.transform = "scale(1)";
+    });
+
+    btn.addEventListener("click", dismissModal);
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(msg);
+    contentDiv.appendChild(btn);
+    modalDiv.appendChild(contentDiv);
+    document.body.appendChild(modalDiv);
+}
+
 async function handleTouchEnd(e) {
     if (taskCompleted) return;
     if (window.isModalOpen || e.target.id === "nextTaskButton") return;
@@ -544,13 +640,6 @@ async function handleTouchEnd(e) {
         return;
     }
 
-    trialNumber += 1;
-    const remaining = TRIAL_LIMIT - trialNumber;
-    if (remaining >= 0) {
-        instructionSub.innerText = `Attempts left: ${remaining}`;
-    }
-
-    trialEndTime = Date.now();
     // Calculate target reach based on the outer red circle (targetPoint in HTML)
     const outerTarget = document.getElementById('targetPoint');
     const outerTargetRect = outerTarget.getBoundingClientRect();
@@ -559,7 +648,21 @@ async function handleTouchEnd(e) {
     const distToTarget = Math.hypot(touchEndX - targetX, touchEndY - targetY);
     const targetReached = distToTarget <= outerTargetRadius;
 
-    // Replaced feedback block with empty code for practice phase
+    if (sessionNumber === 1 && !targetReached) {
+        showPracticeTip("Please drag all the way to the target circle.");
+        const pointer = document.getElementById(`pointer-${touch.identifier}`);
+        if (pointer) pointer.remove();
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    trialNumber += 1;
+    const remaining = TRIAL_LIMIT - trialNumber;
+    if (remaining >= 0) {
+        instructionSub.innerText = `Attempts left: ${remaining}`;
+    }
+
+    trialEndTime = Date.now();
     lastTrialEndTime = trialEndTime;
 
     trajectoryLog.push({
@@ -645,7 +748,7 @@ async function handleTouchEnd(e) {
         }
 
         if (instructionBox) instructionBox.style.display = "none";
-        if (completionBox) completionBox.style.display = "block";
+        if (completionBox) completionBox.style.display = "flex";
 
         // Dim background task elements during completion (practice and main phase)
         const elementsToDim = ['taskHeader', 'mainContainer', 'startPoint', 'targetPoint', 'pathCanvas'];
@@ -675,7 +778,7 @@ async function handleTouchEnd(e) {
         // Show clicking hand animation if they are inactive for 5 seconds on completion screen
         if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
         continueInactivityTimer = setTimeout(() => {
-            if (nextButton && completionBox.style.display === "block" && !document.getElementById("continuePointer")) {
+            if (nextButton && completionBox.style.display === "flex" && !document.getElementById("continuePointer")) {
                 const pointer = document.createElement("div");
                 pointer.id = "continuePointer";
                 pointer.innerText = "👆";
@@ -810,7 +913,7 @@ function resumeDemoAnimationFromOptions() {
             });
 
             practiceStep = 'waiting_for_touch';
-            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and <strong class=\"highlight-instruction\">accurately</strong> as possible.";
             instructionSub.style.display = "inline-block";
             instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
         });
@@ -831,7 +934,7 @@ function resumeDemoAnimationFromOptions() {
             if (gifModal) gifModal.style.display = "none";
 
             practiceStep = 'waiting_for_touch';
-            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and accurately as possible.";
+            instructionMain.innerHTML = "Use your Index finger to drag from Start to Target<br><strong class=\"highlight-instruction\">as fast</strong> and <strong class=\"highlight-instruction\">accurately</strong> as possible.";
             instructionSub.style.display = "inline-block";
             instructionSub.innerText = `Attempts left: ${TRIAL_LIMIT}`;
         });

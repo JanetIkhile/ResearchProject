@@ -7,6 +7,27 @@
     <title>Study Login</title>
 
     <style>
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawk.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawkb.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawkl.ttf') format('truetype');
+            font-weight: 300;
+            font-style: normal;
+        }
+
         body, * {
             -webkit-tap-highlight-color: transparent;
             -webkit-user-select: none;
@@ -16,11 +37,15 @@
 
         body {
             margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background-color: #e5e7eb;
+            font-family: 'Selawik', Arial, Helvetica, sans-serif;
+            background-color: #f4f7fb;
 
             display: flex;
             justify-content: center;
+        }
+
+        button, input, select, textarea {
+            font-family: inherit;
         }
 
         .container {
@@ -47,7 +72,7 @@
         select, input[type="text"] {
             width: 100%;
             padding: 18px;
-            font-size: clamp(1.2rem, 2vw, 1.6rem);
+            font-size: clamp(1.4rem, 2.4vw, 1.9rem);
             border-radius: 12px;
             border: 2px solid transparent;
             background: #f3f4f6;
@@ -57,14 +82,14 @@
 
         select:focus, input[type="text"]:focus {
             outline: none;
-            border-color: #16a34a;
+            border-color: #379777;
             background: #e5e7eb;
         }
 
         input[type="text"].is-filled {
             background-color: #f0fdf4 !important;
-            border-color: #16a34a !important;
-            color: #166534 !important;
+            border-color: #379777 !important;
+            color: #2b765d !important;
             font-weight: bold;
             padding-right: 110px; /* Make room for the lock badge */
         }
@@ -87,7 +112,7 @@
 
         .dropdown-item {
             padding: 12px;
-            font-size: 1.2rem;
+            font-size: clamp(1.4rem, 2.4vw, 1.9rem);
             cursor: pointer;
             border-bottom: 1px solid #eee;
         }
@@ -101,20 +126,27 @@
         }
 
         .option-card {
-            display: block;
-            padding: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 20px;
             margin-bottom: 12px;
             border-radius: 12px;
             background: #f3f4f6;
             border: 2px solid transparent;
             cursor: pointer;
 
-            font-size: clamp(1.2rem, 2vw, 1.6rem);
+            font-size: clamp(1.4rem, 2.4vw, 1.9rem);
             transition: 0.2s;
         }
 
-        .option-card input {
-            display: none;
+        .option-card input[type="radio"] {
+            margin: 0;
+            width: clamp(1.8rem, 3vw, 2.4rem);
+            height: clamp(1.8rem, 3vw, 2.4rem);
+            accent-color: #379777;
+            cursor: pointer;
+            flex-shrink: 0;
         }
 
         .option-card:hover {
@@ -122,21 +154,21 @@
         }
 
         .option-card:has(input:checked) {
-            border-color: #16a34a !important;
+            border-color: #379777 !important;
             background-color: #f0fdf4 !important;
         }
 
         .option-card:has(input:checked) span {
-            color: #166534 !important;
+            color: #2b765d !important;
             font-weight: bold;
         }
 
         button {
-            font-size: clamp(1.3rem, 3vw, 1.8rem);
-            padding: 16px 32px;
+            font-size: clamp(1.5rem, 3.2vw, 2.2rem);
+            padding: 20px 42px;
             font-weight: bold;
 
-            background-color: #16a34a;
+            background-color: #379777;
             color: white;
             border: none;
             border-radius: 12px;
@@ -144,6 +176,11 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
             cursor: pointer;
             margin-right: 12px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #2b765d;
         }
 
         #error {
@@ -213,7 +250,7 @@
             <p class="question">Participant ID</p>
             <div style="position: relative; display: flex; align-items: center;">
                 <input type="text" id="username" placeholder="Type or select ID (e.g. P01)" autocomplete="off">
-                <span id="lockBadge" style="display: none; position: absolute; right: 15px; color: #16a34a; font-weight: bold; font-size: clamp(1rem, 2vw, 1.3rem); pointer-events: none;">✅ Entered</span>
+                <span id="lockBadge" style="display: none; position: absolute; right: 15px; color: #379777; font-weight: bold; font-size: clamp(1.2rem, 2.2vw, 1.6rem); pointer-events: none;">✅ Entered</span>
             </div>
             <div id="participantDropdown" class="custom-dropdown" style="position: absolute;"></div>
         </div>

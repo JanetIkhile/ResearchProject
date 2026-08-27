@@ -1,3 +1,24 @@
+@font-face {
+    font-family: 'Selawik';
+    src: url('../assets/fonts/selawk.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Selawik';
+    src: url('../assets/fonts/selawkb.ttf') format('truetype');
+    font-weight: bold;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Selawik';
+    src: url('../assets/fonts/selawkl.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
 body,
 html,
 canvas,
@@ -12,10 +33,14 @@ canvas,
 
 body {
     margin: 0;
-    background-color: gray;
+    background-color: #A6A6A6;
     /* Match the gray background of other tasks */
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Selawik', Arial, Helvetica, sans-serif;
     overflow: hidden;
+}
+
+button, input, select, textarea {
+    font-family: inherit;
 }
 
 #taskHeader {
@@ -217,20 +242,22 @@ body {
 #nextTaskButton {
     position: static;
     white-space: nowrap;
-    background-color: #16a34a;
+    background-color: #379777;
     color: white;
     border: none;
-    border-radius: 14px;
+    border-radius: 12px;
     font-weight: bold;
     font-size: clamp(1.2rem, 3vw, 1.8rem);
     padding: clamp(16px, 3vw, 24px) clamp(28px, 5vw, 48px);
-    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+    box-shadow: 0 4px 12px rgba(55, 151, 119, 0.3);
     cursor: pointer;
     transition: background-color 0.2s, transform 0.1s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 #nextTaskButton:hover {
-    background-color: #15803d;
+    background-color: #2b765d;
 }
 
 #nextTaskButton:active {
@@ -265,12 +292,12 @@ body {
 }
 
 .session-label.practice {
-    background-color: #facc15;
+    background-color: #FFE162;
     color: #000;
 }
 
 .session-label.real {
-    background-color: #16a34a;
+    background-color: #41A67E;
     color: #fff;
 }
 
@@ -336,12 +363,9 @@ body {
 }
 
 .highlight-instruction {
-    background-color: #fef08a;
-    /* Yellow highlight marker */
-    font-weight: bold;
-    /* Bold text */
-    color: inherit;
-    /* Inherit normal text color */
+    background-color: #F7DEAD; /* Yellow highlight marker */
+    font-weight: bold;         /* Bold text */
+    color: inherit;            /* Inherit normal text color */
     padding: 0 4px;
     border-radius: 4px;
 }
@@ -399,21 +423,21 @@ body {
 }
 
 .practice-option-primary {
-    background-color: #16a34a;
+    background-color: #2A7054;
     color: #ffffff;
 }
 
 .practice-option-primary:hover {
-    background-color: #15803d;
+    background-color: #1E523D;
 }
 
 .practice-option-secondary {
-    background-color: #003366;
+    background-color: #1055C9;
     color: #ffffff;
 }
 
 .practice-option-secondary:hover {
-    background-color: #002244;
+    background-color: #0d46a8;
 }
 
 #helpBanner {
@@ -532,12 +556,12 @@ body {
 }
 
 .gif-btn-primary {
-    background-color: #16a34a;
+    background-color: #2A7054;
     color: white;
 }
 
 .gif-btn-primary:hover {
-    background-color: #15803d;
+    background-color: #1E523D;
 }
 
 .gif-btn-secondary {
@@ -555,7 +579,7 @@ body {
 
 .watch-example-indicator {
     margin-top: 16px;
-    background-color: #003366;
+    background-color: #4682B4;
     color: white;
     border: none;
     border-radius: 12px;
@@ -594,13 +618,13 @@ body {
 }
 
 .trial-dot.completed {
-    background-color: #16a34a;
-    border-color: #16a34a;
+    background-color: #41A67E;
+    border-color: #41A67E;
 }
 
 .trial-dot.active {
-    background-color: #003366;
-    border-color: #003366;
+    background-color: #1055C9;
+    border-color: #1055C9;
 }
 
 @keyframes tapContinue {

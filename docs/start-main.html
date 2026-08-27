@@ -5,6 +5,27 @@
     <meta charset="UTF-8">
     <title>Start Main Session</title>
     <style>
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawk.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawkb.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'Selawik';
+            src: url('assets/fonts/selawkl.ttf') format('truetype');
+            font-weight: 300;
+            font-style: normal;
+        }
+
         body, * {
             -webkit-tap-highlight-color: transparent;
             -webkit-user-select: none;
@@ -14,8 +35,8 @@
 
         body {
             margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background-color: #e5e7eb;
+            font-family: 'Selawik', Arial, Helvetica, sans-serif;
+            background-color: #f4f7fb;
 
             display: flex;
             justify-content: center;
@@ -49,14 +70,20 @@
             font-size: clamp(1.4rem, 3.5vw, 2rem);
             padding: clamp(18px, 4vw, 28px) clamp(32px, 6vw, 56px);
 
+            font-family: inherit;
             font-weight: bold;
-            background-color: #16a34a;
+            background-color: #379777;
             color: white;
             border: none;
             border-radius: 14px;
 
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
             cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #2b765d;
         }
 
         @keyframes tapContinue {
@@ -114,7 +141,7 @@
         // Prevent long-press context menu globally
         document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
 
-        // Show animated helper hand pointing to the button after 5 seconds of inactivity
+        // Show animated helper hand pointing to the button after 2 seconds of inactivity
         window.addEventListener("load", () => {
             setTimeout(() => {
                 const btn = document.querySelector("button");
@@ -128,7 +155,7 @@
                 pointer.style.left = `${rect.left + rect.width / 2 - 30}px`;
                 pointer.style.top = `${rect.top + rect.height / 2 + 15}px`;
                 document.body.appendChild(pointer);
-            }, 5000);
+            }, 2000);
         });
     </script>
 </body>
