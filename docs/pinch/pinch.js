@@ -285,9 +285,6 @@ function resetTargetPositions() {
     bottomTarget.style.top = "";
     bottomTarget.style.transform = "";
     bottomTarget.style.transition = "";
-
-    const debugDiv = document.getElementById("pinchDebug");
-    if (debugDiv) debugDiv.remove();
 }
 
 // Multi-Touch Handler
@@ -628,12 +625,7 @@ function handleTouch(e) {
         }
     }
 
-    // Track initiation delay on first touch of the session/trial
-    if (touches.length > 0 && !firstTouchTime && !taskActive) {
-        firstTouchTime = now;
-        const pageLoadTime = parseFloat(sessionStorage.getItem("pinch_page_load") || now);
-        initiationDelay = now - pageLoadTime;
-    }
+
 
     if (touches.length === 2) {
         // Clear any pending warning timer and restore normal text
@@ -730,25 +722,6 @@ function handleTouch(e) {
  
             // Practice phase validations
             if (sessionNumber === 1) {
-                // On-screen debug indicator to help diagnose touch tracking
-                let debugDiv = document.getElementById("pinchDebug");
-                if (!debugDiv) {
-                    debugDiv = document.createElement("div");
-                    debugDiv.id = "pinchDebug";
-                    debugDiv.style.position = "fixed";
-                    debugDiv.style.top = "10px";
-                    debugDiv.style.left = "10px";
-                    debugDiv.style.backgroundColor = "rgba(0,0,0,0.85)";
-                    debugDiv.style.color = "#4ade80";
-                    debugDiv.style.padding = "6px 12px";
-                    debugDiv.style.borderRadius = "8px";
-                    debugDiv.style.zIndex = "9999";
-                    debugDiv.style.fontFamily = "monospace";
-                    debugDiv.style.fontSize = "14px";
-                    debugDiv.style.border = "1px solid #22c55e";
-                    document.body.appendChild(debugDiv);
-                }
-                debugDiv.innerText = `dist: ${distPx.toFixed(1)} | peak: ${maxStrokeDistance.toFixed(1)} | diff: ${(maxStrokeDistance - distPx).toFixed(1)}`;
 
                 const hasOpened = (maxStrokeDistance > strokeStartDistance + 5);
                 
@@ -1130,6 +1103,10 @@ function startPinchTrial(now) {
     lastIndexY = null;
     lastThumbX = null;
     lastThumbY = null;
+
+    firstTouchTime = now;
+    const pageLoadTime = parseFloat(sessionStorage.getItem("pinch_page_load") || now);
+    initiationDelay = now - pageLoadTime;
 
     // Explicitly hide overlays
     const tryItButton = document.getElementById("tryItButton");

@@ -743,7 +743,8 @@ def extract_features_from_trial(row):
             'peak_jerk': peak_jerk,
             'pause_count': pause_count,
             'longest_hesitation_halt_duration': longest_pause_duration,
-            'initiation_delay': float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else np.nan,
+            'setup_time': float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else np.nan,
+            'initiation_delay': float(valid_pts[start_idx]['t']) if len(valid_pts) > start_idx else 0.0,
             'movement_time_ms': row.get('movement_time_ms'),
             'fitts_law_id': fitts_law_id,
             'fitts_law_throughput': fitts_law_throughput,
@@ -919,9 +920,15 @@ def extract_features_from_trial(row):
         raw_init = row.get('initiation_delay')
         trial_num = row.get('trial_number', 1)
         if raw_init is not None:
-            initiation_delay = float(raw_init) if trial_num <= 1 else max(0.0, float(raw_init) - 2000.0)
+            setup_time = float(raw_init) if trial_num <= 1 else max(0.0, float(raw_init) - 2000.0)
         else:
-            initiation_delay = np.nan
+            setup_time = np.nan
+
+        # Tap initiation delay: Time from start of active trial (first tap) to first subsequent tap
+        if len(times) > 1:
+            initiation_delay = float(times[1] - times[0])
+        else:
+            initiation_delay = 0.0
 
         return pd.Series({
             'tap_count': tap_count,
@@ -930,6 +937,7 @@ def extract_features_from_trial(row):
             'cv_intertap_interval': cv_intertap,
             'tap_spatial_sd': spatial_sd,
             'tap_accuracy': tap_accuracy,
+            'setup_time': setup_time,
             'initiation_delay': initiation_delay,
             'median_amplitude_px': median_amplitude,
             'median_amplitude_mm': median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan,
@@ -990,9 +998,13 @@ def extract_features_from_trial(row):
         raw_init = row.get('initiation_delay')
         trial_num = row.get('trial_number', 1)
         if raw_init is not None:
-            initiation_delay = float(raw_init) if trial_num <= 1 else max(0.0, float(raw_init) - 2000.0)
+            setup_time = float(raw_init) if trial_num <= 1 else max(0.0, float(raw_init) - 2000.0)
         else:
-            initiation_delay = np.nan
+            setup_time = np.nan
+
+        # Hold initiation delay: Time from Go prompt to target press
+        akinetic = row.get('akinetic_delay_hold')
+        initiation_delay = float(akinetic) if akinetic is not None else np.nan
 
         return pd.Series({
             'hold_duration_ms': row.get('total_hold_time_ms'),
@@ -1012,7 +1024,8 @@ def extract_features_from_trial(row):
             'hold_force_range': (np.max(forces) - np.min(forces)) if force_valid else np.nan,
             'hold_force_median': np.median(forces) if force_valid else np.nan,
             'hold_force_valid': force_valid,
-            'akinetic_delay_hold': row.get('akinetic_delay_hold'),
+            'akinetic_delay_hold': akinetic,
+            'setup_time': setup_time,
             'initiation_delay': initiation_delay,
             'release_delay_ms': row.get('release_delay_ms')
         })
@@ -1262,6 +1275,7 @@ def extract_features_from_trial(row):
             'pinch_mean_opening_speed_mm_s': mean_opening_speed_mm,
             'pinch_median_opening_speed_mm_s': median_opening_speed_mm,
             'pinch_max_opening_velocity_mm_s': max_opening_velocity_mm,
+            'setup_time': float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else np.nan,
             'initiation_delay': initiation_delay,
             'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, opening_distance_decrement_ratio, halts, 0, hesitations, pinch_median_opening_distance_mm, is_pinch=True)
         })
