@@ -177,15 +177,11 @@ function setInstruction(html) {
     const isStopPinching = html.includes("Stop pinching");
     
     if (taskActive && !isWarning && !isStopPinching) {
-        // Hide/blur the instruction during active pinching
-        instructionEl.style.opacity = "0";
-        instructionEl.style.pointerEvents = "none";
-        instructionEl.style.transition = "opacity 0.2s ease-in-out";
+        // Hide the instruction during active pinching and collapse its space
+        instructionEl.style.display = "none";
     } else {
-        // Show fully visible
-        instructionEl.style.opacity = "1";
-        instructionEl.style.pointerEvents = "auto";
-        instructionEl.style.transition = "opacity 0.2s ease-in-out";
+        // Show fully visible and restore layout flow
+        instructionEl.style.display = "block";
     }
 }
 
@@ -622,6 +618,13 @@ function handleTouch(e) {
     const touches = e.touches;
     const now = Date.now();
 
+    if (touches.length >= 3) {
+        if (sessionNumber === 1) {
+            showPinchPracticeErrorModal("Please use only two fingers (your index finger and thumb) to pinch.");
+            return;
+        }
+    }
+
     // Track initiation delay on first touch of the session/trial
     if (touches.length > 0 && !firstTouchTime && !taskActive) {
         firstTouchTime = now;
@@ -659,7 +662,9 @@ function handleTouch(e) {
             // Before the trial starts, enforce vertical layout check
             const isVertical = Math.abs(dy) > Math.abs(dx);
             if (!isVertical) {
-                setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers vertically!</span>`);
+                if (sessionNumber === 1) {
+                    showPinchPracticeErrorModal("Please place your fingers vertically.");
+                }
                 return;
             }
 
@@ -863,10 +868,14 @@ function handleTouch(e) {
                     }
 
                     // Show pause warning with debounce
-                    if (!warningTimeout) {
-                        warningTimeout = setTimeout(() => {
-                            setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`);
-                        }, 150);
+                    if (sessionNumber === 1) {
+                        showPinchPracticeErrorModal("Please keep both your index finger and thumb on the screen to pinch.");
+                    } else {
+                        if (!warningTimeout) {
+                            warningTimeout = setTimeout(() => {
+                                setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`);
+                            }, 150);
+                        }
                     }
                 }
             } else {
