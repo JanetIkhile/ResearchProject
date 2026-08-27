@@ -173,13 +173,13 @@ canvas {
 #startPoint {
     background-color: #72B896;
     top: clamp(190px, 25vh, 280px);
-    left: min(8vw, 60px);
+    left: min(4vw, 25px);
 }
 
 #targetPoint {
     background-color: #CD4439;
-    bottom: clamp(60px, 13vh, 180px);
-    right: min(10vw, 60px);
+    bottom: clamp(40px, 10vh, 120px);
+    right: min(5vw, 30px);
 }
 
 #startInnerDot,
