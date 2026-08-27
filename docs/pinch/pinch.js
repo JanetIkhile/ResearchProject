@@ -868,14 +868,14 @@ function handleTouch(e) {
                     }
 
                     // Show pause warning with debounce
-                    if (sessionNumber === 1) {
-                        showPinchPracticeErrorModal("Please keep both your index finger and thumb on the screen to pinch.");
-                    } else {
-                        if (!warningTimeout) {
-                            warningTimeout = setTimeout(() => {
+                    if (!warningTimeout) {
+                        warningTimeout = setTimeout(() => {
+                            if (sessionNumber === 1) {
+                                showPinchPracticeErrorModal("Please keep both your index finger and thumb on the screen to pinch.");
+                            } else {
                                 setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`);
-                            }, 150);
-                        }
+                            }
+                        }, 150);
                     }
                 }
             } else {
