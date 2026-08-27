@@ -167,6 +167,28 @@ const topTarget = document.getElementById("topTarget");
 const bottomTarget = document.getElementById("bottomTarget");
 const liveDistanceLabel = document.getElementById("liveDistanceLabel");
 const instructionEl = document.getElementById("pinchInstruction");
+
+function setInstruction(html) {
+    if (!instructionEl) return;
+    instructionEl.innerHTML = html;
+    
+    // Check if we are showing a warning or cooldown message
+    const isWarning = html.includes("⚠️");
+    const isStopPinching = html.includes("Stop pinching");
+    
+    if (taskActive && !isWarning && !isStopPinching) {
+        // Hide/blur the instruction during active pinching
+        instructionEl.style.opacity = "0";
+        instructionEl.style.pointerEvents = "none";
+        instructionEl.style.transition = "opacity 0.2s ease-in-out";
+    } else {
+        // Show fully visible
+        instructionEl.style.opacity = "1";
+        instructionEl.style.pointerEvents = "auto";
+        instructionEl.style.transition = "opacity 0.2s ease-in-out";
+    }
+}
+
 let timerLine = null;
 let timerBadge = null;
 let attemptsCounter = null;
@@ -637,8 +659,7 @@ function handleTouch(e) {
             // Before the trial starts, enforce vertical layout check
             const isVertical = Math.abs(dy) > Math.abs(dx);
             if (!isVertical) {
-                instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers vertically!</span>`;
-                instructionEl.style.display = "block";
+                setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers vertically!</span>`);
                 return;
             }
 
@@ -657,8 +678,7 @@ function handleTouch(e) {
                     strokeStartDistance = distPx;
                     startPinchTrial(now);
                 } else {
-                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to start!</span>`;
-                    instructionEl.style.display = "block";
+                    setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to start!</span>`);
                 }
             }
         } else {
@@ -673,8 +693,7 @@ function handleTouch(e) {
                     maxStrokeDistance = distPx; // Initialize max distance for this new stroke!
                     strokeStartDistance = distPx;
                 } else {
-                    instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`;
-                    instructionEl.style.display = "block";
+                    setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`);
 
                     trajectory.push({
                         t: now - trialStartTime,
@@ -742,8 +761,7 @@ function handleTouch(e) {
             }
 
             // Restore normal instructions and draw the targets
-            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-            instructionEl.style.display = "block";
+            setInstruction(ORIGINAL_INSTRUCTION);
 
             // Record trajectory frame (always logs actual touch coordinates and actual distance)
             trajectory.push({
@@ -775,8 +793,7 @@ function handleTouch(e) {
                         distance: null
                     });
 
-                    instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-                    instructionEl.style.display = "block";
+                    setInstruction(ORIGINAL_INSTRUCTION);
                 } else {
                     // This is a pause/resume state (1 finger remains). Keep last known position of the missing finger!
                     const remainingTouch = touches[0];
@@ -848,8 +865,7 @@ function handleTouch(e) {
                     // Show pause warning with debounce
                     if (!warningTimeout) {
                         warningTimeout = setTimeout(() => {
-                            instructionEl.innerHTML = `<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`;
-                            instructionEl.style.display = "block";
+                            setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`);
                         }, 150);
                     }
                 }
@@ -879,8 +895,7 @@ function handleTouch(e) {
                     distance: null
                 });
 
-                instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
-                instructionEl.style.display = "block";
+                setInstruction(ORIGINAL_INSTRUCTION);
             }
         } else {
             // If trial not active, just reset circles
@@ -1073,6 +1088,7 @@ function setupProgressiveDisclosure() {
 // Start Trial
 function startPinchTrial(now) {
     taskActive = true;
+    setInstruction(ORIGINAL_INSTRUCTION); // Ensure opacity goes to 0 immediately
     trialNumber += 1;
     trialStartTime = now;
     trajectory = [];
@@ -1124,8 +1140,7 @@ async function stopPinchTrial() {
 
     // Synchronously update screen to disabled transition state at start of stopPinchTrial
     isBetweenTrials = true;
-    instructionEl.textContent = "Stop pinching";
-    instructionEl.style.display = "block";
+    setInstruction("Stop pinching");
     if (timerLine) timerLine.style.display = "none";
     if (attemptsCounter) attemptsCounter.style.display = "none";
 
@@ -1147,7 +1162,7 @@ async function stopPinchTrial() {
         } else {
             isBetweenTrials = false;
             resetTargetPositions(); // Reset back to center now for the next trial
-            instructionEl.innerHTML = ORIGINAL_INSTRUCTION;
+            setInstruction(ORIGINAL_INSTRUCTION);
             updateInstructions(true, (sessionNumber === 1) ? 5 : 10);
             firstTouchTime = null;
             sessionStorage.setItem("pinch_page_load", String(Date.now()));
