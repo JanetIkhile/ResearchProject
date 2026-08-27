@@ -700,7 +700,9 @@ function handleTouch(e) {
                     maxStrokeDistance = distPx; // Initialize max distance for this new stroke!
                     strokeStartDistance = distPx;
                 } else {
-                    setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Please place your fingers inside the two guide circles to start the next stroke!</span>`);
+                    if (sessionNumber === 1) {
+                        showPinchPracticeErrorModal("Please place your fingers inside the two guide circles to start the next stroke.");
+                    }
 
                     trajectory.push({
                         t: now - trialStartTime,
@@ -725,15 +727,15 @@ function handleTouch(e) {
  
             // Practice phase validations
             if (sessionNumber === 1) {
-                const hasOpenedEnough = (maxStrokeDistance > strokeStartDistance + 15);
+                const hasOpened = (maxStrokeDistance > strokeStartDistance + 5);
                 
                 // Smart log to help track pinch-in behavior
-                if (hasOpenedEnough && distPx < maxStrokeDistance - 2) {
+                if (hasOpened && distPx < maxStrokeDistance - 2) {
                     console.log(`Pinch-in detected: dist=${distPx.toFixed(1)}, peak=${maxStrokeDistance.toFixed(1)}, diff=${(maxStrokeDistance - distPx).toFixed(1)}`);
                 }
 
                 // 1) Pinch in check (active if they pinch inward from start, or back in after opening)
-                if (distPx < strokeStartDistance - 10 || (hasOpenedEnough && distPx < maxStrokeDistance - 10)) {
+                if (distPx < strokeStartDistance - 5 || (hasOpened && distPx < maxStrokeDistance - 5)) {
                     showPinchPracticeErrorModal("Please open your fingers outward. Do not pinch inward.");
                     return;
                 }
@@ -869,14 +871,10 @@ function handleTouch(e) {
                         }
                     }
 
-                    // Show pause warning with debounce
-                    if (!warningTimeout) {
+                    // Show pause warning with debounce (only in practice phase)
+                    if (sessionNumber === 1 && !warningTimeout) {
                         warningTimeout = setTimeout(() => {
-                            if (sessionNumber === 1) {
-                                showPinchPracticeErrorModal("Please keep both your index finger and thumb on the screen to pinch.");
-                            } else {
-                                setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Pinch paused. Place your second finger back on screen to resume.</span>`);
-                            }
+                            showPinchPracticeErrorModal("Please keep both your index finger and thumb on the screen to pinch.");
                         }, 150);
                     }
                 }
