@@ -253,7 +253,7 @@ async function startSession() {
             if (indicator) indicator.style.display = "inline-block";
             setupProgressiveDisclosure();
         } else {
-            updateInstructions(true);
+            updateInstructions(false); // Hide timer and attempts until fingers are placed in targets
         }
         scheduleDemoAnimation(500);
     } catch (err) {
@@ -285,6 +285,9 @@ function resetTargetPositions() {
     bottomTarget.style.top = "";
     bottomTarget.style.transform = "";
     bottomTarget.style.transition = "";
+
+    const debugDiv = document.getElementById("pinchDebug");
+    if (debugDiv) debugDiv.remove();
 }
 
 // Multi-Touch Handler
@@ -727,6 +730,26 @@ function handleTouch(e) {
  
             // Practice phase validations
             if (sessionNumber === 1) {
+                // On-screen debug indicator to help diagnose touch tracking
+                let debugDiv = document.getElementById("pinchDebug");
+                if (!debugDiv) {
+                    debugDiv = document.createElement("div");
+                    debugDiv.id = "pinchDebug";
+                    debugDiv.style.position = "fixed";
+                    debugDiv.style.top = "10px";
+                    debugDiv.style.left = "10px";
+                    debugDiv.style.backgroundColor = "rgba(0,0,0,0.85)";
+                    debugDiv.style.color = "#4ade80";
+                    debugDiv.style.padding = "6px 12px";
+                    debugDiv.style.borderRadius = "8px";
+                    debugDiv.style.zIndex = "9999";
+                    debugDiv.style.fontFamily = "monospace";
+                    debugDiv.style.fontSize = "14px";
+                    debugDiv.style.border = "1px solid #22c55e";
+                    document.body.appendChild(debugDiv);
+                }
+                debugDiv.innerText = `dist: ${distPx.toFixed(1)} | peak: ${maxStrokeDistance.toFixed(1)} | diff: ${(maxStrokeDistance - distPx).toFixed(1)}`;
+
                 const hasOpened = (maxStrokeDistance > strokeStartDistance + 5);
                 
                 // Smart log to help track pinch-in behavior
