@@ -734,8 +734,8 @@ function handleTouch(e) {
                     console.log(`Pinch-in detected: dist=${distPx.toFixed(1)}, peak=${maxStrokeDistance.toFixed(1)}, diff=${(maxStrokeDistance - distPx).toFixed(1)}`);
                 }
 
-                // 1) Pinch in check (active if they pinch inward from start, or back in after opening)
-                if (distPx < strokeStartDistance - 5 || (hasOpened && distPx < maxStrokeDistance - 5)) {
+                // 1) Pinch in check (active if they drag inward by more than 8px from peak distance)
+                if (distPx < maxStrokeDistance - 8) {
                     showPinchPracticeErrorModal("Please open your fingers outward. Do not pinch inward.");
                     return;
                 }
