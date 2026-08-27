@@ -683,7 +683,9 @@ function handleTouch(e) {
                     strokeStartDistance = distPx;
                     startPinchTrial(now);
                 } else {
-                    setInstruction(`<span style="color: #003366; font-weight: bold;">⚠️ Please place your thumb on the bottom circle and your index finger on the top circle to start!</span>`);
+                    if (sessionNumber === 1) {
+                        showPinchPracticeErrorModal("Please place your thumb on the bottom circle and your index finger on the top circle to start.");
+                    }
                 }
             }
         } else {
