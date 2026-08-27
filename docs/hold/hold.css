@@ -26,7 +26,10 @@ body {
     overflow: hidden;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
     font-family: inherit;
 }
 
@@ -85,7 +88,7 @@ canvas {
 
 #holdInstruction {
     margin: 0;
-    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+    font-size: clamp(1.3rem, 2.8vw, 1.8rem);
     font-weight: 600;
     color: #111;
     line-height: 1.4;
@@ -294,7 +297,7 @@ body.modal-open #holdInstruction {
     }
 
     #holdInstruction {
-        font-size: 1.7rem;
+        font-size: 2.0rem;
     }
 
     #startTaskButton {
@@ -319,6 +322,7 @@ body.modal-open #holdInstruction {
     /* strictly lock pixel width to 2+ chars so 10 and 9 are physically identical */
     text-align: center;
 }
+
 /* Pressure Feedback Gauge */
 #pressureGaugeContainer {
     position: relative;
@@ -342,13 +346,14 @@ body.modal-open #holdInstruction {
     background-color: #ddd;
     border-radius: 6px;
     overflow: hidden;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 #pressureGaugeFill {
     width: 0%;
     height: 100%;
-    background-color: #10b981; /* Default optimal green */
+    background-color: #10b981;
+    /* Default optimal green */
     transition: width 0.1s linear, background-color 0.2s ease;
 }
 
@@ -611,9 +616,12 @@ body.modal-open #holdInstruction {
 }
 
 @keyframes tapContinue {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translate(-50%, 0) scale(1);
     }
+
     50% {
         transform: translate(-50%, 15px) scale(0.9);
     }
@@ -624,11 +632,14 @@ body.modal-open #holdInstruction {
 }
 
 @keyframes buttonPulsePress {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateX(-50%) scale(1);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
         background-color: #0B8457;
     }
+
     50% {
         transform: translateX(-50%) scale(0.82);
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);

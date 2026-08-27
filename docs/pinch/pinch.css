@@ -39,7 +39,10 @@ body {
     overflow: hidden;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
     font-family: inherit;
 }
 
@@ -87,13 +90,15 @@ button, input, select, textarea {
 
 #pinchInstruction {
     margin: 0;
-    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+    font-size: clamp(1.3rem, 2.8vw, 1.8rem);
     font-weight: 600;
     color: #111;
     /* Match dark instruction text of other tasks */
     line-height: 1.4;
-    white-space: nowrap; /* Forces each sentence to be exactly one line */
-    text-align: left; /* Left align sentences relative to each other */
+    white-space: nowrap;
+    /* Forces each sentence to be exactly one line */
+    text-align: left;
+    /* Left align sentences relative to each other */
 }
 
 #countdownTimer {
@@ -303,7 +308,7 @@ button, input, select, textarea {
 
 @media (min-width: 600px) {
     #pinchInstruction {
-        font-size: 1.7rem;
+        font-size: 1.9rem;
     }
 
     .session-label {
@@ -363,9 +368,12 @@ button, input, select, textarea {
 }
 
 .highlight-instruction {
-    background-color: #F7DEAD; /* Yellow highlight marker */
-    font-weight: bold;         /* Bold text */
-    color: inherit;            /* Inherit normal text color */
+    background-color: #F7DEAD;
+    /* Yellow highlight marker */
+    font-weight: bold;
+    /* Bold text */
+    color: inherit;
+    /* Inherit normal text color */
     padding: 0 4px;
     border-radius: 4px;
 }

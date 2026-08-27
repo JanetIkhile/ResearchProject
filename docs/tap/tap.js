@@ -314,12 +314,16 @@ function runDemoTrialCycle() {
             // Briefly show "Stop tapping" just like a real trial end!
             const tapInstruction = document.getElementById("tapInstruction");
             const originalInstructionText = tapInstruction ? tapInstruction.innerHTML : "";
-            if (tapInstruction) tapInstruction.innerText = "Stop tapping";
+            if (tapInstruction) {
+                tapInstruction.innerText = "Stop tapping";
+                tapInstruction.style.textAlign = "center";
+            }
             if (timerLine) timerLine.style.display = "none";
 
             setTimeout(() => {
                 if (tapInstruction && originalInstructionText) {
                     tapInstruction.innerHTML = originalInstructionText;
+                    tapInstruction.style.textAlign = "left";
                 }
                 demoTrialNumber += 1;
                 runDemoTrialCycle();
@@ -571,6 +575,7 @@ function handleTouchStart(e) {
 function updateInstructions(showTimeRemaining, secondsLeft) {
     if (tapInstruction) {
         tapInstruction.innerHTML = `Use your index finger to tap the blue circle<br>alternatively <strong class="highlight-instruction">as fast as possible</strong>!`;
+        tapInstruction.style.textAlign = "left";
     }
 
     const indicator = document.getElementById("watchExampleIndicator");
@@ -735,6 +740,7 @@ function startTapTrial(startTs) {
         const reachedFinal = (trialNumber >= TRIAL_LIMIT);
         if (tapInstruction) {
             tapInstruction.innerText = "Stop tapping";
+            tapInstruction.style.textAlign = "center";
         }
         if (attemptsCounter) {
             attemptsCounter.style.display = "none";
@@ -842,6 +848,7 @@ function startTapTrial(startTs) {
             // non-final: wait cooldown then re-enable start
             if (tapInstruction) {
                 tapInstruction.innerText = "Stop tapping";
+                tapInstruction.style.textAlign = "center";
             }
 
             setTimeout(() => {

@@ -37,7 +37,10 @@ body {
     overflow: hidden;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
     font-family: inherit;
 }
 
@@ -67,16 +70,16 @@ button, input, select, textarea {
 #tapArea {
     position: absolute;
     top: 130px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
     width: 100%;
     text-align: center;
 }
 
 .instruction-container {
     position: absolute;
-    top: 10px; /* 130px + 10px = 140px from viewport top */
-    width: fit-content;
+    top: 10px;
+    /* 130px + 10px = 140px from viewport top */
+    width: 90%;
     max-width: 90%;
     left: 50%;
     transform: translateX(-50%);
@@ -119,11 +122,12 @@ button, input, select, textarea {
 }
 
 #topTarget {
-    top: 260px;
+    top: 390px;
 }
 
 #bottomTarget {
-    top: 487px; /* 260px + 227px center-to-center (60mm) */
+    top: 617px;
+    /* 390px + 227px center-to-center (60mm) */
 }
 
 .tap-target.active {
@@ -193,11 +197,12 @@ body.modal-open #tapInstruction {
 
 #tapInstruction {
     margin: 0;
-    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+    font-size: clamp(1.3rem, 2.8vw, 1.8rem);
     font-weight: 600;
     line-height: 1.4;
     white-space: nowrap;
     text-align: left;
+    width: 100%;
 }
 
 #countdownTimer {
@@ -310,7 +315,7 @@ body.modal-open #tapInstruction {
     }
 
     #tapInstruction {
-        font-size: 1.7rem;
+        font-size: 2.0rem;
     }
 
     #countdownTimer {
@@ -338,9 +343,12 @@ body.modal-open #tapInstruction {
 }
 
 .highlight-instruction {
-    background-color: #F7DEAD; /* Yellow highlight marker */
-    font-weight: bold;         /* Bold text */
-    color: inherit;            /* Inherit normal text color */
+    background-color: #F7DEAD;
+    /* Yellow highlight marker */
+    font-weight: bold;
+    /* Bold text */
+    color: inherit;
+    /* Inherit normal text color */
     padding: 0 4px;
     border-radius: 4px;
 }
@@ -454,7 +462,7 @@ body.modal-open #tapInstruction {
     font-size: clamp(1.2rem, 2.2vw, 1.6rem);
     padding: 16px 32px;
     cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     transition: background-color 0.2s, transform 0.1s;
 }
 
@@ -570,15 +578,20 @@ body.modal-open #tapInstruction {
     0% {
         transform: translateY(0) scale(1);
     }
+
     40% {
         transform: translateY(-32px) scale(1);
     }
+
     50% {
-        transform: translateY(-28px) scale(0.8); /* Click scale */
+        transform: translateY(-28px) scale(0.8);
+        /* Click scale */
     }
+
     60% {
         transform: translateY(-32px) scale(1);
     }
+
     100% {
         transform: translateY(0) scale(1);
     }
