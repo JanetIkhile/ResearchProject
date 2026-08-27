@@ -732,9 +732,9 @@ function handleTouch(e) {
                     console.log(`Pinch-in detected: dist=${distPx.toFixed(1)}, peak=${maxStrokeDistance.toFixed(1)}, diff=${(maxStrokeDistance - distPx).toFixed(1)}`);
                 }
 
-                // 1) Pinch in check (with 10px tolerance, active only after opening)
-                if (hasOpenedEnough && distPx < maxStrokeDistance - 10) {
-                    showPinchPracticeErrorModal("Please keep your fingers apart and do not pinch back in.");
+                // 1) Pinch in check (active if they pinch inward from start, or back in after opening)
+                if (distPx < strokeStartDistance - 10 || (hasOpenedEnough && distPx < maxStrokeDistance - 10)) {
+                    showPinchPracticeErrorModal("Please open your fingers outward. Do not pinch inward.");
                     return;
                 }
                 // 2) Orientation change check (allow generous deviation from vertical line)
