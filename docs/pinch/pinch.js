@@ -1,6 +1,8 @@
 import { supabase } from "../client/supabaseClient.js";
 import { initSession } from "../utils/sessionManager.js";
 
+
+
 const TASK_TYPE = 'pinch';
 let participantId = null;
 let sessionId = null;
@@ -59,13 +61,13 @@ function showPinchPracticeErrorModal(message) {
         clearInterval(countdownTimer);
         taskActive = false;
         trialNumber--; // decrement so they repeat this trial
-        
+
         // Reset target positions back to default baseline
         resetTargetPositions();
-        
+
         // Reset screen state
         if (liveDistanceLabel) liveDistanceLabel.style.display = "none";
-        
+
         updateInstructions(true, (sessionNumber === 1) ? 5 : 10);
     }
 
@@ -171,11 +173,11 @@ const instructionEl = document.getElementById("pinchInstruction");
 function setInstruction(html) {
     if (!instructionEl) return;
     instructionEl.innerHTML = html;
-    
+
     // Check if we are showing a warning or cooldown message
     const isWarning = html.includes("⚠️");
     const isStopPinching = html.includes("Stop pinching");
-    
+
     if (taskActive && !isWarning && !isStopPinching) {
         // Hide the instruction during active pinching and collapse its space
         instructionEl.style.display = "none";
@@ -514,6 +516,7 @@ function startDemoAnimation() {
 }
 
 function stopDemoAnimation() {
+    if (!isFingerDemoAnimating) return;
     isFingerDemoAnimating = false;
     clearDemoTimeout();
     if (demoCountdownInterval) {
@@ -640,18 +643,19 @@ function handleTouch(e) {
         let indexTouch = (t1.clientY < t2.clientY) ? t1 : t2;
         let thumbTouch = (t1.clientY < t2.clientY) ? t2 : t1;
 
-        // Store touch identifiers to distinguish partial lift-offs
-        indexTouchId = indexTouch.identifier;
-        thumbTouchId = thumbTouch.identifier;
-
         const x1 = indexTouch.clientX;
         const y1 = indexTouch.clientY;
         const x2 = thumbTouch.clientX;
         const y2 = thumbTouch.clientY;
-
         const dx = x1 - x2;
         const dy = y1 - y2;
         const distPx = Math.sqrt(dx * dx + dy * dy);
+
+
+
+        // Store touch identifiers to distinguish partial lift-offs
+        indexTouchId = indexTouch.identifier;
+        thumbTouchId = thumbTouch.identifier;
 
         if (!taskActive) {
             // Before the trial starts, enforce vertical layout check
@@ -719,12 +723,12 @@ function handleTouch(e) {
             if (strokeStartDistance === 0) {
                 strokeStartDistance = distPx;
             }
- 
+
             // Practice phase validations
             if (sessionNumber === 1) {
 
                 const hasOpened = (maxStrokeDistance > strokeStartDistance + 5);
-                
+
                 // Smart log to help track pinch-in behavior
                 if (hasOpened && distPx < maxStrokeDistance - 2) {
                     console.log(`Pinch-in detected: dist=${distPx.toFixed(1)}, peak=${maxStrokeDistance.toFixed(1)}, diff=${(maxStrokeDistance - distPx).toFixed(1)}`);
@@ -1287,12 +1291,12 @@ sessionStorage.setItem("pinch_page_load", String(Date.now()));
 startSession();
 
 // Programmatic zoom prevention (Pinch task requires multi-touch, so gesturestart blocker is used)
-document.addEventListener('gesturestart', function(e) {
+document.addEventListener('gesturestart', function (e) {
     e.preventDefault();
 }, { passive: false });
-document.addEventListener('gesturechange', function(e) {
+document.addEventListener('gesturechange', function (e) {
     e.preventDefault();
 }, { passive: false });
-document.addEventListener('gestureend', function(e) {
+document.addEventListener('gestureend', function (e) {
     e.preventDefault();
 }, { passive: false });
