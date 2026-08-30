@@ -799,7 +799,7 @@ async function handleTouchEnd(e) {
         removeTouchListeners();
         if (canvas) canvas.style.pointerEvents = 'none';
 
-        // Show clicking hand animation if they are inactive for 5 seconds on completion screen
+        // Show clicking hand animation if they are inactive for 2 seconds on completion screen
         if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
         continueInactivityTimer = setTimeout(() => {
             if (nextButton && completionBox.style.display === "flex" && !document.getElementById("continuePointer")) {
@@ -817,7 +817,7 @@ async function handleTouchEnd(e) {
                 pointer.style.top = `${rect.bottom + 15}px`;
                 document.body.appendChild(pointer);
             }
-        }, 5000);
+        }, 2000);
     }
 }
 

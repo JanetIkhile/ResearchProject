@@ -867,7 +867,7 @@ function startTapTrial(startTs) {
                 if (countdown) countdown.style.display = "none";
             }, 1200);
 
-            // Show clicking hand animation if they are inactive for 5 seconds on completion screen
+            // Show clicking hand animation if they are inactive for 2 seconds on completion screen
             if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
             continueInactivityTimer = setTimeout(() => {
                 const completionBox = document.getElementById("completionBox");
@@ -886,7 +886,7 @@ function startTapTrial(startTs) {
                     pointer.style.top = `${rect.bottom + 15}px`;
                     document.body.appendChild(pointer);
                 }
-            }, 5000);
+            }, 2000);
         } else {
             // non-final: wait cooldown then re-enable start
             if (tapInstruction) {

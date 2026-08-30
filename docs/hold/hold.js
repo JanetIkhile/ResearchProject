@@ -1306,7 +1306,7 @@ async function maybeFinishSession() {
             };
         }
 
-        // Create finger pointer continue animation after 5 seconds
+        // Create finger pointer continue animation after 2 seconds
         if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
         continueInactivityTimer = setTimeout(() => {
             if (taskCompleted) {
@@ -1328,7 +1328,7 @@ async function maybeFinishSession() {
                     document.body.appendChild(pointer);
                 }
             }
-        }, 5000);
+        }, 2000);
     }
 }
 

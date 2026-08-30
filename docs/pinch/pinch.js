@@ -1343,27 +1343,25 @@ function endPinchTask() {
 
     completionBox.style.display = "flex";
 
-    // Setup inactivity continue pointer after 5 seconds of inactivity on completion box
-    if (sessionNumber === 1) {
-        continueInactivityTimer = setTimeout(() => {
-            const nextButton = document.getElementById("nextTaskButton");
-            if (nextButton && completionBox.style.display === "flex") {
-                const pointer = document.createElement("div");
-                pointer.id = "continuePointer";
-                pointer.innerText = "👆";
-                pointer.style.position = "absolute";
-                pointer.style.fontSize = "54px";
-                pointer.style.zIndex = "3000";
-                pointer.style.pointerEvents = "none";
-                pointer.classList.add("continue-pointer-animate");
+    // Setup inactivity continue pointer after 2 seconds of inactivity on completion box
+    continueInactivityTimer = setTimeout(() => {
+        const nextButton = document.getElementById("nextTaskButton");
+        if (nextButton && completionBox.style.display === "flex") {
+            const pointer = document.createElement("div");
+            pointer.id = "continuePointer";
+            pointer.innerText = "👆";
+            pointer.style.position = "absolute";
+            pointer.style.fontSize = "54px";
+            pointer.style.zIndex = "3000";
+            pointer.style.pointerEvents = "none";
+            pointer.classList.add("continue-pointer-animate");
 
-                const rect = nextButton.getBoundingClientRect();
-                pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
-                pointer.style.top = `${rect.bottom + 15}px`;
-                document.body.appendChild(pointer);
-            }
-        }, 5000);
-    }
+            const rect = nextButton.getBoundingClientRect();
+            pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+            pointer.style.top = `${rect.bottom + 15}px`;
+            document.body.appendChild(pointer);
+        }
+    }, 2000);
 }
 
 // Page load initialization
