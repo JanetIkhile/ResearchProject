@@ -22,7 +22,7 @@ let sessionNumber = null;
 let savingInProgress = false;
 
 // Progressive disclosure practice states
-let practiceStep = 'initial_demo'; // 'initial_demo', 'try_button_shown', 'waiting_for_touch', 'help_banner_shown', 'detailed_demo', 'gif_ready_prompt', 'active_practice'
+let practiceStep = 'initial_demo_waiting'; // 'initial_demo_waiting', 'initial_demo_animating', 'try_button_shown', 'waiting_for_touch', 'help_banner_shown', 'detailed_demo', 'gif_ready_prompt', 'active_practice'
 let demoLoopCount = 0;
 let isFingerDemoAnimating = false;
 let demoCountdownInterval = null;
@@ -212,7 +212,7 @@ function runDemoTrialCycle() {
         return;
     }
 
-    if (demoTrialNumber > 2) {
+    if (demoTrialNumber > 1) {
         stopDemoAnimation();
         practiceStep = 'options_shown';
         const optionsOverlay = document.getElementById("practiceOptionsOverlay");
@@ -221,8 +221,8 @@ function runDemoTrialCycle() {
         if (optionsContainer) optionsContainer.style.display = "flex";
         const tryItButton = document.getElementById("tryItButton");
         if (tryItButton) tryItButton.style.display = "block";
-        const indicator = document.getElementById("watchExampleIndicator");
-        if (indicator) indicator.style.display = "none";
+        const watchExampleBtn = document.getElementById("watchExampleBtn");
+        if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
         // Dim background elements
         ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'].forEach(id => {
@@ -366,28 +366,61 @@ function startDemoAnimation() {
     runDemoTrialCycle();
 }
 
+function showButtonPointer(btn) {
+    const existing = document.getElementById("btnPointer");
+    if (existing) existing.remove();
+
+    btn.classList.add("button-pressed-animate");
+
+    const pointer = document.createElement("div");
+    pointer.id = "btnPointer";
+    pointer.innerText = "👆";
+    pointer.style.position = "absolute";
+    pointer.style.fontSize = "54px";
+    pointer.style.zIndex = "3000";
+    pointer.style.pointerEvents = "none";
+    pointer.classList.add("continue-pointer-animate");
+
+    const rect = btn.getBoundingClientRect();
+    pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+    pointer.style.top = `${rect.bottom + 15}px`;
+    document.body.appendChild(pointer);
+}
+
+// Reposition the helper hand pointer on window resize
+window.addEventListener("resize", () => {
+    const btn = document.getElementById("watchExampleBtn");
+    const pointer = document.getElementById("btnPointer");
+    if (btn && pointer && btn.style.display !== "none") {
+        const rect = btn.getBoundingClientRect();
+        pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+        pointer.style.top = `${rect.bottom + 15}px`;
+    }
+});
+
 function stopDemoAnimation() {
-    if (!isFingerDemoAnimating) return;
-    isFingerDemoAnimating = false;
-    if (demoCountdownInterval) {
-        clearInterval(demoCountdownInterval);
-        demoCountdownInterval = null;
-    }
-    if (demoTapInterval) {
-        clearInterval(demoTapInterval);
-        demoTapInterval = null;
-    }
-    if (demoPointer) {
-        demoPointer.remove();
-        demoPointer = null;
-    }
-    if (topTarget) {
-        topTarget.classList.remove("active");
-        topTarget.classList.add("inactive");
-    }
-    if (bottomTarget) {
-        bottomTarget.classList.remove("active");
-        bottomTarget.classList.add("inactive");
+    if (isFingerDemoAnimating) {
+        isFingerDemoAnimating = false;
+        if (demoCountdownInterval) {
+            clearInterval(demoCountdownInterval);
+            demoCountdownInterval = null;
+        }
+        if (demoTapInterval) {
+            clearInterval(demoTapInterval);
+            demoTapInterval = null;
+        }
+        if (demoPointer) {
+            demoPointer.remove();
+            demoPointer = null;
+        }
+        if (topTarget) {
+            topTarget.classList.remove("active");
+            topTarget.classList.add("inactive");
+        }
+        if (bottomTarget) {
+            bottomTarget.classList.remove("active");
+            bottomTarget.classList.add("inactive");
+        }
     }
 
     // Clear progressive timers
@@ -406,6 +439,9 @@ function stopDemoAnimation() {
     const continuePointer = document.getElementById("continuePointer");
     if (continuePointer) continuePointer.remove();
 
+    const btnPointer = document.getElementById("btnPointer");
+    if (btnPointer) btnPointer.remove();
+
     // Hide progressive disclosure helper UI
     const tryItButton = document.getElementById("tryItButton");
     if (tryItButton) tryItButton.style.display = "none";
@@ -416,23 +452,41 @@ function stopDemoAnimation() {
         gifModal.style.display = "none";
         gifModal.classList.remove("show");
     }
-    const watchExampleIndicator = document.getElementById("watchExampleIndicator");
-    if (watchExampleIndicator) watchExampleIndicator.style.display = "none";
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    if (watchExampleBtn) {
+        watchExampleBtn.style.display = "none";
+        watchExampleBtn.classList.remove("button-pressed-animate");
+    }
 }
 
 function handleTouchStart(e) {
-    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
+    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer") || e.target.closest(".instruction-container")) {
         return; // Let custom button click handlers capture the action
     }
 
     // In practice phase (trial 0): block target dots and screen taps during demo animation or until "Start Practice" is clicked
     if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'initial_demo_animating') {
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
+        if (practiceStep === 'initial_demo_waiting') {
+            // Touch occurred on load before watching demo -> show helper hand pointer to guide the user, then ignore touch
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn && !document.getElementById("btnPointer")) {
+                showButtonPointer(watchExampleBtn);
+            }
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
         if (practiceStep === 'options_shown') {
             e.stopPropagation();
             e.preventDefault();
             return;
         }
-        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
+        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice' && practiceStep !== 'help_banner_shown' && practiceStep !== 'try_button_shown')) {
             return; // Ignore all touches on dots and screen while demo is running or options are shown
         }
     }
@@ -440,20 +494,10 @@ function handleTouchStart(e) {
     if (sessionNumber === 1 && trialNumber === 0) {
         if (practiceStep === 'help_banner_shown') {
             const helpBanner = document.getElementById("helpBanner");
-            if (helpBanner && !helpBanner.contains(e.target)) {
-                helpBanner.style.display = "none";
+            if (!helpBanner || !helpBanner.contains(e.target)) {
+                if (helpBanner) helpBanner.style.display = "none";
                 practiceStep = 'waiting_for_touch';
                 updateInstructions(true);
-
-                // Setup inactivity timer when dismissing the help banner
-                if (inactivityTimer) clearTimeout(inactivityTimer);
-                inactivityTimer = setTimeout(() => {
-                    if (practiceStep === 'waiting_for_touch') {
-                        practiceStep = 'help_banner_shown';
-                        const banner = document.getElementById("helpBanner");
-                        if (banner) banner.style.display = "flex";
-                    }
-                }, 7000);
             }
         }
     }
@@ -479,14 +523,14 @@ function handleTouchStart(e) {
     const isInsideAnyTarget = isInsideTop || isInsideBottom;
 
     if (sessionNumber === 1 && trialNumber === 0) {
-        if (practiceStep === 'help_banner_shown' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
+        if (practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
             return; // Lock task interaction during dialog phases
         }
-        if (practiceStep === 'initial_demo' || practiceStep === 'try_button_shown' || practiceStep === 'waiting_for_touch') {
+        if (practiceStep === 'initial_demo' || practiceStep === 'try_button_shown' || practiceStep === 'waiting_for_touch' || practiceStep === 'help_banner_shown') {
             const tryItButton = document.getElementById("tryItButton");
             if (tryItButton) tryItButton.style.display = "none";
-            const indicator = document.getElementById("watchExampleIndicator");
-            if (indicator) indicator.style.display = "none";
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
             if (inactivityTimer) {
                 clearTimeout(inactivityTimer);
@@ -498,32 +542,26 @@ function handleTouchStart(e) {
                 practiceStep = 'active_practice';
                 updateInstructions(true);
             } else {
-                // Touched outside targets: transition to waiting_for_touch and set inactivity timer
-                practiceStep = 'waiting_for_touch';
+                // Touched outside targets: transition to help_banner_shown immediately
+                practiceStep = 'help_banner_shown';
                 updateInstructions(true);
-
-                inactivityTimer = setTimeout(() => {
-                    if (practiceStep === 'waiting_for_touch') {
-                        practiceStep = 'help_banner_shown';
-                        const helpBanner = document.getElementById("helpBanner");
-                        if (helpBanner) helpBanner.style.display = "flex";
-                    }
-                }, 7000);
+                const helpBanner = document.getElementById("helpBanner");
+                if (helpBanner) helpBanner.style.display = "flex";
             }
         }
     }
 
-    // If we're BETWEEN trials, a touch starts the trial ONLY if it hits one of the targets
+    // If we're BETWEEN trials, a touch starts the trial ONLY if it hits the highlighted blue target (topTarget)
     if (!taskActive && isBetweenTrials) {
-        if (!isInsideTop && !isInsideBottom) {
-            showTapPracticeErrorModal("Please tap inside the blue circle.");
-            return; // Must hit target to start
-        }
-
-        // For practice phase, they MUST start by tapping the highlighted blue circle (topTarget)
-        if (sessionNumber === 1 && !isInsideTop) {
-            showTapPracticeErrorModal("Please tap the highlighted blue circle.");
-            return; // Must hit correct target to start in practice
+        if (!isInsideTop) {
+            if (sessionNumber === 1) {
+                if (!isInsideBottom) {
+                    showTapPracticeErrorModal("Please tap inside the blue circle.");
+                } else {
+                    showTapPracticeErrorModal("Please tap the highlighted blue circle.");
+                }
+            }
+            return; // Must hit highlighted top target to start
         }
         if (trialNumber >= TRIAL_LIMIT) return;
 
@@ -578,7 +616,7 @@ function updateInstructions(showTimeRemaining, secondsLeft) {
         tapInstruction.style.textAlign = "left";
     }
 
-    const indicator = document.getElementById("watchExampleIndicator");
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
 
     if (timerLine) {
         timerLine.style.display = showTimeRemaining ? "block" : "none";
@@ -588,7 +626,7 @@ function updateInstructions(showTimeRemaining, secondsLeft) {
     }
 
     if (attemptsCounter) {
-        const isDemoPlaying = (sessionNumber === 1 && (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'options_shown'));
+        const isDemoPlaying = (sessionNumber === 1 && (practiceStep === 'initial_demo_waiting' || practiceStep === 'initial_demo_animating' || practiceStep === 'detailed_demo' || practiceStep === 'options_shown'));
         const displayTrial = taskActive ? trialNumber : Math.min(trialNumber + 1, TRIAL_LIMIT);
         if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoPlaying) {
             attemptsCounter.style.display = "block";
@@ -598,10 +636,10 @@ function updateInstructions(showTimeRemaining, secondsLeft) {
         }
     }
 
-    if (sessionNumber === 1 && trialNumber === 0 && !showTimeRemaining && (practiceStep === 'initial_demo' || practiceStep === 'try_button_shown')) {
-        if (indicator) indicator.style.display = "inline-block";
+    if (sessionNumber === 1 && trialNumber === 0 && !showTimeRemaining && (practiceStep === 'initial_demo_waiting' || practiceStep === 'try_button_shown')) {
+        if (watchExampleBtn) watchExampleBtn.style.display = "inline-block";
     } else {
-        if (indicator) indicator.style.display = "none";
+        if (watchExampleBtn) watchExampleBtn.style.display = "none";
     }
 }
 
@@ -687,7 +725,12 @@ function updateInstructions(showTimeRemaining, secondsLeft) {
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd, { passive: false });
     initProgressiveDisclosure();
-    setTimeout(startDemoAnimation, 500);
+    if (sessionNumber === 1) {
+        const watchExampleBtn = document.getElementById("watchExampleBtn");
+        if (watchExampleBtn) {
+            watchExampleBtn.style.display = "inline-block";
+        }
+    }
 })();
 
 // ---------- Start a trial ----------
@@ -1028,12 +1071,11 @@ function resumeDemoAnimationFromOptions() {
         if (el) el.classList.remove("dimmed");
     });
 
-    const indicator = document.getElementById("watchExampleIndicator");
-    if (indicator) indicator.style.display = "inline-block";
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    if (watchExampleBtn) watchExampleBtn.style.display = "inline-block";
 
-    practiceStep = 'initial_demo';
+    practiceStep = 'initial_demo_waiting';
     demoTrialNumber = 1;
-    setTimeout(startDemoAnimation, 300);
 }
 
 function initProgressiveDisclosure() {
@@ -1042,6 +1084,25 @@ function initProgressiveDisclosure() {
     const gifBtnYes = document.getElementById("gifBtnYes");
     const gifBtnAgain = document.getElementById("gifBtnAgain");
     const optionsContainer = document.getElementById("practiceOptionsContainer");
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+
+    if (watchExampleBtn) {
+        watchExampleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            // Remove helper hand
+            const pointer = document.getElementById("btnPointer");
+            if (pointer) pointer.remove();
+
+            // Hide the button and remove animate class
+            watchExampleBtn.style.display = "none";
+            watchExampleBtn.classList.remove("button-pressed-animate");
+
+            // Start the hand demo animation
+            practiceStep = 'initial_demo_animating';
+            demoTrialNumber = 1;
+            startDemoAnimation();
+        });
+    }
 
     const optionsOverlay = document.getElementById("practiceOptionsOverlay");
     if (optionsOverlay) {
@@ -1096,8 +1157,8 @@ function initProgressiveDisclosure() {
             const optionsOverlay = document.getElementById("practiceOptionsOverlay");
             if (optionsOverlay) optionsOverlay.style.display = "none";
             if (optionsContainer) optionsContainer.style.display = "none";
-            const indicator = document.getElementById("watchExampleIndicator");
-            if (indicator) indicator.style.display = "none";
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
             // Un-dim background elements
             ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget'].forEach(id => {

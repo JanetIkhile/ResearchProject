@@ -6,8 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tap Task</title>
-    <link rel="stylesheet" href="tap.css?v=2">
-    <script type="module" src="tap.js" defer></script>
+    <link rel="stylesheet" href="tap.css?v=12">
+    <script type="module" src="tap.js?v=12" defer></script>
 </head>
 
 <body>
@@ -20,7 +20,7 @@
         <div class="instruction-container">
             <p id="tapInstruction">Use your index finger to tap the blue circle<br>alternatively <strong class="highlight-instruction">as fast as possible</strong>!</p>
             <p id="countdownTimer" style="display:none;"></p>
-            <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
+            <button id="watchExampleBtn" class="watch-example-btn" style="display:none;">Watch Example</button>
             <p id="timerLine" class="timer-line" style="display:none;">Time remaining: <span id="timerBadge" class="timer-badge">10</span> seconds</p>
             <div id="attemptsCounter" class="attempts-container" style="display:none;"></div>
         </div>
@@ -61,10 +61,10 @@
             </div>
         </div>
     </div>
-    <div id="completionBox" style="display:none; cursor: pointer;" onclick="window.location.href='../pinch/pinch.html'">
+    <div id="completionBox" style="display:none; cursor: pointer;" onclick="window.location.href='../pinch/pinch.html?v=100'">
         <p id="completionText">✅ Task Complete</p>
 
-        <button id="nextTaskButton" onclick="window.location.href='../pinch/pinch.html'">
+        <button id="nextTaskButton" onclick="window.location.href='../pinch/pinch.html?v=100'">
             Next: Pinch Task
         </button>
     </div>

@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE-edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link href="drag.css" rel="stylesheet" />
+    <link href="drag.css?v=8" rel="stylesheet" />
     <title>Drag Task</title>
 
     <!-- <script type="module" src="app.js" defer></script> -->
-    <script type="module" src="drag.js" defer></script>
+    <script type="module" src="drag.js?v=8" defer></script>
 </head>
 
 <body>
@@ -20,7 +20,7 @@
         <div id="instructionBox" class="instruction-container">
             <p id="instructionMain">Use your Index finger to drag from Start to Target<br><strong class="highlight-instruction">as fast</strong> and <strong class="highlight-instruction">accurately</strong> as possible.</p>
             <p id="instructionSub"></p>
-            <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
+            <button id="watchExampleBtn" class="watch-example-btn" style="display:none;">Watch Example</button>
         </div>
     </div>
 
@@ -70,9 +70,9 @@
         </div>
     </div>
     <!-- <button id="nextTaskButton" style="display:none;" onclick="window.location.href='/docs/drag/adaptive_drag.html'"> -->
-    <div id="completionBox" style="display:none; cursor: pointer;" onclick="window.location.href='../tap/tap.html'">
+    <div id="completionBox" style="display:none; cursor: pointer;" onclick="window.location.href='../tap/tap.html?v=6'">
         <p id="completionText">✅ Task Complete</p>
-        <button id="nextTaskButton" style="display:none;" onclick="window.location.href='../tap/tap.html'">
+        <button id="nextTaskButton" style="display:none;" onclick="window.location.href='../tap/tap.html?v=6'">
             Next: Tap Task
         </button>
     </div>

@@ -46,7 +46,7 @@ let baselineBottomCenterY = null;
 let inactivityTimer = null;
 let gifTimer = null;
 let continueInactivityTimer = null;
-let practiceStep = 'initial_demo'; // initial_demo -> try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
+let practiceStep = 'initial_demo_waiting'; // initial_demo_waiting, initial_demo_animating, try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
 
 const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles.<br>Open them <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.<br>Then lift both fingers and repeat.";
 
@@ -54,6 +54,7 @@ function showPinchPracticeErrorModal(message) {
     if (sessionNumber !== 1) return; // Only in practice phase
     if (document.getElementById("practiceErrorModal")) return;
 
+    window.isModalOpen = true; // Lock modal interactions
     stopDemoAnimation(); // Stop any running demo animations and clear timeouts!
 
     // Abort active trial if active
@@ -88,6 +89,7 @@ function showPinchPracticeErrorModal(message) {
 
     const dismissModal = () => {
         modalDiv.remove();
+        window.isModalOpen = false; // Release modal interactions lock
         // Allow restarting
         firstTouchTime = null;
         sessionStorage.setItem("pinch_page_load", String(Date.now()));
@@ -251,13 +253,12 @@ async function startSession() {
 
         if (sessionNumber === 1) {
             updateInstructions(false);
-            const indicator = document.getElementById("watchExampleIndicator");
-            if (indicator) indicator.style.display = "inline-block";
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn) watchExampleBtn.style.display = "inline-block";
             setupProgressiveDisclosure();
         } else {
-            updateInstructions(false); // Hide timer and attempts until fingers are placed in targets
+            updateInstructions(true, 10); // Show timer label at the start of the page
         }
-        scheduleDemoAnimation(500);
     } catch (err) {
         console.error("Session initialization failed:", err);
     }
@@ -300,10 +301,6 @@ let demoPointer2 = null;
 
 function scheduleDemoAnimation(delay = 1000) {
     clearDemoTimeout();
-    if (document.getElementById("practiceErrorModal")) return; // Don't run demo while error modal is open!
-    if (sessionNumber === 1 && trialNumber === 0 && !taskActive) {
-        demoTimeout = setTimeout(startDemoAnimation, delay);
-    }
 }
 
 function clearDemoTimeout() {
@@ -319,7 +316,7 @@ function runDemoTrialCycle() {
         return;
     }
 
-    if (demoTrialNumber > 2) {
+    if (demoTrialNumber > 1) {
         stopDemoAnimation();
         practiceStep = 'options_shown';
         const optionsOverlay = document.getElementById("practiceOptionsOverlay");
@@ -328,8 +325,8 @@ function runDemoTrialCycle() {
         if (optionsContainer) optionsContainer.style.display = "flex";
         const tryItButton = document.getElementById("tryItButton");
         if (tryItButton) tryItButton.style.display = "block";
-        const indicator = document.getElementById("watchExampleIndicator");
-        if (indicator) indicator.style.display = "none";
+        const watchExampleBtn = document.getElementById("watchExampleBtn");
+        if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
         // Dim background elements
         ['taskHeader', 'pinchArea'].forEach(id => {
@@ -515,44 +512,101 @@ function startDemoAnimation() {
     runDemoTrialCycle();
 }
 
+function showButtonPointer(btn) {
+    const existing = document.getElementById("btnPointer");
+    if (existing) existing.remove();
+
+    btn.classList.add("button-pressed-animate");
+
+    const pointer = document.createElement("div");
+    pointer.id = "btnPointer";
+    pointer.innerText = "👆";
+    pointer.style.position = "absolute";
+    pointer.style.fontSize = "54px";
+    pointer.style.zIndex = "3000";
+    pointer.style.pointerEvents = "none";
+    pointer.classList.add("continue-pointer-animate");
+
+    const rect = btn.getBoundingClientRect();
+    pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+    pointer.style.top = `${rect.bottom + 15}px`;
+    document.body.appendChild(pointer);
+}
+
+// Reposition the helper hand pointer on window resize
+window.addEventListener("resize", () => {
+    const btn = document.getElementById("watchExampleBtn");
+    const pointer = document.getElementById("btnPointer");
+    if (btn && pointer && btn.style.display !== "none") {
+        const rect = btn.getBoundingClientRect();
+        pointer.style.left = `${rect.left + rect.width / 2 - 27}px`;
+        pointer.style.top = `${rect.bottom + 15}px`;
+    }
+});
+
 function stopDemoAnimation() {
-    if (!isFingerDemoAnimating) return;
-    isFingerDemoAnimating = false;
-    clearDemoTimeout();
-    if (demoCountdownInterval) {
-        clearInterval(demoCountdownInterval);
-        demoCountdownInterval = null;
+    if (isFingerDemoAnimating) {
+        isFingerDemoAnimating = false;
+        clearDemoTimeout();
+        if (demoCountdownInterval) {
+            clearInterval(demoCountdownInterval);
+            demoCountdownInterval = null;
+        }
+        if (demoPinchInterval) {
+            clearInterval(demoPinchInterval);
+            demoPinchInterval = null;
+        }
+        demoTimeouts.forEach(t => clearTimeout(t));
+        demoTimeouts = [];
+        if (demoPointer1) {
+            demoPointer1.remove();
+            demoPointer1 = null;
+        }
+        if (demoPointer2) {
+            demoPointer2.remove();
+            demoPointer2 = null;
+        }
+        resetTargetPositions(); // Instantly restore target circles to baseline CSS
     }
-    if (demoPinchInterval) {
-        clearInterval(demoPinchInterval);
-        demoPinchInterval = null;
+
+    const btnPointer = document.getElementById("btnPointer");
+    if (btnPointer) btnPointer.remove();
+
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    if (watchExampleBtn) {
+        watchExampleBtn.style.display = "none";
+        watchExampleBtn.classList.remove("button-pressed-animate");
     }
-    demoTimeouts.forEach(t => clearTimeout(t));
-    demoTimeouts = [];
-    if (demoPointer1) {
-        demoPointer1.remove();
-        demoPointer1 = null;
-    }
-    if (demoPointer2) {
-        demoPointer2.remove();
-        demoPointer2 = null;
-    }
-    resetTargetPositions(); // Instantly restore target circles to baseline CSS
 }
 
 function handleTouch(e) {
-    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.id === "nextTaskButton" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer")) {
+    if (e.target.id === "tryItButton" || e.target.id === "watchVideoBtn" || e.target.id === "watchExampleBtn" || e.target.id === "gifBtnYes" || e.target.id === "gifBtnAgain" || e.target.id === "nextTaskButton" || e.target.closest("#gifModal") || e.target.closest("#helpBanner") || e.target.closest("#completionBox") || e.target.closest("#practiceOptionsContainer") || e.target.closest(".instruction-container")) {
         return;
     }
 
     // In practice phase (trial 0): block screen and target pinch touches during demo animation or until "Start Practice" is clicked
     if (sessionNumber === 1 && trialNumber === 0) {
+        if (practiceStep === 'initial_demo_animating') {
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
+        if (practiceStep === 'initial_demo_waiting') {
+            // Touch occurred on load before watching demo -> show helper hand pointer to guide the user, then ignore touch
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn && !document.getElementById("btnPointer")) {
+                showButtonPointer(watchExampleBtn);
+            }
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
         if (practiceStep === 'options_shown') {
             e.stopPropagation();
             e.preventDefault();
             return;
         }
-        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
+        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice' && practiceStep !== 'help_banner_shown' && practiceStep !== 'try_button_shown')) {
             return; // Ignore all touches on screen and targets while demo is running or options are shown
         }
     }
@@ -564,7 +618,7 @@ function handleTouch(e) {
     }
 
     if (sessionNumber === 1 && trialNumber === 0) {
-        if (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
+        if (practiceStep === 'initial_demo_waiting' || practiceStep === 'initial_demo_animating' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
             e.preventDefault();
             return;
         }
@@ -573,8 +627,8 @@ function handleTouch(e) {
             const tryItButton = document.getElementById("tryItButton");
             if (tryItButton && !tryItButton.contains(e.target)) {
                 tryItButton.style.display = "none";
-                const indicator = document.getElementById("watchExampleIndicator");
-                if (indicator) indicator.style.display = "none";
+                const watchExampleBtn = document.getElementById("watchExampleBtn");
+                if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
                 practiceStep = 'waiting_for_touch';
                 if (inactivityTimer) clearTimeout(inactivityTimer);
@@ -593,8 +647,8 @@ function handleTouch(e) {
 
         if (practiceStep === 'help_banner_shown') {
             const helpBanner = document.getElementById("helpBanner");
-            if (helpBanner && !helpBanner.contains(e.target)) {
-                helpBanner.style.display = "none";
+            if (!helpBanner || !helpBanner.contains(e.target)) {
+                if (helpBanner) helpBanner.style.display = "none";
 
                 practiceStep = 'waiting_for_touch';
                 if (inactivityTimer) clearTimeout(inactivityTimer);
@@ -620,6 +674,22 @@ function handleTouch(e) {
 
     const touches = e.touches;
     const now = Date.now();
+
+    if (sessionNumber === 1 && trialNumber === 0 && !taskActive && practiceStep === 'waiting_for_touch') {
+        if (e.type === 'touchstart') {
+            if (touches.length === 1) {
+                if (warningTimeout) clearTimeout(warningTimeout);
+                warningTimeout = setTimeout(() => {
+                    showPinchPracticeErrorModal("Please place both your index finger and thumb on the screen to start.");
+                }, 250);
+            } else if (touches.length === 2) {
+                if (warningTimeout) {
+                    clearTimeout(warningTimeout);
+                    warningTimeout = null;
+                }
+            }
+        }
+    }
 
     if (touches.length >= 3) {
         if (sessionNumber === 1) {
@@ -736,7 +806,7 @@ function handleTouch(e) {
 
                 // 1) Pinch in check (active if they drag inward by more than 8px from peak distance)
                 if (distPx < maxStrokeDistance - 8) {
-                    showPinchPracticeErrorModal("Please open your fingers outward. Do not pinch inward.");
+                    showPinchPracticeErrorModal("Open your fingers outward, then lift both fingers. Do not pinch inward.");
                     return;
                 }
                 // 2) Orientation change check (allow generous deviation from vertical line)
@@ -918,9 +988,9 @@ function handleTouch(e) {
 }
 
 function updateInstructions(showTimeRemaining, secondsLeft = 10) {
-    const indicator = document.getElementById("watchExampleIndicator");
-    if (indicator) {
-        indicator.style.display = (sessionNumber === 1 && !showTimeRemaining && trialNumber === 0) ? "inline-block" : "none";
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    if (watchExampleBtn) {
+        watchExampleBtn.style.display = (sessionNumber === 1 && (practiceStep === 'initial_demo_waiting' || practiceStep === 'try_button_shown') && trialNumber === 0) ? "inline-block" : "none";
     }
     if (timerLine) {
         timerLine.style.display = showTimeRemaining ? "block" : "none";
@@ -964,12 +1034,11 @@ function resumeDemoAnimationFromOptions() {
         if (el) el.classList.remove("dimmed");
     });
 
-    const indicator = document.getElementById("watchExampleIndicator");
-    if (indicator) indicator.style.display = "inline-block";
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    if (watchExampleBtn) watchExampleBtn.style.display = "inline-block";
 
-    practiceStep = 'initial_demo';
+    practiceStep = 'initial_demo_waiting';
     demoTrialNumber = 1;
-    scheduleDemoAnimation(300);
 }
 
 function setupProgressiveDisclosure() {
@@ -1036,8 +1105,8 @@ function setupProgressiveDisclosure() {
             const optionsOverlay = document.getElementById("practiceOptionsOverlay");
             if (optionsOverlay) optionsOverlay.style.display = "none";
             if (optionsContainer) optionsContainer.style.display = "none";
-            const indicator = document.getElementById("watchExampleIndicator");
-            if (indicator) indicator.style.display = "none";
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
             // Un-dim background elements
             ['taskHeader', 'pinchArea'].forEach(id => {
@@ -1067,7 +1136,18 @@ function setupProgressiveDisclosure() {
     if (watchExampleBtn) {
         watchExampleBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            openGifModal();
+            // Remove helper hand
+            const pointer = document.getElementById("btnPointer");
+            if (pointer) pointer.remove();
+
+            // Hide the button and remove scale animation class
+            watchExampleBtn.style.display = "none";
+            watchExampleBtn.classList.remove("button-pressed-animate");
+
+            // Start the hand demo animation
+            practiceStep = 'initial_demo_animating';
+            demoTrialNumber = 1;
+            startDemoAnimation();
         });
     }
 

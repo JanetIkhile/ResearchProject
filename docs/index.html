@@ -220,6 +220,21 @@
             pointer-events: none;
         }
 
+        @keyframes tapButtonSync {
+            0%, 45%, 55%, 100% {
+                transform: scale(1);
+                filter: brightness(1);
+            }
+            50% {
+                transform: scale(0.96);
+                filter: brightness(0.85);
+            }
+        }
+
+        .button-pressed-animate {
+            animation: tapButtonSync 2s infinite ease-in-out;
+        }
+
         @keyframes tapContinue {
             0% {
                 transform: translateY(0) scale(1);
@@ -243,7 +258,7 @@
 <body>
     <div class="container">
 
-        <h2>Motor Study</h2>
+        <h2>Quick Information</h2>
 
         <!-- Participant -->
         <div class="form-group" style="position: relative;">
@@ -298,7 +313,7 @@
 
     </div>
 
-    <script type="module" src="index.js"></script>
+    <script type="module" src="index.js?v=2"></script>
     <script>
         // Prevent long-press context menu globally
         document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
@@ -315,7 +330,7 @@
 </head>
 
 <body>
-    <h2>Motor Study</h2>
+    <h2>Quick Information</h2>
 
     <label for="username">Participant ID:</label>
     <select id="username">

@@ -6,8 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Hold Task</title>
-    <link rel="stylesheet" href="hold.css" />
-    <script type="module" src="hold.js" defer></script>
+    <link rel="stylesheet" href="hold.css?v=106" />
+    <script type="module" src="hold.js?v=106" defer></script>
 </head>
 
 <body>
@@ -17,7 +17,8 @@
 
     <div class="instruction-container">
         <p id="holdInstruction">Press <strong class="highlight-instruction">Start</strong> and immediately <strong class="highlight-instruction">hold</strong> the blue circle<br>with your index finger</p>
-        <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example below</div>
+        <p id="timerLine" class="timer-line" style="display:none;">Time remaining: <span id="timerBadge" class="timer-badge">10</span> seconds</p>
+        <button id="watchExampleBtn" class="watch-example-btn" style="display:none;">Watch Example</button>
         <div id="attemptsCounter" class="attempts-container" style="display:none;"></div>
     </div>
 

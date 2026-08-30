@@ -16,7 +16,8 @@ let isFingerDemoAnimating = false;
 let inactivityTimer = null;
 let gifTimer = null;
 let continueInactivityTimer = null;
-let practiceStep = 'initial_demo'; // initial_demo -> try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
+let practiceStep = 'initial_demo_waiting'; // initial_demo_waiting, initial_demo_animating, try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
+let trialStartTimestamp = 0;
 
 const ORIGINAL_INSTRUCTION = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
 
@@ -77,7 +78,7 @@ function startDemoAnimation() {
 
         if (sessionNumber === 1 && trialCount === 0) {
             demoLoopCount += 1;
-            if (demoLoopCount > 2) {
+            if (demoLoopCount > 1) {
                 stopDemoAnimation();
                 practiceStep = 'options_shown';
                 const optionsOverlay = document.getElementById("practiceOptionsOverlay");
@@ -86,8 +87,8 @@ function startDemoAnimation() {
                 if (optionsContainer) optionsContainer.style.display = "flex";
                 const tryItButton = document.getElementById("tryItButton");
                 if (tryItButton) tryItButton.style.display = "block";
-                const indicator = document.getElementById("watchExampleIndicator");
-                if (indicator) indicator.style.display = "none";
+                const watchExampleBtn = document.getElementById("watchExampleBtn");
+                if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
                 // Dim background elements
                 ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
@@ -207,8 +208,8 @@ function startDemoAnimation() {
             holdTarget.style.backgroundColor = "#0046FF";
             holdTarget.style.transform = "translateX(-50%) scale(1)";
             
-            if (sessionNumber === 1 && trialCount === 0 && demoLoopCount >= 2) {
-                // End of the 2nd demo cycle in practice phase: show options!
+            if (sessionNumber === 1 && trialCount === 0 && demoLoopCount >= 1) {
+                // End of the 1st demo cycle in practice phase: show options!
                 stopDemoAnimation();
                 practiceStep = 'options_shown';
                 const optionsOverlay = document.getElementById("practiceOptionsOverlay");
@@ -217,8 +218,8 @@ function startDemoAnimation() {
                 if (optionsContainer) optionsContainer.style.display = "flex";
                 const tryItButton = document.getElementById("tryItButton");
                 if (tryItButton) tryItButton.style.display = "block";
-                const indicator = document.getElementById("watchExampleIndicator");
-                if (indicator) indicator.style.display = "none";
+                const watchExampleBtn = document.getElementById("watchExampleBtn");
+                if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
                 // Dim background elements
                 ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
@@ -401,47 +402,90 @@ function showHoldTargetHint() {
     }, 2250));
 }
 
+function showButtonPointer(btn) {
+    const existing = document.getElementById("btnPointer");
+    if (existing) existing.remove();
+
+    btn.classList.add("button-pressed-animate");
+
+    const pointer = document.createElement("div");
+    pointer.id = "btnPointer";
+    pointer.innerText = "👆";
+    pointer.style.position = "absolute";
+    pointer.style.fontSize = "54px";
+    pointer.style.zIndex = "3000";
+    pointer.style.pointerEvents = "none";
+    pointer.classList.add("continue-pointer-animate");
+
+    const rect = btn.getBoundingClientRect();
+    pointer.style.left = `${rect.left + rect.width / 2}px`;
+    pointer.style.top = `${rect.bottom + 15}px`;
+    document.body.appendChild(pointer);
+}
+
+// Reposition the helper hand pointer on window resize
+window.addEventListener("resize", () => {
+    const btn = document.getElementById("watchExampleBtn");
+    const pointer = document.getElementById("btnPointer");
+    if (btn && pointer && btn.style.display !== "none") {
+        const rect = btn.getBoundingClientRect();
+        pointer.style.left = `${rect.left + rect.width / 2}px`;
+        pointer.style.top = `${rect.bottom + 15}px`;
+    }
+});
+
 function stopDemoAnimation() {
-    isFingerDemoAnimating = false;
-    if (demoInterval) {
-        clearInterval(demoInterval);
-        demoInterval = null;
-    }
-    demoTimeouts.forEach(t => clearTimeout(t));
-    demoTimeouts = [];
-
-    if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-        inactivityTimer = null;
-    }
-    if (gifTimer) {
-        clearTimeout(gifTimer);
-        gifTimer = null;
-    }
-
-    if (demoPointer) {
-        demoPointer.remove();
-        demoPointer = null;
-    }
-
-    // Reset visual elements
-    if (holdTarget) {
-        holdTarget.style.backgroundColor = "#0046FF";
-        holdTarget.style.transform = "translateX(-50%) scale(1)";
-    }
-    if (startButton) {
-        if (sessionNumber === 1 && (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'options_shown')) {
-            startButton.style.opacity = "0";
-            startButton.style.pointerEvents = 'none';
-        } else {
-            startButton.style.opacity = "1";
-            startButton.style.pointerEvents = 'auto';
+    if (isFingerDemoAnimating) {
+        isFingerDemoAnimating = false;
+        if (demoInterval) {
+            clearInterval(demoInterval);
+            demoInterval = null;
         }
-        startButton.classList.remove("pressed");
-        startButton.classList.remove("pulse-pressed");
+        demoTimeouts.forEach(t => clearTimeout(t));
+        demoTimeouts = [];
+
+        if (inactivityTimer) {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = null;
+        }
+        if (gifTimer) {
+            clearTimeout(gifTimer);
+            gifTimer = null;
+        }
+
+        if (demoPointer) {
+            demoPointer.remove();
+            demoPointer = null;
+        }
+
+        // Reset visual elements
+        if (holdTarget) {
+            holdTarget.style.backgroundColor = "#0046FF";
+            holdTarget.style.transform = "translateX(-50%) scale(1)";
+        }
+        if (startButton) {
+            if (sessionNumber === 1 && (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'options_shown')) {
+                startButton.style.opacity = "0";
+                startButton.style.pointerEvents = 'none';
+            } else {
+                startButton.style.opacity = "1";
+                startButton.style.pointerEvents = 'auto';
+            }
+            startButton.classList.remove("pressed");
+            startButton.classList.remove("pulse-pressed");
+        }
+        if (holdInstruction) {
+            holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
+        }
     }
-    if (holdInstruction) {
-        holdInstruction.innerHTML = "Press <strong class=\"highlight-instruction\">Start</strong> and immediately <strong class=\"highlight-instruction\">hold</strong> the blue circle<br>with your index finger";
+
+    const btnPointer = document.getElementById("btnPointer");
+    if (btnPointer) btnPointer.remove();
+
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    if (watchExampleBtn) {
+        watchExampleBtn.style.display = "none";
+        watchExampleBtn.classList.remove("button-pressed-animate");
     }
 }
 
@@ -456,6 +500,8 @@ let holdTarget = null;
 let nextButton = null;
 let holdInstruction = null;
 let startButton = null;
+let timerLine = null;
+let timerBadge = null;
 
 let pressureGaugeContainer = null;
 let pressureGaugeFill = null;
@@ -537,6 +583,8 @@ let initiationDelay = null;
     nextButton = document.getElementById("nextTaskButton");
     holdInstruction = document.getElementById("holdInstruction");
     startButton = document.getElementById("startTaskButton");
+    timerLine = document.getElementById("timerLine");
+    timerBadge = document.getElementById("timerBadge");
 
     pressureGaugeContainer = document.getElementById("pressureGaugeContainer");
     pressureGaugeFill = document.getElementById("pressureGaugeFill");
@@ -545,14 +593,12 @@ let initiationDelay = null;
 
     if (sessionNumber === 1) {
         updateInstructions(false);
-        const indicator = document.getElementById("watchExampleIndicator");
-        if (indicator) indicator.style.display = "inline-block";
+        const watchExampleBtn = document.getElementById("watchExampleBtn");
+        if (watchExampleBtn) watchExampleBtn.style.display = "inline-block";
         setupProgressiveDisclosure();
     } else {
-        updateInstructions(false);
+        updateInstructions(true, 10); // Show timer remaining on load during main phase
     }
-
-    setTimeout(startDemoAnimation, 500);
 
     if (!holdTarget) {
         console.error("holdTarget element not found");
@@ -569,7 +615,10 @@ let initiationDelay = null;
         if (sessionNumber === 1) {
             startButton.style.pointerEvents = 'none'; // Lock until Now Try It clicked
         }
-        startButton.addEventListener("pointerdown", (e) => {
+        const handleStartTrigger = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
             // don't start if we've already finished all trials
             if (taskCompleted || trialCount >= TRIAL_LIMIT) return;
 
@@ -586,7 +635,11 @@ let initiationDelay = null;
             initiationDelay = now - lastTrialEndTime;
             stopDemoAnimation();
             if (!trialActive) startHoldTrial();
-        });
+        };
+
+        startButton.addEventListener("pointerdown", handleStartTrigger);
+        startButton.addEventListener("touchstart", handleStartTrigger, { passive: false });
+        startButton.addEventListener("mousedown", handleStartTrigger);
     }
     // Touch handlers: they now early-return if not active or task finished
     holdTarget.addEventListener("touchstart", (e) => {
@@ -717,6 +770,7 @@ function startHoldTrial() {
     // defensive: do nothing if task already completed
     if (taskCompleted || trialCount >= TRIAL_LIMIT) return;
 
+    trialStartTimestamp = Date.now();
     trialActive = true;
     isHolding = false;
     readyToRelease = false;
@@ -751,7 +805,7 @@ function startHoldTrial() {
             if (trialActive && !isHolding) {
                 showHoldTargetHint();
             }
-        }, 5000);
+        }, 2000);
     }
 }
 
@@ -837,12 +891,19 @@ function beginHold(touch) {
         });
     }, 16);
 
+    if (timerLine) timerLine.style.display = "none";
+
     if (holdDisplayInterval) clearInterval(holdDisplayInterval);
     holdDisplayInterval = setInterval(() => {
         const elapsed = Date.now() - holdStartTime;
         const remainingSeconds = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
-        if (remainingSeconds > 0 && holdInstruction) {
-            holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${remainingSeconds}</span> seconds...`;
+        if (remainingSeconds > 0) {
+            if (holdInstruction) {
+                holdInstruction.innerHTML = `Keep holding steady for<br><span class="timer-badge">${remainingSeconds}</span> seconds...`;
+            }
+            if (timerBadge) {
+                timerBadge.innerText = remainingSeconds;
+            }
         }
     }, 100);
 
@@ -852,6 +913,7 @@ function beginHold(touch) {
         if (holdDisplayInterval) clearInterval(holdDisplayInterval);
         readyToRelease = true;
         if (holdInstruction) holdInstruction.innerText = "✅ You can release now!";
+        if (timerBadge) timerBadge.innerText = "0";
         if (holdTarget) holdTarget.style.backgroundColor = "#41A67E";
         if (navigator.vibrate) navigator.vibrate(200);
     }, HOLD_DURATION);
@@ -879,6 +941,7 @@ async function handleEarlyRelease(touch) {
 function showEarlyReleaseModal() {
     if (document.getElementById("earlyReleaseModal")) return;
 
+    window.isModalOpen = true; // Lock modal interactions
     const modalDiv = document.createElement("div");
     modalDiv.id = "earlyReleaseModal";
     modalDiv.style.position = "fixed";
@@ -896,6 +959,7 @@ function showEarlyReleaseModal() {
 
     const dismissModal = () => {
         modalDiv.remove();
+        window.isModalOpen = false; // Release modal interactions lock
         resetTrial();
     };
 
@@ -1173,7 +1237,11 @@ function resetTrial() {
     holdStartTime = 0;
     holdEvents = [];
 
-    updateInstructions(false);
+    if (sessionNumber === 1) {
+        updateInstructions(true, 5);
+    } else {
+        updateInstructions(true, 10);
+    }
 }
 
 async function maybeFinishSession() {
@@ -1238,28 +1306,29 @@ async function maybeFinishSession() {
             };
         }
 
-        if (sessionNumber === 1) {
-            // Create finger pointer continue animation after 5 seconds
-            if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
-            continueInactivityTimer = setTimeout(() => {
-                if (taskCompleted) {
-                    const existingPointer = document.getElementById("continuePointer");
-                    if (!existingPointer) {
-                        const pointer = document.createElement("div");
-                        pointer.id = "continuePointer";
-                        pointer.classList.add("continue-pointer-animate");
-                        pointer.innerText = "👆";
-                        pointer.style.position = "fixed";
-                        pointer.style.left = "50%";
-                        pointer.style.top = "50%";
-                        pointer.style.fontSize = "54px";
-                        pointer.style.zIndex = "2500";
-                        pointer.style.pointerEvents = "none";
-                        document.body.appendChild(pointer);
-                    }
+        // Create finger pointer continue animation after 5 seconds
+        if (continueInactivityTimer) clearTimeout(continueInactivityTimer);
+        continueInactivityTimer = setTimeout(() => {
+            if (taskCompleted) {
+                const nextBtn = document.getElementById("nextTaskButton");
+                const existingPointer = document.getElementById("continuePointer");
+                if (nextBtn && !existingPointer) {
+                    const pointer = document.createElement("div");
+                    pointer.id = "continuePointer";
+                    pointer.classList.add("continue-pointer-animate");
+                    pointer.innerText = "👆";
+                    pointer.style.position = "absolute";
+                    pointer.style.fontSize = "54px";
+                    pointer.style.zIndex = "2500";
+                    pointer.style.pointerEvents = "none";
+
+                    const rect = nextBtn.getBoundingClientRect();
+                    pointer.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
+                    pointer.style.top = `${rect.bottom + 15 + window.scrollY}px`;
+                    document.body.appendChild(pointer);
                 }
-            }, 5000);
-        }
+            }
+        }, 5000);
     }
 }
 
@@ -1272,12 +1341,27 @@ function handleTouch(e) {
 
     // In practice phase (trial 0): block screen and target touches during demo animation or until "Start Practice" is clicked
     if (sessionNumber === 1 && trialCount === 0) {
+        if (practiceStep === 'initial_demo_animating') {
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
+        if (practiceStep === 'initial_demo_waiting') {
+            // Touch occurred on load before watching demo -> show helper hand pointer to guide the user, then ignore touch
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn && !document.getElementById("btnPointer")) {
+                showButtonPointer(watchExampleBtn);
+            }
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+        }
         if (practiceStep === 'options_shown') {
             e.stopPropagation();
             e.preventDefault();
             return;
         }
-        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice')) {
+        if (isFingerDemoAnimating || (practiceStep !== 'waiting_for_touch' && practiceStep !== 'active_practice' && practiceStep !== 'help_banner_shown' && practiceStep !== 'try_button_shown')) {
             return; // Ignore all touches while demo is running or options are shown
         }
     }
@@ -1287,8 +1371,43 @@ function handleTouch(e) {
         return;
     }
 
+    if (sessionNumber === 1) {
+        // 1. If trial is not active, but they touched outside start button
+        if (!trialActive && practiceStep === 'waiting_for_touch') {
+            if (e.target !== startButton) {
+                showStartHint();
+                e.stopPropagation();
+                e.preventDefault();
+                return;
+            }
+        }
+        
+        // 2. If trial is active, but they haven't started holding, and touched outside the circle target
+        if (trialActive && !isHolding && (Date.now() - trialStartTimestamp > 500)) {
+            if (e.target !== holdTarget && e.target !== startButton) {
+                // Abort the trial
+                clearHoldInactivityTimer();
+                if (holdDisplayInterval) {
+                    clearInterval(holdDisplayInterval);
+                    holdDisplayInterval = null;
+                }
+                if (holdTimer) {
+                    clearTimeout(holdTimer);
+                    holdTimer = null;
+                }
+                trialActive = false;
+                isHolding = false;
+                
+                showHoldPracticeMissModal();
+                e.stopPropagation();
+                e.preventDefault();
+                return;
+            }
+        }
+    }
+
     if (sessionNumber === 1 && trialCount === 0) {
-        if (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
+        if (practiceStep === 'initial_demo_waiting' || practiceStep === 'initial_demo_animating' || practiceStep === 'detailed_demo' || practiceStep === 'gif_ready_prompt') {
             e.preventDefault();
             return;
         }
@@ -1297,8 +1416,8 @@ function handleTouch(e) {
             const tryItButton = document.getElementById("tryItButton");
             if (tryItButton && !tryItButton.contains(e.target)) {
                 tryItButton.style.display = "none";
-                const indicator = document.getElementById("watchExampleIndicator");
-                if (indicator) indicator.style.display = "none";
+                const watchExampleBtn = document.getElementById("watchExampleBtn");
+                if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
                 practiceStep = 'waiting_for_touch';
                 if (startButton) startButton.style.pointerEvents = 'auto';
@@ -1320,8 +1439,8 @@ function handleTouch(e) {
 
         if (practiceStep === 'help_banner_shown') {
             const helpBanner = document.getElementById("helpBanner");
-            if (helpBanner && !helpBanner.contains(e.target)) {
-                helpBanner.style.display = "none";
+            if (!helpBanner || !helpBanner.contains(e.target)) {
+                if (helpBanner) helpBanner.style.display = "none";
 
                 practiceStep = 'waiting_for_touch';
                 if (startButton) startButton.style.pointerEvents = 'auto';
@@ -1356,12 +1475,11 @@ function resumeDemoAnimationFromOptions() {
         if (el) el.classList.remove("dimmed");
     });
 
-    const indicator = document.getElementById("watchExampleIndicator");
-    if (indicator) indicator.style.display = "inline-block";
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    if (watchExampleBtn) watchExampleBtn.style.display = "inline-block";
 
-    practiceStep = 'initial_demo';
+    practiceStep = 'initial_demo_waiting';
     demoLoopCount = 0;
-    setTimeout(startDemoAnimation, 300);
 }
 
 function setupProgressiveDisclosure() {
@@ -1426,8 +1544,8 @@ function setupProgressiveDisclosure() {
             const optionsOverlay = document.getElementById("practiceOptionsOverlay");
             if (optionsOverlay) optionsOverlay.style.display = "none";
             if (optionsContainer) optionsContainer.style.display = "none";
-            const indicator = document.getElementById("watchExampleIndicator");
-            if (indicator) indicator.style.display = "none";
+            const watchExampleBtn = document.getElementById("watchExampleBtn");
+            if (watchExampleBtn) watchExampleBtn.style.display = "none";
 
             // Un-dim background elements
             ['taskHeader', 'holdArea', 'holdInstruction'].forEach(id => {
@@ -1440,7 +1558,25 @@ function setupProgressiveDisclosure() {
                 startButton.style.opacity = "1";
                 startButton.style.pointerEvents = 'auto';
             }
-            updateInstructions(false);
+            updateInstructions(true, 5);
+        });
+    }
+
+    if (watchExampleBtn) {
+        watchExampleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            // Remove helper hand
+            const pointer = document.getElementById("btnPointer");
+            if (pointer) pointer.remove();
+
+            // Hide the button and remove scale animation class
+            watchExampleBtn.style.display = "none";
+            watchExampleBtn.classList.remove("button-pressed-animate");
+
+            // Start the finger demo animation
+            practiceStep = 'initial_demo_animating';
+            demoLoopCount = 0;
+            startDemoAnimation();
         });
     }
 
@@ -1467,6 +1603,7 @@ function setupProgressiveDisclosure() {
                 startButton.style.opacity = "1";
                 startButton.style.pointerEvents = 'auto';
             }
+            updateInstructions(true, 5);
         });
     }
 
@@ -1479,16 +1616,24 @@ function setupProgressiveDisclosure() {
     }
 }
 
-function updateInstructions(showAttempts) {
-    const indicator = document.getElementById("watchExampleIndicator");
-    const isDemoPlaying = (sessionNumber === 1 && (practiceStep === 'initial_demo' || practiceStep === 'detailed_demo'));
+function updateInstructions(showTimeRemaining, secondsLeft) {
+    const watchExampleBtn = document.getElementById("watchExampleBtn");
+    const isDemoWaitingOrPlaying = (sessionNumber === 1 && (practiceStep === 'initial_demo_waiting' || practiceStep === 'initial_demo_animating' || practiceStep === 'detailed_demo' || practiceStep === 'try_button_shown'));
     
-    if (indicator) {
-        indicator.style.display = (sessionNumber === 1 && isDemoPlaying && trialCount === 0) ? "inline-block" : "none";
+    if (watchExampleBtn) {
+        watchExampleBtn.style.display = (sessionNumber === 1 && (practiceStep === 'initial_demo_waiting' || practiceStep === 'try_button_shown') && trialCount === 0) ? "inline-block" : "none";
     }
+
+    if (timerLine) {
+        timerLine.style.display = showTimeRemaining ? "block" : "none";
+        if (showTimeRemaining && timerBadge) {
+            timerBadge.innerText = (secondsLeft !== undefined) ? secondsLeft : (HOLD_DURATION / 1000);
+        }
+    }
+
     if (attemptsCounter) {
         const displayTrial = Math.min(trialCount + 1, TRIAL_LIMIT);
-        if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoPlaying) {
+        if (displayTrial <= TRIAL_LIMIT && !taskCompleted && !isDemoWaitingOrPlaying) {
             attemptsCounter.style.display = "block";
             attemptsCounter.innerText = `${displayTrial} of ${TRIAL_LIMIT}`;
         } else {
@@ -1589,6 +1734,7 @@ async function handleDriftError() {
 function showHoldPracticeDriftModal() {
     if (document.getElementById("practiceDriftModal")) return;
 
+    window.isModalOpen = true; // Lock modal interactions
     const modalDiv = document.createElement("div");
     modalDiv.id = "practiceDriftModal";
     modalDiv.style.position = "fixed";
@@ -1606,6 +1752,7 @@ function showHoldPracticeDriftModal() {
 
     const dismissModal = () => {
         modalDiv.remove();
+        window.isModalOpen = false; // Release modal interactions lock
         resetTrial();
     };
 
@@ -1638,6 +1785,102 @@ function showHoldPracticeDriftModal() {
 
     const msg = document.createElement("p");
     msg.innerText = "Please try keeping your finger on the dot.";
+    msg.style.margin = "0 0 28px 0";
+    msg.style.fontSize = "22px";
+    msg.style.lineHeight = "1.6";
+    msg.style.color = "#4b5563";
+
+    const btn = document.createElement("button");
+    btn.innerText = "Okay";
+    btn.style.backgroundColor = "#003366";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.padding = "16px 28px";
+    btn.style.fontSize = "20px";
+    btn.style.fontWeight = "bold";
+    btn.style.borderRadius = "12px";
+    btn.style.cursor = "pointer";
+    btn.style.width = "100%";
+    btn.style.boxSizing = "border-box";
+    btn.style.boxShadow = "0 4px 12px rgba(0, 51, 102, 0.25)";
+    btn.style.transition = "background-color 0.2s, transform 0.1s";
+
+    btn.addEventListener("mouseenter", () => {
+        btn.style.backgroundColor = "#002244";
+    });
+    btn.addEventListener("mouseleave", () => {
+        btn.style.backgroundColor = "#003366";
+    });
+    btn.addEventListener("pointerdown", () => {
+        btn.style.transform = "scale(0.97)";
+    });
+    btn.addEventListener("pointerup", () => {
+        btn.style.transform = "scale(1)";
+    });
+
+    btn.addEventListener("click", dismissModal);
+
+    contentDiv.appendChild(title);
+    contentDiv.appendChild(msg);
+    contentDiv.appendChild(btn);
+    modalDiv.appendChild(contentDiv);
+    document.body.appendChild(modalDiv);
+}
+
+function showHoldPracticeMissModal() {
+    if (document.getElementById("practiceMissModal")) return;
+
+    window.isModalOpen = true; // Lock modal interactions
+    const modalDiv = document.createElement("div");
+    modalDiv.id = "practiceMissModal";
+    modalDiv.style.position = "fixed";
+    modalDiv.style.top = "0";
+    modalDiv.style.left = "0";
+    modalDiv.style.width = "100%";
+    modalDiv.style.height = "100%";
+    modalDiv.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+    modalDiv.style.backdropFilter = "blur(8px)";
+    modalDiv.style.webkitBackdropFilter = "blur(8px)";
+    modalDiv.style.display = "flex";
+    modalDiv.style.justifyContent = "center";
+    modalDiv.style.alignItems = "center";
+    modalDiv.style.zIndex = "9999";
+
+    const dismissModal = () => {
+        modalDiv.remove();
+        window.isModalOpen = false; // Release modal interactions lock
+        resetTrial();
+    };
+
+    modalDiv.addEventListener("click", dismissModal);
+
+    // Stop touch/pointer events from bubbling down to task elements underneath
+    ["touchstart", "touchmove", "touchend", "mousedown", "mouseup"].forEach(evtName => {
+        modalDiv.addEventListener(evtName, (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    const contentDiv = document.createElement("div");
+    contentDiv.style.backgroundColor = "white";
+    contentDiv.style.padding = "40px clamp(24px, 5vw, 40px)";
+    contentDiv.style.borderRadius = "24px";
+    contentDiv.style.boxShadow = "0 20px 40px rgba(0,0,0,0.15)";
+    contentDiv.style.maxWidth = "580px";
+    contentDiv.style.width = "85%";
+    contentDiv.style.textAlign = "center";
+    contentDiv.style.fontFamily = "'Selawik', Arial, Helvetica, sans-serif";
+    contentDiv.style.boxSizing = "border-box";
+
+    const title = document.createElement("h3");
+    title.innerText = "⚠️ Practice Tip";
+    title.style.margin = "0 0 16px 0";
+    title.style.color = "#ea580c";
+    title.style.fontSize = "26px";
+    title.style.fontWeight = "bold";
+
+    const msg = document.createElement("p");
+    msg.innerText = "Please place and hold your index finger on the blue circle.";
     msg.style.margin = "0 0 28px 0";
     msg.style.fontSize = "22px";
     msg.style.lineHeight = "1.6";

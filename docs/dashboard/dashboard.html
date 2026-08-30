@@ -7,27 +7,28 @@
   <title>Motor Performance System</title>
   <style>
     @font-face {
-        font-family: 'Selawik';
-        src: url('../assets/fonts/selawk.ttf') format('truetype');
-        font-weight: normal;
-        font-style: normal;
+      font-family: 'Selawik';
+      src: url('../assets/fonts/selawk.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
     }
 
     @font-face {
-        font-family: 'Selawik';
-        src: url('../assets/fonts/selawkb.ttf') format('truetype');
-        font-weight: bold;
-        font-style: normal;
+      font-family: 'Selawik';
+      src: url('../assets/fonts/selawkb.ttf') format('truetype');
+      font-weight: bold;
+      font-style: normal;
     }
 
     @font-face {
-        font-family: 'Selawik';
-        src: url('../assets/fonts/selawkl.ttf') format('truetype');
-        font-weight: 300;
-        font-style: normal;
+      font-family: 'Selawik';
+      src: url('../assets/fonts/selawkl.ttf') format('truetype');
+      font-weight: 300;
+      font-style: normal;
     }
 
-    body, * {
+    body,
+    * {
       -webkit-tap-highlight-color: transparent;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
@@ -45,7 +46,10 @@
       margin: 0;
     }
 
-    button, input, select, textarea {
+    button,
+    input,
+    select,
+    textarea {
       font-family: inherit;
     }
 
@@ -71,7 +75,8 @@
       line-height: 1.6;
       color: #333;
       margin: 0;
-      white-space: nowrap; /* Forces each sentence to be exactly one line */
+      white-space: nowrap;
+      /* Forces each sentence to be exactly one line */
     }
 
     .task-buttons {
@@ -126,19 +131,39 @@
       pointer-events: none;
     }
 
+    @keyframes tapButtonSync {
+      0%, 45%, 55%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+      }
+      50% {
+        transform: scale(0.96);
+        filter: brightness(0.85);
+      }
+    }
+
+    .task-btn.button-pressed-animate {
+      animation: tapButtonSync 2s infinite ease-in-out !important;
+      transition: none !important;
+    }
+
     @keyframes tapContinue {
       0% {
         transform: translateY(0) scale(1);
       }
+
       40% {
         transform: translateY(-32px) scale(1);
       }
+
       50% {
         transform: translateY(-28px) scale(0.8);
       }
+
       60% {
         transform: translateY(-32px) scale(1);
       }
+
       100% {
         transform: translateY(0) scale(1);
       }
@@ -155,13 +180,13 @@
       }
     }
   </style>
-  <script type="module" src="dashboard.js"></script>
+  <script type="module" src="dashboard.js?v=4"></script>
 
 </head>
 
 <body>
   <div class="dashboard-content">
-    <h1>Motor Performance Tasks</h1>
+    <h1>Task Overview</h1>
     <p id="instructionText"></p>
     <div class="task-buttons">
       <button id="startBtn" class="task-btn">Begin Tasks</button>
@@ -170,7 +195,7 @@
 
   <script>
     // Prevent long-press context menu globally
-    document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
+    document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   </script>
 </body>
 

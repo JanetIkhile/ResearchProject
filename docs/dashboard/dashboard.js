@@ -79,13 +79,15 @@ const startBtn = document.getElementById("startBtn");
 
     // Set instruction dynamically
     instructionEl.innerHTML =
-        `Complete four short motor tasks.<br>` +
+        `Complete four short tasks.<br>` +
         `Use your <span class="highlight">${dominantArm || 'dominant'} hand</span> throughout.<br>` +
         `Follow the instructions for each task.`;
 
     // Show animated helper hand pointing to the button after 2 seconds of inactivity
     const pointerTimeout = setTimeout(() => {
         if (!startBtn || startBtn.style.display === "none" || startBtn.disabled) return;
+        
+        startBtn.classList.add("button-pressed-animate");
         const rect = startBtn.getBoundingClientRect();
         
         const pointer = document.createElement("div");
@@ -105,6 +107,7 @@ const startBtn = document.getElementById("startBtn");
             clearTimeout(pointerTimeout);
             const pointer = document.getElementById("continuePointer");
             if (pointer) pointer.remove();
+            startBtn.classList.remove("button-pressed-animate");
             startBtn.disabled = true;
             let nextPath = "../drag/drag.html"; // Default start path
             
@@ -134,13 +137,13 @@ const startBtn = document.getElementById("startBtn");
                         
                         // Route dynamically to the first incomplete task
                         if (!sessionRow.drag_completed) {
-                            nextPath = "../drag/drag.html";
+                            nextPath = "../drag/drag.html?v=7";
                         } else if (!sessionRow.tap_completed) {
-                            nextPath = "../tap/tap.html";
+                            nextPath = "../tap/tap.html?v=6";
                         } else if (!pinchCompleted) {
-                            nextPath = "../pinch/pinch.html";
+                            nextPath = "../pinch/pinch.html?v=100";
                         } else if (!sessionRow.hold_completed) {
-                            nextPath = "../hold/hold.html";
+                            nextPath = "../hold/hold.html?v=100";
                         } else {
                             nextPath = "../thank-you.html";
                         }

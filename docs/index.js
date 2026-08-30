@@ -13,6 +13,7 @@ let allParticipants = [];
 
 function showPointerOnButton(btn) {
     if (document.getElementById("continuePointer")) return;
+    btn.classList.add("button-pressed-animate");
     const rect = btn.getBoundingClientRect();
     const pointer = document.createElement("div");
     pointer.id = "continuePointer";
@@ -28,6 +29,10 @@ function removePointer() {
     const pointer = document.getElementById("continuePointer");
     if (pointer) {
         pointer.remove();
+    }
+    const loginBtn = document.getElementById("loginBtn");
+    if (loginBtn) {
+        loginBtn.classList.remove("button-pressed-animate");
     }
 }
 

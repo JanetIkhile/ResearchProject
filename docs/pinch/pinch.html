@@ -6,8 +6,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pinch Task</title>
-    <link rel="stylesheet" href="pinch.css?v=99">
-    <script type="module" src="pinch.js?v=99" defer></script>
+    <link rel="stylesheet" href="pinch.css?v=104">
+    <script type="module" src="pinch.js?v=104" defer></script>
 </head>
 
 <body>
@@ -22,8 +22,7 @@
             <p id="pinchInstruction">Place your index finger and thumb on the guide circles.<br>Open them <strong
                     class="highlight-instruction">as widely</strong> and <strong class="highlight-instruction">as
                     quickly</strong> as possible.<br>Then lift both fingers and repeat.</p>
-            <div id="watchExampleIndicator" class="watch-example-indicator" style="display:none;">Watch the example
-                below</div>
+            <button id="watchExampleBtn" class="watch-example-btn" style="display:none;">Watch Example</button>
             <p id="timerLine" class="timer-line" style="display:none;">Time remaining: <span id="timerBadge"
                     class="timer-badge">10</span> seconds</p>
             <div id="attemptsCounter" class="attempts-container" style="display:none;"></div>
@@ -73,7 +72,7 @@
     </div>
 
     <!-- Completion routing -->
-    <div id="completionBox" style="display:none; cursor:pointer;" onclick="window.location.href='../hold/hold.html'">
+    <div id="completionBox" style="display:none; cursor:pointer;" onclick="window.location.href='../hold/hold.html?v=100'">
         <p id="completionText">✅ Practice Complete</p>
         <button id="nextTaskButton">
             Continue ➔
