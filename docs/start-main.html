@@ -154,14 +154,22 @@
     </div>
 
     <script>
+        let pointerTimeout = null;
+
         function goToDashboard() {
+            // Cancel timer if user taps before it fires (dashboard pattern)
+            clearTimeout(pointerTimeout);
+
+            // Clean up pointer and button animation
+            const pointer = document.getElementById("continuePointer");
+            if (pointer) pointer.remove();
             const btn = document.querySelector("button");
             if (btn) {
+                btn.classList.remove("button-pressed-animate");
                 btn.classList.add("pressed");
-                // Remove the helper pointer if shown
-                const ptr = document.getElementById("continuePointer");
-                if (ptr) ptr.remove();
+                btn.disabled = true;
             }
+
             setTimeout(() => {
                 sessionStorage.setItem("session_type", "main");
                 window.location.href = "dashboard/dashboard.html";
@@ -171,11 +179,11 @@
         // Prevent long-press context menu globally
         document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
 
-        // Show animated helper hand pointing to the button after 2 seconds of inactivity
+        // Show animated helper hand pointing to the button after 2 seconds
         window.addEventListener("load", () => {
-            setTimeout(() => {
+            pointerTimeout = setTimeout(() => {
                 const btn = document.querySelector("button");
-                if (!btn || document.getElementById("continuePointer")) return;
+                if (!btn || btn.disabled || document.getElementById("continuePointer")) return;
                 const rect = btn.getBoundingClientRect();
 
                 // Animate the button in sync with the hand
@@ -189,14 +197,6 @@
                 pointer.style.top = `${rect.top + rect.height / 2 + 15}px`;
                 document.body.appendChild(pointer);
             }, 2000);
-        });
-
-        // Remove button animation and pointer when user taps the button
-        document.querySelector("button").addEventListener("touchstart", () => {
-            const btn = document.querySelector("button");
-            if (btn) btn.classList.remove("button-pressed-animate");
-            const ptr = document.getElementById("continuePointer");
-            if (ptr) ptr.remove();
         });
     </script>
 </body>
