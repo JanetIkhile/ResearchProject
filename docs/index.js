@@ -185,7 +185,11 @@ function renderDropdown(filterText = "") {
 // -----------------------------
 // START SESSION (login flow)
 // -----------------------------
-loginBtn.onclick = async () => {
+let isSubmittingLogin = false;
+
+async function handleLogin(e) {
+    if (isSubmittingLogin) return;
+    isSubmittingLogin = true;
     errorEl.textContent = "";
 
     const participantCode = participantInput.value;
@@ -193,6 +197,7 @@ loginBtn.onclick = async () => {
     // ---------- VALIDATION ----------
     if (!participantCode) {
         errorEl.textContent = "Please select a participant.";
+        isSubmittingLogin = false;
         return;
     }
     const identity = document.querySelector('input[name="identity"]:checked')?.value;
@@ -200,13 +205,17 @@ loginBtn.onclick = async () => {
 
     if (!identity) {
         errorEl.textContent = "Please select how you identify.";
+        isSubmittingLogin = false;
         return;
     }
 
     if (!dominantArm) {
         errorEl.textContent = "Please select your dominant arm.";
+        isSubmittingLogin = false;
         return;
     }
+
+    if (loginBtn) loginBtn.disabled = true;
 
     try {
         // ---------- GET OR CREATE PARTICIPANT ----------
@@ -266,7 +275,11 @@ loginBtn.onclick = async () => {
             const confirmReuse = confirm(
                 `${participantCode} has already completed both sessions (2/2).\n\nDo you want to continue anyway?`
             );
-            if (!confirmReuse) return;
+            if (!confirmReuse) {
+                isSubmittingLogin = false;
+                if (loginBtn) loginBtn.disabled = false;
+                return;
+            }
         }
         const sessionType = (sessionCount === 0) ? "practice" : "main";
 
@@ -284,8 +297,24 @@ loginBtn.onclick = async () => {
     } catch (err) {
         console.error(err);
         errorEl.textContent = err.message || "Something went wrong.";
+        isSubmittingLogin = false;
+        if (loginBtn) loginBtn.disabled = false;
     }
-};
+}
+
+if (loginBtn) {
+    let handled = false;
+    const triggerLogin = (e) => {
+        if (handled) return;
+        handled = true;
+        if (e && e.cancelable && e.type !== 'click') e.preventDefault();
+        handleLogin(e);
+        setTimeout(() => { handled = false; }, 300);
+    };
+    loginBtn.addEventListener("pointerup", triggerLogin);
+    loginBtn.addEventListener("touchend", triggerLogin);
+    loginBtn.addEventListener("click", triggerLogin);
+}
 // Will use this later for remote study
 // import { supabase } from "./client/supabaseClient.js";
 

@@ -179,8 +179,31 @@
         // Prevent long-press context menu globally
         document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
 
-        // Show animated helper hand pointing to the button after 2 seconds
+        function addInstantButtonHandler(btn, callback) {
+            if (!btn) return;
+            let handled = false;
+            const trigger = (e) => {
+                if (handled) return;
+                handled = true;
+                if (e && e.cancelable) e.preventDefault();
+                if (e) e.stopPropagation();
+                callback(e);
+                setTimeout(() => { handled = false; }, 300);
+            };
+            btn.addEventListener("pointerup", trigger);
+            btn.addEventListener("touchend", trigger);
+            btn.addEventListener("click", trigger);
+        }
+
         window.addEventListener("load", () => {
+            const btn = document.querySelector("button");
+            if (btn) {
+                addInstantButtonHandler(btn, () => {
+                    goToDashboard();
+                });
+            }
+
+            // Show animated helper hand pointing to the button after 2 seconds
             pointerTimeout = setTimeout(() => {
                 const btn = document.querySelector("button");
                 if (!btn || btn.disabled || document.getElementById("continuePointer")) return;

@@ -46,6 +46,22 @@ let baselineBottomCenterY = null;
 let inactivityTimer = null;
 let gifTimer = null;
 let continueInactivityTimer = null;
+
+function addInstantButtonHandler(btn, callback) {
+    if (!btn) return;
+    let handled = false;
+    const trigger = (e) => {
+        if (handled) return;
+        handled = true;
+        if (e && e.cancelable) e.preventDefault();
+        if (e) e.stopPropagation();
+        callback(e);
+        setTimeout(() => { handled = false; }, 300);
+    };
+    btn.addEventListener("pointerup", trigger);
+    btn.addEventListener("touchend", trigger);
+    btn.addEventListener("click", trigger);
+}
 let practiceStep = 'initial_demo_waiting'; // initial_demo_waiting, initial_demo_animating, try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
 
 const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles.<br>Open them <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.<br>Then lift both fingers and repeat.";
@@ -1099,8 +1115,7 @@ function setupProgressiveDisclosure() {
     };
 
     if (tryItButton) {
-        tryItButton.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(tryItButton, (e) => {
             stopDemoAnimation();
             const optionsOverlay = document.getElementById("practiceOptionsOverlay");
             if (optionsOverlay) optionsOverlay.style.display = "none";
@@ -1120,22 +1135,19 @@ function setupProgressiveDisclosure() {
     }
 
     if (watchVideoBtn) {
-        watchVideoBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(watchVideoBtn, (e) => {
             openGifModal();
         });
     }
 
     if (helpBanner) {
-        helpBanner.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(helpBanner, (e) => {
             openGifModal();
         });
     }
 
     if (watchExampleBtn) {
-        watchExampleBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(watchExampleBtn, (e) => {
             // Remove helper hand
             const pointer = document.getElementById("btnPointer");
             if (pointer) pointer.remove();
@@ -1152,8 +1164,7 @@ function setupProgressiveDisclosure() {
     }
 
     if (gifBtnYes) {
-        gifBtnYes.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(gifBtnYes, (e) => {
             if (gifTimer) clearTimeout(gifTimer);
             if (gifModal) {
                 gifModal.style.display = "none";
@@ -1167,8 +1178,7 @@ function setupProgressiveDisclosure() {
     }
 
     if (gifBtnAgain) {
-        gifBtnAgain.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(gifBtnAgain, (e) => {
             openGifModal();
         });
     }
@@ -1342,6 +1352,15 @@ function endPinchTask() {
     }
 
     completionBox.style.display = "flex";
+    addInstantButtonHandler(completionBox, () => {
+        finishAndNavigate();
+    });
+    const nextButton = document.getElementById("nextTaskButton");
+    if (nextButton) {
+        addInstantButtonHandler(nextButton, () => {
+            finishAndNavigate();
+        });
+    }
 
     // Setup inactivity continue pointer after 2 seconds of inactivity on completion box
     continueInactivityTimer = setTimeout(() => {

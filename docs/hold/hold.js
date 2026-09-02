@@ -30,6 +30,22 @@ let gifPromptTitle = null;
 let gifBtnGroup = null;
 let attemptsCounter = null;
 
+function addInstantButtonHandler(btn, callback) {
+    if (!btn) return;
+    let handled = false;
+    const trigger = (e) => {
+        if (handled) return;
+        handled = true;
+        if (e && e.cancelable) e.preventDefault();
+        if (e) e.stopPropagation();
+        callback(e);
+        setTimeout(() => { handled = false; }, 300);
+    };
+    btn.addEventListener("pointerup", trigger);
+    btn.addEventListener("touchend", trigger);
+    btn.addEventListener("click", trigger);
+}
+
 function startDemoAnimation() {
     if (sessionNumber !== 1) return; // Only practice phase
     if (taskCompleted || trialCount >= TRIAL_LIMIT || trialActive) return;
@@ -1301,9 +1317,14 @@ async function maybeFinishSession() {
         if (completionBox) {
             completionBox.style.display = "flex";
             completionBox.style.cursor = "pointer";
-            completionBox.onclick = () => {
+            addInstantButtonHandler(completionBox, () => {
                 finishAndNavigate();
-            };
+            });
+            if (nextBtn) {
+                addInstantButtonHandler(nextBtn, () => {
+                    finishAndNavigate();
+                });
+            }
         }
 
         // Create finger pointer continue animation after 2 seconds
@@ -1538,8 +1559,7 @@ function setupProgressiveDisclosure() {
     };
 
     if (tryItButton) {
-        tryItButton.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(tryItButton, (e) => {
             stopDemoAnimation();
             const optionsOverlay = document.getElementById("practiceOptionsOverlay");
             if (optionsOverlay) optionsOverlay.style.display = "none";
@@ -1563,8 +1583,7 @@ function setupProgressiveDisclosure() {
     }
 
     if (watchExampleBtn) {
-        watchExampleBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(watchExampleBtn, (e) => {
             // Remove helper hand
             const pointer = document.getElementById("btnPointer");
             if (pointer) pointer.remove();
@@ -1581,16 +1600,14 @@ function setupProgressiveDisclosure() {
     }
 
     if (watchVideoBtn) {
-        watchVideoBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(watchVideoBtn, (e) => {
             openGifModal();
         });
     }
 
     const gifBtnYes = document.getElementById("gifBtnYes");
     if (gifBtnYes) {
-        gifBtnYes.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(gifBtnYes, (e) => {
             if (gifTimer) clearTimeout(gifTimer);
             if (gifModal) {
                 gifModal.style.display = "none";
@@ -1609,8 +1626,7 @@ function setupProgressiveDisclosure() {
 
     const gifBtnAgain = document.getElementById("gifBtnAgain");
     if (gifBtnAgain) {
-        gifBtnAgain.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(gifBtnAgain, (e) => {
             openGifModal();
         });
     }

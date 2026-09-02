@@ -23,6 +23,22 @@ let demoLoopCount = 0;
 let inactivityTimer = null;
 let gifTimer = null;
 let continueInactivityTimer = null;
+
+function addInstantButtonHandler(btn, callback) {
+    if (!btn) return;
+    let handled = false;
+    const trigger = (e) => {
+        if (handled) return;
+        handled = true;
+        if (e && e.cancelable) e.preventDefault();
+        if (e) e.stopPropagation();
+        callback(e);
+        setTimeout(() => { handled = false; }, 300);
+    };
+    btn.addEventListener("pointerup", trigger);
+    btn.addEventListener("touchend", trigger);
+    btn.addEventListener("click", trigger);
+}
 // const dragInstruction = document.getElementById("dragInstruction");
 
 // async setup
@@ -789,6 +805,15 @@ async function handleTouchEnd(e) {
         if (nextButton) {
             nextButton.innerText = "Continue ➔";
             nextButton.style.display = 'block';
+            addInstantButtonHandler(nextButton, () => {
+                window.location.href = '../tap/tap.html?v=13';
+            });
+        }
+        if (completionBox) {
+            completionBox.style.display = "flex";
+            addInstantButtonHandler(completionBox, () => {
+                window.location.href = '../tap/tap.html?v=13';
+            });
         }
         if (!taskCompleted) {
             taskCompleted = true;
@@ -891,8 +916,7 @@ window.addEventListener("resize", () => {
     const watchExampleBtn = document.getElementById("watchExampleBtn");
 
     if (watchExampleBtn) {
-        watchExampleBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(watchExampleBtn, (e) => {
             // Remove helper hand
             const pointer = document.getElementById("btnPointer");
             if (pointer) pointer.remove();
@@ -951,8 +975,7 @@ window.addEventListener("resize", () => {
     };
 
     if (tryItButton) {
-        tryItButton.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(tryItButton, (e) => {
             stopDemoAnimation();
             const optionsOverlay = document.getElementById("practiceOptionsOverlay");
             if (optionsOverlay) optionsOverlay.style.display = "none";
@@ -974,15 +997,13 @@ window.addEventListener("resize", () => {
     }
 
     if (watchVideoBtn) {
-        watchVideoBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(watchVideoBtn, (e) => {
             openGifModal();
         });
     }
 
     if (gifBtnYes) {
-        gifBtnYes.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(gifBtnYes, (e) => {
             if (gifTimer) clearTimeout(gifTimer);
             const gifModal = document.getElementById("gifModal");
             if (gifModal) gifModal.style.display = "none";
@@ -995,8 +1016,7 @@ window.addEventListener("resize", () => {
     }
 
     if (gifBtnAgain) {
-        gifBtnAgain.addEventListener("click", (e) => {
-            e.stopPropagation();
+        addInstantButtonHandler(gifBtnAgain, (e) => {
             openGifModal();
         });
     }

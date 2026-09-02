@@ -103,7 +103,11 @@ const startBtn = document.getElementById("startBtn");
     // 3. Dynamic Task Routing on startBtn Click
     // -----------------------------
     if (startBtn) {
-        startBtn.onclick = async () => {
+        let handled = false;
+        const handleStartClick = async (e) => {
+            if (handled) return;
+            handled = true;
+            if (e && e.cancelable) e.preventDefault();
             clearTimeout(pointerTimeout);
             const pointer = document.getElementById("continuePointer");
             if (pointer) pointer.remove();
@@ -154,6 +158,9 @@ const startBtn = document.getElementById("startBtn");
             }
             window.location.href = nextPath;
         };
+        startBtn.addEventListener("pointerup", handleStartClick);
+        startBtn.addEventListener("touchend", handleStartClick);
+        startBtn.addEventListener("click", handleStartClick);
     }
 
 })();
