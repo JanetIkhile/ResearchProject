@@ -31,6 +31,7 @@ let lastThumbX = null;
 let lastThumbY = null;
 let maxStrokeDistance = 0;
 let strokeStartDistance = 0;
+let strokeStartTime = 0;
 
 // Progressive Disclosure state variables
 let demoLoopCount = 0;
@@ -64,11 +65,60 @@ function addInstantButtonHandler(btn, callback) {
 }
 let practiceStep = 'initial_demo_waiting'; // initial_demo_waiting, initial_demo_animating, try_button_shown -> waiting_for_touch -> help_banner_shown -> detailed_demo -> gif_ready_prompt -> active_practice
 
-const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles.<br>Open them <strong class=\"highlight-instruction\">as widely</strong> and <strong class=\"highlight-instruction\">as quickly</strong> as possible.<br>Then lift both fingers and repeat.";
+const ORIGINAL_INSTRUCTION = "Place your index finger and thumb on the guide circles.<br>Spread your fingers as <strong class=\"highlight-instruction\">wide</strong> and <strong class=\"highlight-instruction\">fast</strong> as possible.<br>Then lift both fingers and repeat.";
+
+let practiceTipCount = 0;
+let openGifModalFn = null;
+let inwardErrorCount = 0;
+
+// Practice error threshold
+const MAX_PRACTICE_ERRORS = 7;
+let practiceErrorCount = 0;
+
+function getInwardErrorMessage() {
+    inwardErrorCount++;
+    if (inwardErrorCount % 2 === 1) {
+        return "Please spread your fingers apart, not inward.";
+    } else {
+        return "Imagine you are zooming in on a picture.";
+    }
+}
 
 function showPinchPracticeErrorModal(message) {
     if (sessionNumber !== 1) return; // Only in practice phase
+
+    // Check error threshold
+    practiceErrorCount++;
+    console.log(`[Pinch] Practice error #${practiceErrorCount}`);
+    if (practiceErrorCount >= MAX_PRACTICE_ERRORS) {
+        // Log threshold reached to Supabase, then end practice early
+        (async () => {
+            try {
+                if (sessionId) {
+                    await supabase.from("trial_results").insert({
+                        participant_id: participantId,
+                        session_id: sessionId,
+                        task_type: TASK_TYPE,
+                        trial_number: trialNumber,
+                        timestamp: new Date().toISOString(),
+                        notes: "practice_error_threshold_reached",
+                        viewport_width: window.innerWidth,
+                        viewport_height: window.innerHeight,
+                        device_pixel_ratio: window.devicePixelRatio
+                    });
+                }
+            } catch (err) {
+                console.warn("Could not log pinch practice threshold event:", err);
+            }
+            console.log("[Pinch] Practice error threshold reached — ending practice early.");
+            endPinchTask();
+        })();
+        return;
+    }
+
     if (document.getElementById("practiceErrorModal")) return;
+
+    practiceTipCount++;
 
     window.isModalOpen = true; // Lock modal interactions
     stopDemoAnimation(); // Stop any running demo animations and clear timeouts!
@@ -109,6 +159,14 @@ function showPinchPracticeErrorModal(message) {
         // Allow restarting
         firstTouchTime = null;
         sessionStorage.setItem("pinch_page_load", String(Date.now()));
+
+        // If practice tips triggered 3 times, open watch video modal
+        if (practiceTipCount >= 3) {
+            practiceTipCount = 0;
+            if (typeof openGifModalFn === 'function') {
+                openGifModalFn();
+            }
+        }
     };
 
     modalDiv.addEventListener("click", dismissModal);
@@ -280,14 +338,14 @@ async function startSession() {
     }
 }
 
-// Check touch containment inside targets
-function isTouchInsideElement(touch, element) {
+// Check touch containment inside targets with padding tolerance
+function isTouchInsideElement(touch, element, padding = 35) {
     const rect = element.getBoundingClientRect();
     return (
-        touch.clientX >= rect.left &&
-        touch.clientX <= rect.right &&
-        touch.clientY >= rect.top &&
-        touch.clientY <= rect.bottom
+        touch.clientX >= (rect.left - padding) &&
+        touch.clientX <= (rect.right + padding) &&
+        touch.clientY >= (rect.top - padding) &&
+        touch.clientY <= (rect.bottom + padding)
     );
 }
 
@@ -295,6 +353,7 @@ function isTouchInsideElement(touch, element) {
 function resetTargetPositions() {
     maxStrokeDistance = 0;
     strokeStartDistance = 0;
+    strokeStartTime = 0;
     topTarget.style.left = "";
     topTarget.style.top = "";
     topTarget.style.transform = "";
@@ -691,32 +750,13 @@ function handleTouch(e) {
     const touches = e.touches;
     const now = Date.now();
 
-    if (sessionNumber === 1 && trialNumber === 0 && !taskActive && practiceStep === 'waiting_for_touch') {
-        if (e.type === 'touchstart') {
-            if (touches.length === 1) {
-                if (warningTimeout) clearTimeout(warningTimeout);
-                warningTimeout = setTimeout(() => {
-                    showPinchPracticeErrorModal("Please place both your index finger and thumb on the screen to start.");
-                }, 250);
-            } else if (touches.length === 2) {
-                if (warningTimeout) {
-                    clearTimeout(warningTimeout);
-                    warningTimeout = null;
-                }
-            }
-        }
-    }
-
-    if (touches.length >= 3) {
-        if (sessionNumber === 1) {
-            showPinchPracticeErrorModal("Please use only two fingers (your index finger and thumb) to pinch.");
-            return;
-        }
-    }
 
 
 
-    if (touches.length === 2) {
+
+
+
+    if (touches.length >= 2) {
         // Clear any pending warning timer and restore normal text
         if (warningTimeout) {
             clearTimeout(warningTimeout);
@@ -724,10 +764,9 @@ function handleTouch(e) {
         }
 
         // Distinguish between Index (higher up, lower Y) and Thumb (lower down, higher Y)
-        let t1 = touches[0];
-        let t2 = touches[1];
-        let indexTouch = (t1.clientY < t2.clientY) ? t1 : t2;
-        let thumbTouch = (t1.clientY < t2.clientY) ? t2 : t1;
+        let sortedTouches = Array.from(touches).sort((a, b) => a.clientY - b.clientY);
+        let indexTouch = sortedTouches[0];
+        let thumbTouch = sortedTouches[sortedTouches.length - 1];
 
         const x1 = indexTouch.clientX;
         const y1 = indexTouch.clientY;
@@ -744,19 +783,10 @@ function handleTouch(e) {
         thumbTouchId = thumbTouch.identifier;
 
         if (!taskActive) {
-            // Before the trial starts, enforce vertical layout check
-            const isVertical = Math.abs(dy) > Math.abs(dx);
-            if (!isVertical) {
-                if (sessionNumber === 1) {
-                    showPinchPracticeErrorModal("Please place your fingers vertically.");
-                }
-                return;
-            }
-
             // Check target containment to start the trial
             if (!savingTrial) {
-                const oneInTop = isTouchInsideElement(indexTouch, topTarget) || isTouchInsideElement(thumbTouch, topTarget);
-                const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
+                const oneInTop = isTouchInsideElement(indexTouch, topTarget, 35) || isTouchInsideElement(thumbTouch, topTarget, 35);
+                const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget, 35) || isTouchInsideElement(thumbTouch, bottomTarget, 35);
 
                 if (oneInTop && oneInBottom) {
                     if (sessionNumber === 1 && trialNumber === 0) {
@@ -766,10 +796,11 @@ function handleTouch(e) {
                     requiresReset = false;
                     maxStrokeDistance = distPx;
                     strokeStartDistance = distPx;
+                    strokeStartTime = now;
                     startPinchTrial(now);
                 } else {
                     if (sessionNumber === 1) {
-                        showPinchPracticeErrorModal("Please place your thumb on the bottom circle and your index finger on the top circle to start.");
+                        showPinchPracticeErrorModal("Place your fingers on the circles, spread them apart, and lift.");
                     }
                 }
             }
@@ -777,16 +808,17 @@ function handleTouch(e) {
             // During the active trial
             if (requiresReset) {
                 // Enforce placing fingers back inside baseline circles to resume trial (from 0 touches)
-                const oneInTop = isTouchInsideElement(indexTouch, topTarget) || isTouchInsideElement(thumbTouch, topTarget);
-                const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget) || isTouchInsideElement(thumbTouch, bottomTarget);
+                const oneInTop = isTouchInsideElement(indexTouch, topTarget, 35) || isTouchInsideElement(thumbTouch, topTarget, 35);
+                const oneInBottom = isTouchInsideElement(indexTouch, bottomTarget, 35) || isTouchInsideElement(thumbTouch, bottomTarget, 35);
 
                 if (oneInTop && oneInBottom) {
                     requiresReset = false; // Recovered!
                     maxStrokeDistance = distPx; // Initialize max distance for this new stroke!
                     strokeStartDistance = distPx;
+                    strokeStartTime = now;
                 } else {
                     if (sessionNumber === 1) {
-                        showPinchPracticeErrorModal("Please place your fingers inside the two guide circles to start the next stroke.");
+                        showPinchPracticeErrorModal("Place your fingers back on the circles, spread them apart, and lift.");
                     }
 
                     trajectory.push({
@@ -809,28 +841,32 @@ function handleTouch(e) {
             if (strokeStartDistance === 0) {
                 strokeStartDistance = distPx;
             }
+            if (strokeStartTime === 0) {
+                strokeStartTime = now;
+            }
 
             // Practice phase validations
             if (sessionNumber === 1) {
+                const strokeAge = now - strokeStartTime;
 
-                const hasOpened = (maxStrokeDistance > strokeStartDistance + 5);
+                // Ignore inward check during the initial 300ms touch landing settlement phase
+                if (strokeAge > 300) {
+                    const hasOpened = (maxStrokeDistance > strokeStartDistance + 40);
 
-                // Smart log to help track pinch-in behavior
-                if (hasOpened && distPx < maxStrokeDistance - 2) {
-                    console.log(`Pinch-in detected: dist=${distPx.toFixed(1)}, peak=${maxStrokeDistance.toFixed(1)}, diff=${(maxStrokeDistance - distPx).toFixed(1)}`);
+                    // Require the participant to pinch inward fully (fingers brought together <80px or collapsed by >100px) before showing practice tip
+                    const isFullyPinchedInward = (distPx < 80) || (hasOpened && distPx < maxStrokeDistance - 100);
+
+                    if (isFullyPinchedInward) {
+                        showPinchPracticeErrorModal(getInwardErrorMessage());
+                        return;
+                    }
                 }
 
-                // 1) Pinch in check (active if they drag inward by more than 8px from peak distance)
-                if (distPx < maxStrokeDistance - 8) {
-                    showPinchPracticeErrorModal("Open your fingers outward, then lift both fingers. Do not pinch inward.");
-                    return;
-                }
-                // 2) Orientation change check (allow generous deviation from vertical line)
-                const isAcceptablyVertical = Math.abs(dy) > Math.abs(dx);
-                if (!isAcceptablyVertical) {
-                    showPinchPracticeErrorModal("Please keep your fingers vertical while pinching out.");
-                    return;
-                }
+                // Check if user holds fingers stationary on guide circles for >2.5s without spreading apart
+                // if (strokeAge > 2500 && maxStrokeDistance < strokeStartDistance + 35) {
+                //     showPinchPracticeErrorModal("Please spread your fingers apart as wide and fast as possible.");
+                //     return;
+                // }
             }
 
             // Lock circles to monotonically non-decreasing distance during active pinching
@@ -875,6 +911,12 @@ function handleTouch(e) {
         liveDistanceLabel.style.display = "none";
 
         if (taskActive) {
+            // Check if user lifted fingers without spreading circles wide (only in practice phase)
+            // if (sessionNumber === 1 && maxStrokeDistance < strokeStartDistance + 40) {
+            //     showPinchPracticeErrorModal("Please spread your fingers apart as wide and fast as possible.");
+            //     return;
+            // }
+
             if (touches.length === 1) {
                 if (requiresReset) {
                     // If we previously dropped to 0 touches, they must place BOTH fingers back on circles to recover
@@ -955,13 +997,6 @@ function handleTouch(e) {
                             topTarget.style.top = `${lastIndexY}px`;
                             topTarget.style.transform = "translate(-50%, -50%)";
                         }
-                    }
-
-                    // Show pause warning with debounce (only in practice phase)
-                    if (sessionNumber === 1 && !warningTimeout) {
-                        warningTimeout = setTimeout(() => {
-                            showPinchPracticeErrorModal("Please keep both your index finger and thumb on the screen to pinch.");
-                        }, 150);
                     }
                 }
             } else {
@@ -1079,6 +1114,7 @@ function setupProgressiveDisclosure() {
     }
 
     const openGifModal = () => {
+        openGifModalFn = openGifModal;
         const optionsOverlay = document.getElementById("practiceOptionsOverlay");
         if (optionsOverlay) optionsOverlay.style.display = "none";
         if (optionsContainer) optionsContainer.style.display = "none";
@@ -1182,6 +1218,8 @@ function setupProgressiveDisclosure() {
             openGifModal();
         });
     }
+
+    openGifModalFn = openGifModal;
 }
 
 // Start Trial
@@ -1308,6 +1346,24 @@ async function savePinchTrial(startTime, endTime) {
     }
 }
 
+async function finishAndNavigate() {
+    const nextBtn = document.getElementById("nextTaskButton");
+    if (nextBtn) nextBtn.disabled = true;
+    try {
+        if (sessionId && sessionNumber !== 1) {
+            const { error } = await supabase
+                .from('sessions')
+                .update({ completed: true })
+                .eq('id', sessionId);
+            if (error) console.error("Failed to mark session completed:", error);
+        }
+    } catch (err) {
+        console.error("Unexpected error while finishing session:", err);
+    } finally {
+        window.location.href = "../hold/hold.html?v=100";
+    }
+}
+
 // End Task
 function endPinchTask() {
     taskCompleted = true;
@@ -1315,10 +1371,10 @@ function endPinchTask() {
     sessionStorage.setItem("pinch_completed", "true");
 
     // Remove listeners
-    document.removeEventListener("touchstart", handleTouch);
-    document.removeEventListener("touchmove", handleTouch);
-    document.removeEventListener("touchend", handleTouch);
-    document.removeEventListener("touchcancel", handleTouch);
+    document.removeEventListener("touchstart", handleTouch, { passive: false });
+    document.removeEventListener("touchmove", handleTouch, { passive: false });
+    document.removeEventListener("touchend", handleTouch, { passive: false });
+    document.removeEventListener("touchcancel", handleTouch, { passive: false });
 
     // Clear any pending warning timeouts immediately
     if (warningTimeout) {

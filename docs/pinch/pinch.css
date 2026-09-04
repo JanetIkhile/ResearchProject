@@ -123,10 +123,8 @@ textarea {
     position: fixed;
     left: 50%;
     transform: translateX(-50%);
-    width: 98px;
-    /* Radius 49px (26.0mm at 96dpi) */
-    height: 98px;
-    /* Radius 49px (26.0mm at 96dpi) */
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     background-color: transparent;
     /* Outlined guide, transparent center */
@@ -140,7 +138,7 @@ textarea {
 
 /* Dots positioned close to each other in the center initially */
 #topTarget {
-    top: calc(50% - 90px);
+    top: calc(50% - 100px);
 }
 
 #bottomTarget {

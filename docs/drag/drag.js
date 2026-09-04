@@ -14,6 +14,10 @@ let hasShownSpeedPrompt = false;
 let pageLoadTime = Date.now();
 let lastTrialEndTime = pageLoadTime;
 let initiationDelay = null;
+
+// Practice error threshold
+const MAX_PRACTICE_ERRORS = 7;
+let practiceErrorCount = 0;
 const instructionMain = document.getElementById("instructionMain");
 const instructionSub = document.getElementById("instructionSub");
 
@@ -564,7 +568,75 @@ function handleTouchMove(e) {
     }
 }
 
+async function endDragPracticeEarly() {
+    // Log threshold reached to Supabase
+    try {
+        if (sessionId) {
+            await supabase.from("trial_results").insert({
+                participant_id: participantId,
+                session_id: sessionId,
+                task_type: TASK_TYPE,
+                trial_number: trialNumber,
+                timestamp: new Date().toISOString(),
+                notes: "practice_error_threshold_reached",
+                viewport_width: window.innerWidth,
+                viewport_height: window.innerHeight,
+                device_pixel_ratio: window.devicePixelRatio
+            });
+        }
+    } catch (err) {
+        console.warn("Could not log drag practice threshold event:", err);
+    }
+    console.log("[Drag] Practice error threshold reached — ending practice early.");
+
+    taskCompleted = true;
+    activeTouchId = null;
+
+    // Dim background elements
+    ['taskHeader', 'mainContainer', 'startPoint', 'targetPoint', 'pathCanvas'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add("dimmed");
+    });
+
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const completionText = document.getElementById("completionText");
+    if (completionText) completionText.innerText = "✅ Practice Complete";
+
+    const instructionBox = document.getElementById("instructionBox");
+    if (instructionBox) instructionBox.style.display = "none";
+
+    const completionBox = document.getElementById("completionBox");
+    const nextButton = document.getElementById('nextTaskButton');
+    if (nextButton) {
+        nextButton.innerText = "Continue ➔";
+        nextButton.style.display = 'block';
+        addInstantButtonHandler(nextButton, () => {
+            window.location.href = '../tap/tap.html?v=13';
+        });
+    }
+    if (completionBox) {
+        completionBox.style.display = "flex";
+        addInstantButtonHandler(completionBox, () => {
+            window.location.href = '../tap/tap.html?v=13';
+        });
+    }
+
+    removeTouchListeners();
+    if (canvas) canvas.style.pointerEvents = 'none';
+}
+
 function showPracticeTip(message) {
+    if (sessionNumber !== 1) return; // Only in practice phase
+
+    // Check error threshold
+    practiceErrorCount++;
+    console.log(`[Drag] Practice error #${practiceErrorCount}`);
+    if (practiceErrorCount >= MAX_PRACTICE_ERRORS) {
+        endDragPracticeEarly();
+        return;
+    }
+
     if (document.getElementById("practiceErrorModal")) return;
 
     const modalDiv = document.createElement("div");

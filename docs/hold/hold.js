@@ -511,6 +511,10 @@ let trialNumber = 0;
 const TASK_TYPE = "hold";
 const PRESSURE_FEEDBACK_ENABLED = false;
 
+// Practice error threshold
+const MAX_PRACTICE_ERRORS = 7;
+let practiceErrorCount = 0;
+
 // DOM refs (will be assigned after session init)
 let holdTarget = null;
 let nextButton = null;
@@ -954,8 +958,73 @@ async function handleEarlyRelease(touch) {
     await endHoldTrialEarly(releaseTime);
 }
 
+async function endHoldPracticeEarly() {
+    // Log threshold reached to Supabase
+    try {
+        if (sessionId) {
+            await supabase.from("trial_results").insert({
+                participant_id: participantId,
+                session_id: sessionId,
+                task_type: TASK_TYPE,
+                trial_number: trialNumber,
+                timestamp: new Date().toISOString(),
+                notes: "practice_error_threshold_reached",
+                viewport_width: window.innerWidth,
+                viewport_height: window.innerHeight,
+                device_pixel_ratio: window.devicePixelRatio
+            });
+        }
+    } catch (err) {
+        console.warn("Could not log hold practice threshold event:", err);
+    }
+    console.log("[Hold] Practice error threshold reached — ending practice early.");
+
+    // Clean up timers
+    if (holdPollingInterval) { clearInterval(holdPollingInterval); holdPollingInterval = null; }
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (holdDisplayInterval) { clearInterval(holdDisplayInterval); holdDisplayInterval = null; }
+    isHolding = false;
+    trialActive = false;
+    taskCompleted = true;
+
+    if (holdTarget) holdTarget.style.pointerEvents = 'none';
+    if (startButton) { startButton.style.display = 'none'; }
+
+    // Show completion UI
+    const nextBtn = document.getElementById("nextTaskButton");
+    const completionBox = document.getElementById("completionBox");
+    const completionText = document.getElementById("completionText");
+    if (completionText) completionText.innerText = "✅ Practice Complete";
+    if (nextBtn) nextBtn.innerText = "Finish Tasks";
+    if (nextBtn) nextBtn.style.display = "block";
+    if (completionBox) {
+        completionBox.style.display = "flex";
+        addInstantButtonHandler(completionBox, () => { finishAndNavigate(); });
+        if (nextBtn) addInstantButtonHandler(nextBtn, () => { finishAndNavigate(); });
+    }
+}
+
 function showEarlyReleaseModal() {
+    if (sessionNumber !== 1) {
+        // In main phase, early release still shows modal but does NOT count toward practice threshold
+        if (document.getElementById("earlyReleaseModal")) return;
+        _showEarlyReleaseModalImpl();
+        return;
+    }
+
+    // In practice phase, count this as a practice error
+    practiceErrorCount++;
+    console.log(`[Hold] Practice error (early release) #${practiceErrorCount}`);
+    if (practiceErrorCount >= MAX_PRACTICE_ERRORS) {
+        endHoldPracticeEarly();
+        return;
+    }
+
     if (document.getElementById("earlyReleaseModal")) return;
+    _showEarlyReleaseModalImpl();
+}
+
+function _showEarlyReleaseModalImpl() {
 
     window.isModalOpen = true; // Lock modal interactions
     const modalDiv = document.createElement("div");
@@ -1748,6 +1817,16 @@ async function handleDriftError() {
 }
 
 function showHoldPracticeDriftModal() {
+    if (sessionNumber === 1) {
+        // In practice phase, count this as a practice error
+        practiceErrorCount++;
+        console.log(`[Hold] Practice error (drift) #${practiceErrorCount}`);
+        if (practiceErrorCount >= MAX_PRACTICE_ERRORS) {
+            endHoldPracticeEarly();
+            return;
+        }
+    }
+
     if (document.getElementById("practiceDriftModal")) return;
 
     window.isModalOpen = true; // Lock modal interactions

@@ -21,6 +21,10 @@ let taskCompleted = false;
 let sessionNumber = null;
 let savingInProgress = false;
 
+// Practice error threshold
+const MAX_PRACTICE_ERRORS = 7;
+let practiceErrorCount = 0;
+
 // Progressive disclosure practice states
 let practiceStep = 'initial_demo_waiting'; // 'initial_demo_waiting', 'initial_demo_animating', 'try_button_shown', 'waiting_for_touch', 'help_banner_shown', 'detailed_demo', 'gif_ready_prompt', 'active_practice'
 let demoLoopCount = 0;
@@ -49,8 +53,81 @@ function addInstantButtonHandler(btn, callback) {
 }
 let demoPointer = null;
 
+async function endTapPracticeEarly() {
+    // Log threshold reached to Supabase
+    try {
+        if (sessionId) {
+            await supabase.from("trial_results").insert({
+                participant_id: participantId,
+                session_id: sessionId,
+                task_type: TASK_TYPE,
+                trial_number: trialNumber,
+                timestamp: new Date().toISOString(),
+                notes: "practice_error_threshold_reached",
+                viewport_width: window.innerWidth,
+                viewport_height: window.innerHeight,
+                device_pixel_ratio: window.devicePixelRatio
+            });
+        }
+    } catch (err) {
+        console.warn("Could not log practice threshold event:", err);
+    }
+    console.log("[Tap] Practice error threshold reached — ending practice early.");
+
+    // Stop the active trial if running
+    clearTimers();
+    taskActive = false;
+    taskCompleted = true;
+    isBetweenTrials = false;
+
+    // Remove touch listeners
+    try {
+        document.removeEventListener("touchstart", handleTouchStart, { passive: false });
+        document.removeEventListener("touchmove", handleTouchMove, { passive: false });
+        document.removeEventListener("touchend", handleTouchEnd, { passive: false });
+    } catch (e) {}
+
+    if (topTarget) topTarget.style.pointerEvents = 'none';
+    if (bottomTarget) bottomTarget.style.pointerEvents = 'none';
+
+    // Show completion UI
+    const elementsToDim = ['taskHeader', 'tapArea', 'topTarget', 'bottomTarget', 'attemptsCounter'];
+    elementsToDim.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add("dimmed");
+    });
+
+    const completionText = document.getElementById("completionText");
+    if (completionText) completionText.innerText = "✅ Practice Complete";
+
+    const nextButton = document.getElementById('nextTaskButton');
+    if (nextButton) {
+        nextButton.innerText = "Continue ➔";
+        nextButton.style.display = 'block';
+        addInstantButtonHandler(nextButton, () => {
+            window.location.href = '../pinch/pinch.html?v=105';
+        });
+    }
+    const completionBox = document.getElementById("completionBox");
+    if (completionBox) {
+        completionBox.style.display = "flex";
+        addInstantButtonHandler(completionBox, () => {
+            window.location.href = '../pinch/pinch.html?v=105';
+        });
+    }
+    if (tapInstruction) tapInstruction.style.display = "none";
+}
+
 function showTapPracticeErrorModal(message) {
     if (sessionNumber !== 1) return; // Only in practice phase
+
+    // Check error threshold
+    practiceErrorCount++;
+    console.log(`[Tap] Practice error #${practiceErrorCount}`);
+    if (practiceErrorCount >= MAX_PRACTICE_ERRORS) {
+        endTapPracticeEarly();
+        return;
+    }
     if (document.getElementById("practiceErrorModal")) return;
 
     // Abort active trial if active
@@ -620,7 +697,7 @@ function handleTouchStart(e) {
             if (isInsideTop || isInsideBottom) {
                 showTapPracticeErrorModal("Please tap the highlighted blue circle.");
             } else {
-                showTapPracticeErrorModal("Please tap inside the blue circles.");
+                showTapPracticeErrorModal("Please tap inside the blue circle.");
             }
         }
     }
