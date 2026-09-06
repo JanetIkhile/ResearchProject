@@ -95,80 +95,80 @@ Below are the calculated raw statistical tables for each clinical concept. Metri
 
 | Feature | Task | Spearman $\rho$ | Pearson $r$ | ICC (3,1) | Cohen's $d$ (Mild-Sev) | Kruskal H-stat | Mean (AR) | Mean (TD) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Tap Frequency (Hz) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Mean Intertap Interval (ms) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Mean Speed (px/s) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Median Speed (px/s) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Peak Speed (px/s) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Movement Time (ms) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Cycle Frequency (Hz) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Mean Pinch Interval (ms) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Mean Opening Speed (mm/s) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Median Opening Speed (mm/s) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Max Opening Velocity (mm/s) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Tap Initiation Delay (ms) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Initiation Delay (ms) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Initiation Delay (ms) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Hold Initiation Delay (ms) | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Tap Frequency (Hz) | Tap | N/A | N/A | 0.67 | N/A | N/A | N/A | N/A |
+| Mean Intertap Interval (ms) | Tap | N/A | N/A | 0.16 | N/A | N/A | N/A | N/A |
+| Drag Mean Speed (px/s) | Drag | N/A | N/A | 0.45 | N/A | N/A | N/A | N/A |
+| Drag Median Speed (px/s) | Drag | N/A | N/A | 0.40 | N/A | N/A | N/A | N/A |
+| Drag Peak Speed (px/s) | Drag | N/A | N/A | 0.21 | N/A | N/A | N/A | N/A |
+| Drag Movement Time (ms) | Drag | N/A | N/A | -0.11 | N/A | N/A | N/A | N/A |
+| Pinch Cycle Frequency (Hz) | Pinch | N/A | N/A | -0.09 | N/A | N/A | N/A | N/A |
+| Mean Pinch Interval (ms) | Pinch | N/A | N/A | 0.03 | N/A | N/A | N/A | N/A |
+| Pinch Mean Opening Speed (mm/s) | Pinch | N/A | N/A | 0.30 | N/A | N/A | N/A | N/A |
+| Pinch Median Opening Speed (mm/s) | Pinch | N/A | N/A | 0.49 | N/A | N/A | N/A | N/A |
+| Pinch Max Opening Velocity (mm/s) | Pinch | N/A | N/A | 0.67 | N/A | N/A | N/A | N/A |
+| Tap Initiation Delay (ms) | Tap | N/A | N/A | 0.30 | N/A | N/A | N/A | N/A |
+| Drag Initiation Delay (ms) | Drag | N/A | N/A | 1.00 | N/A | N/A | N/A | N/A |
+| Pinch Initiation Delay (ms) | Pinch | N/A | N/A | 0.96 | N/A | N/A | N/A | N/A |
+| Hold Initiation Delay (ms) | Hold | N/A | N/A | 0.82 | N/A | N/A | N/A | N/A |
 
 ## Hypokinesia
 *Reduction in spatial range of motion or target undershooting. Correlated with Bradykinesia Subscore.*
 
 | Feature | Task | Spearman $\rho$ | Pearson $r$ | ICC (3,1) | Cohen's $d$ (Mild-Sev) | Kruskal H-stat | Mean (AR) | Mean (TD) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Drag Terminal Undershoot (px) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Movement Amplitude (px) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Signed Target Deviation (px) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Drag Terminal Undershoot (px) | Drag | N/A | N/A | 0.69 | N/A | N/A | N/A | N/A |
+| Drag Movement Amplitude (px) | Drag | N/A | N/A | 0.65 | N/A | N/A | N/A | N/A |
+| Drag Signed Target Deviation (px) | Drag | N/A | N/A | 0.50 | N/A | N/A | N/A | N/A |
 | Drag Undershoot Proportion | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Max Opening Distance (mm) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Median Opening Distance (mm) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Pinch Max Opening Distance (mm) | Pinch | N/A | N/A | 0.98 | N/A | N/A | N/A | N/A |
+| Pinch Median Opening Distance (mm) | Pinch | N/A | N/A | 0.97 | N/A | N/A | N/A | N/A |
 
 ## Sequence effect
 *Progressive decay/decrement of speed or amplitude as movement repeats. Correlated with Bradykinesia Subscore.*
 
 | Feature | Task | Spearman $\rho$ | Pearson $r$ | ICC (3,1) | Cohen's $d$ (Mild-Sev) | Kruskal H-stat | Mean (AR) | Mean (TD) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Tap Interval Decrement Ratio | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Tap Frequency Decrement Ratio | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Tap Interval Slope (ms/tap) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Tap Frequency Slope (Hz/tap) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Tap Interval Decrement Ratio | Tap | N/A | N/A | -0.50 | N/A | N/A | N/A | N/A |
+| Tap Frequency Decrement Ratio | Tap | N/A | N/A | -0.01 | N/A | N/A | N/A | N/A |
+| Tap Interval Slope (ms/tap) | Tap | N/A | N/A | 0.02 | N/A | N/A | N/A | N/A |
+| Tap Frequency Slope (Hz/tap) | Tap | N/A | N/A | 0.10 | N/A | N/A | N/A | N/A |
 | Drag Speed Decrement Ratio | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 | Drag Speed Slope | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 | Drag Amplitude Decrement Ratio | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 | Drag Amplitude Slope | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 | Drag Duration Slope | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Opening Distance Decrement Ratio | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Opening Distance Slope (mm/cycle) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Cycle Duration Decrement Ratio | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Cycle Speed Decrement Ratio | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Cycle Duration Slope (ms/cycle) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Cycle Speed Slope (Hz/cycle) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Pinch Opening Distance Decrement Ratio | Pinch | N/A | N/A | -0.49 | N/A | N/A | N/A | N/A |
+| Pinch Opening Distance Slope (mm/cycle) | Pinch | N/A | N/A | -0.33 | N/A | N/A | N/A | N/A |
+| Pinch Cycle Duration Decrement Ratio | Pinch | N/A | N/A | 0.03 | N/A | N/A | N/A | N/A |
+| Pinch Cycle Speed Decrement Ratio | Pinch | N/A | N/A | 0.02 | N/A | N/A | N/A | N/A |
+| Pinch Cycle Duration Slope (ms/cycle) | Pinch | N/A | N/A | 0.01 | N/A | N/A | N/A | N/A |
+| Pinch Cycle Speed Slope (Hz/cycle) | Pinch | N/A | N/A | -0.25 | N/A | N/A | N/A | N/A |
 
 ## Hesitations halts
 *Rhythm arhythmicity, pauses, freezes, or transient blocks in coordination. Correlated with Bradykinesia Subscore.*
 
 | Feature | Task | Spearman $\rho$ | Pearson $r$ | ICC (3,1) | Cohen's $d$ (Mild-Sev) | Kruskal H-stat | Mean (AR) | Mean (TD) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Tap Total Hesitation/Halt Count | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Tap Total Hesitation/Halt Duration (ms) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Tap Longest Hesitation/Halt Duration (ms) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Total Hesitation/Halt Count | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Total Hesitation/Halt Duration (ms) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Longest Hesitation/Halt Duration (ms) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Total Hesitation/Halt Count | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Total Hesitation/Halt Duration (ms) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Longest Hesitation/Halt Duration (ms) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Tap Total Hesitation/Halt Count | Tap | N/A | N/A | 0.73 | N/A | N/A | N/A | N/A |
+| Tap Total Hesitation/Halt Duration (ms) | Tap | N/A | N/A | 0.68 | N/A | N/A | N/A | N/A |
+| Tap Longest Hesitation/Halt Duration (ms) | Tap | N/A | N/A | 0.39 | N/A | N/A | N/A | N/A |
+| Pinch Total Hesitation/Halt Count | Pinch | N/A | N/A | -0.00 | N/A | N/A | N/A | N/A |
+| Pinch Total Hesitation/Halt Duration (ms) | Pinch | N/A | N/A | -0.00 | N/A | N/A | N/A | N/A |
+| Pinch Longest Hesitation/Halt Duration (ms) | Pinch | N/A | N/A | 0.00 | N/A | N/A | N/A | N/A |
+| Drag Total Hesitation/Halt Count | Drag | N/A | N/A | -0.04 | N/A | N/A | N/A | N/A |
+| Drag Total Hesitation/Halt Duration (ms) | Drag | N/A | N/A | 0.04 | N/A | N/A | N/A | N/A |
+| Drag Longest Hesitation/Halt Duration (ms) | Drag | N/A | N/A | -0.01 | N/A | N/A | N/A | N/A |
 
 ## Akinesia
 *Initiation lag or reaction delay to lift/start the motor sequence. Correlated with Bradykinesia Subscore.*
 
 | Feature | Task | Spearman $\rho$ | Pearson $r$ | ICC (3,1) | Cohen's $d$ (Mild-Sev) | Kruskal H-stat | Mean (AR) | Mean (TD) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Tap Initiation Delay (ms) | Tap | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Initiation Delay (ms) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Pinch Initiation Delay (ms) | Pinch | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Hold Initiation Delay (ms) | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Hold Target Contact Delay (ms) | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Tap Initiation Delay (ms) | Tap | N/A | N/A | 0.30 | N/A | N/A | N/A | N/A |
+| Drag Initiation Delay (ms) | Drag | N/A | N/A | 1.00 | N/A | N/A | N/A | N/A |
+| Pinch Initiation Delay (ms) | Pinch | N/A | N/A | 0.96 | N/A | N/A | N/A | N/A |
+| Hold Initiation Delay (ms) | Hold | N/A | N/A | 0.82 | N/A | N/A | N/A | N/A |
+| Hold Target Contact Delay (ms) | Hold | N/A | N/A | 0.82 | N/A | N/A | N/A | N/A |
 | Hold Release Delay (ms) | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 
 ## Postural tremor
@@ -179,14 +179,14 @@ Below are the calculated raw statistical tables for each clinical concept. Metri
 | Hold Peak Tremor Amplitude (cm) | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 | Hold Tremor Spectral Power | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 | Hold Average Tremor Amplitude (cm) | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Hold Spatial Spread (px) | Hold | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Hold Spatial Spread (px) | Hold | N/A | N/A | -0.45 | N/A | N/A | N/A | N/A |
 
 ## Kinetic tremor
 *Involuntary rhythmic oscillations transverse to active voluntary path trajectories. Correlated with Tremor Subscore.*
 
 | Feature | Task | Spearman $\rho$ | Pearson $r$ | ICC (3,1) | Cohen's $d$ (Mild-Sev) | Kruskal H-stat | Mean (AR) | Mean (TD) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Drag Peak Tremor Amplitude (cm) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Tremor Spectral Power | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Average Tremor Amplitude (cm) | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
-| Drag Path Efficiency | Drag | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+| Drag Peak Tremor Amplitude (cm) | Drag | N/A | N/A | -0.01 | N/A | N/A | N/A | N/A |
+| Drag Tremor Spectral Power | Drag | N/A | N/A | -0.10 | N/A | N/A | N/A | N/A |
+| Drag Average Tremor Amplitude (cm) | Drag | N/A | N/A | -0.11 | N/A | N/A | N/A | N/A |
+| Drag Path Efficiency | Drag | N/A | N/A | 0.57 | N/A | N/A | N/A | N/A |
