@@ -1,5 +1,5 @@
 import { supabase } from "../client/supabaseClient.js";
-import { initSession } from "../utils/sessionManager.js";
+import { initSession, updateSessionFlags } from "../utils/sessionManager.js";
 
 
 
@@ -763,10 +763,22 @@ function handleTouch(e) {
             warningTimeout = null;
         }
 
-        // Distinguish between Index (higher up, lower Y) and Thumb (lower down, higher Y)
-        let sortedTouches = Array.from(touches).sort((a, b) => a.clientY - b.clientY);
-        let indexTouch = sortedTouches[0];
-        let thumbTouch = sortedTouches[sortedTouches.length - 1];
+        // Distinguish between Index and Thumb using saved identifiers if active, or top two touches
+        let indexTouch = null;
+        let thumbTouch = null;
+
+        if (taskActive && indexTouchId !== null && thumbTouchId !== null) {
+            indexTouch = Array.from(touches).find(t => t.identifier === indexTouchId);
+            thumbTouch = Array.from(touches).find(t => t.identifier === thumbTouchId);
+        }
+
+        if (!indexTouch || !thumbTouch) {
+            let sortedTouches = Array.from(touches).sort((a, b) => a.clientY - b.clientY);
+            indexTouch = sortedTouches[0];
+            thumbTouch = sortedTouches[1] || sortedTouches[sortedTouches.length - 1];
+            indexTouchId = indexTouch.identifier;
+            thumbTouchId = thumbTouch.identifier;
+        }
 
         const x1 = indexTouch.clientX;
         const y1 = indexTouch.clientY;
@@ -775,12 +787,6 @@ function handleTouch(e) {
         const dx = x1 - x2;
         const dy = y1 - y2;
         const distPx = Math.sqrt(dx * dx + dy * dy);
-
-
-
-        // Store touch identifiers to distinguish partial lift-offs
-        indexTouchId = indexTouch.identifier;
-        thumbTouchId = thumbTouch.identifier;
 
         if (!taskActive) {
             // Check target containment to start the trial
@@ -849,8 +855,8 @@ function handleTouch(e) {
             if (sessionNumber === 1) {
                 const strokeAge = now - strokeStartTime;
 
-                // Ignore inward check during the initial 300ms touch landing settlement phase
-                if (strokeAge > 300) {
+                // Ignore inward check if extra fingers (3+ touches) are on screen or during landing settlement phase
+                if (strokeAge > 300 && touches.length === 2) {
                     const hasOpened = (maxStrokeDistance > strokeStartDistance + 40);
 
                     // Require the participant to pinch inward fully (fingers brought together <80px or collapsed by >100px) before showing practice tip
@@ -894,15 +900,22 @@ function handleTouch(e) {
             // Restore normal instructions and draw the targets
             setInstruction(ORIGINAL_INSTRUCTION);
 
-            // Record trajectory frame (always logs actual touch coordinates and actual distance)
+            // Record extra touch points (e.g. 3rd finger) if present
+            const extraTouches = touches.length > 2 ? Array.from(touches)
+                .filter(t => t.identifier !== indexTouchId && t.identifier !== thumbTouchId)
+                .map(t => ({ x: t.clientX, y: t.clientY })) : [];
+
+            // Record trajectory frame (logs actual touch coordinates, touch count, extra touches, and distance)
             trajectory.push({
                 t: now - trialStartTime,
-                state: "2_touches_active",
+                state: touches.length >= 3 ? "3plus_touches_active" : "2_touches_active",
+                num_touches: touches.length,
                 x_index: x1,
                 y_index: y1,
                 x_thumb: x2,
                 y_thumb: y2,
-                distance: distPx
+                distance: distPx,
+                ...(extraTouches.length > 0 ? { extra_touches: extraTouches } : {})
             });
         }
 
@@ -1350,15 +1363,11 @@ async function finishAndNavigate() {
     const nextBtn = document.getElementById("nextTaskButton");
     if (nextBtn) nextBtn.disabled = true;
     try {
-        if (sessionId && sessionNumber !== 1) {
-            const { error } = await supabase
-                .from('sessions')
-                .update({ completed: true })
-                .eq('id', sessionId);
-            if (error) console.error("Failed to mark session completed:", error);
+        if (sessionId) {
+            await updateSessionFlags(sessionId, { pinch: true });
         }
     } catch (err) {
-        console.error("Unexpected error while finishing session:", err);
+        console.error("Unexpected error while updating pinch session flag:", err);
     } finally {
         window.location.href = "../hold/hold.html?v=100";
     }
@@ -1367,8 +1376,6 @@ async function finishAndNavigate() {
 // End Task
 function endPinchTask() {
     taskCompleted = true;
-    // Save state
-    sessionStorage.setItem("pinch_completed", "true");
 
     // Remove listeners
     document.removeEventListener("touchstart", handleTouch, { passive: false });

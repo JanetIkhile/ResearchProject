@@ -17,38 +17,40 @@ const startBtn = document.getElementById("startBtn");
         return;
     }
 
-    const perUserKey = `session_${participantUUID}`;
+    const sessionType = sessionStorage.getItem("session_type") || "practice";
+    const perUserKey = `session_${participantUUID}_${sessionType}`;
 
-    let sessionId = null;
+    let sessionId = sessionStorage.getItem(perUserKey);
 
-    try {
-        const { data: inserted, error } = await supabase
-            .from("sessions")
-            .insert({
-                participant_id: participantUUID,
-                session_type: sessionStorage.getItem("session_type"),
-                started_at: new Date().toISOString(),
-                completed: false,
-                drag_completed: false,
-                tap_completed: false,
-                hold_completed: false
-            })
-            .select("id")
-            .single();
+    if (!sessionId) {
+        try {
+            const { data: inserted, error } = await supabase
+                .from("sessions")
+                .insert({
+                    participant_id: participantUUID,
+                    session_type: sessionType,
+                    started_at: new Date().toISOString(),
+                    completed: false,
+                    drag_completed: false,
+                    tap_completed: false,
+                    pinch_completed: false,
+                    hold_completed: false
+                })
+                .select("id")
+                .single();
 
-        if (error) throw error;
+            if (error) throw error;
 
-        sessionId = inserted.id;
+            sessionId = inserted.id;
+            sessionStorage.setItem(perUserKey, sessionId);
+            console.log(`New ${sessionType} session created:`, sessionId);
 
-        sessionStorage.setItem(perUserKey, sessionId);
-        window.CURRENT_SESSION_ID = sessionId;
-
-        console.log("New session created:", sessionId);
-
-    } catch (err) {
-        console.error("Failed to create session:", err);
-        alert("Could not start session.");
-        return;
+        } catch (err) {
+            console.error("Failed to create session in Supabase:", err);
+            // Fallback UUID so session flow doesn't freeze
+            sessionId = crypto.randomUUID();
+            sessionStorage.setItem(perUserKey, sessionId);
+        }
     }
 
     window.CURRENT_SESSION_ID = sessionId;
@@ -120,22 +122,22 @@ const startBtn = document.getElementById("startBtn");
                     // Check task status from sessions table
                     const { data: sessionRow } = await supabase
                         .from("sessions")
-                        .select("drag_completed, tap_completed, hold_completed")
+                        .select("drag_completed, tap_completed, pinch_completed, hold_completed")
                         .eq("id", sessionId)
                         .single();
                         
                     if (sessionRow) {
-                        // Check pinch task completion state from sessionStorage or database
-                        let pinchCompleted = sessionStorage.getItem("pinch_completed") === "true";
+                        let pinchCompleted = sessionRow.pinch_completed === true;
                         if (!pinchCompleted) {
+                            // Fallback check in trial_results table
                             const { data: pinchTrials } = await supabase
                                 .from("trial_results")
                                 .select("id")
                                 .eq("session_id", sessionId)
                                 .eq("task_type", "pinch");
+
                             if (pinchTrials && pinchTrials.length > 0) {
                                 pinchCompleted = true;
-                                sessionStorage.setItem("pinch_completed", "true");
                             }
                         }
                         
@@ -158,6 +160,14 @@ const startBtn = document.getElementById("startBtn");
             }
             window.location.href = nextPath;
         };
+        window.addEventListener("pageshow", () => {
+            handled = false;
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.classList.remove("button-pressed-animate");
+            }
+        });
+
         startBtn.addEventListener("pointerup", handleStartClick);
         startBtn.addEventListener("touchend", handleStartClick);
         startBtn.addEventListener("click", handleStartClick);

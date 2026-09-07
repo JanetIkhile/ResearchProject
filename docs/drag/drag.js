@@ -48,7 +48,7 @@ function addInstantButtonHandler(btn, callback) {
 // async setup
 (async function initContext() {
     try {
-        const result = await initSession({ dashboardPath: "/dashboard.html" });
+        const result = await initSession({ dashboardPath: "../dashboard/dashboard.html" });
 
         participantId = result.participantId;
         sessionId = result.sessionId;

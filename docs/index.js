@@ -126,6 +126,36 @@ async function populateParticipants() {
             allParticipants.push({ code, text: `${code}${status}` });
         }
 
+        const dbParticipants = participants;
+
+        async function autoFillExistingParticipant(code) {
+            if (!code) return;
+            const p = dbParticipants.find(item => item.participant_code.toLowerCase() === code.toLowerCase());
+            if (p) {
+                try {
+                    const { data: fullP } = await supabase
+                        .from("participants")
+                        .select("participant_group, dominant_arm")
+                        .eq("id", p.id)
+                        .maybeSingle();
+
+                    if (fullP) {
+                        if (fullP.participant_group) {
+                            const radio = document.querySelector(`input[name="identity"][value="${fullP.participant_group}"]`);
+                            if (radio) radio.checked = true;
+                        }
+                        if (fullP.dominant_arm) {
+                            const radio = document.querySelector(`input[name="dominant_arm"][value="${fullP.dominant_arm}"]`);
+                            if (radio) radio.checked = true;
+                        }
+                        checkAllFieldsFilled();
+                    }
+                } catch (e) {
+                    console.warn("Could not auto-fill participant data:", e);
+                }
+            }
+        }
+
         renderDropdown();
 
         participantInput.addEventListener("focus", () => {
@@ -134,9 +164,13 @@ async function populateParticipants() {
         });
 
         participantInput.addEventListener("input", (e) => {
+            const val = e.target.value.trim();
             participantDropdown.style.display = "block";
-            renderDropdown(e.target.value);
+            renderDropdown(val);
             updateFilledStatus();
+            if (val.length >= 2) {
+                autoFillExistingParticipant(val);
+            }
         });
 
         document.addEventListener("click", (e) => {
@@ -173,10 +207,33 @@ function renderDropdown(filterText = "") {
         const div = document.createElement("div");
         div.className = "dropdown-item";
         div.textContent = opt.text;
-        div.onclick = () => {
+        div.onclick = async () => {
             participantInput.value = opt.code;
             participantDropdown.style.display = "none";
             updateFilledStatus();
+            
+            // Try to auto-fill saved identity / dominant arm from DB if existing
+            try {
+                const { data: pData } = await supabase
+                    .from("participants")
+                    .select("participant_group, dominant_arm")
+                    .eq("participant_code", opt.code)
+                    .maybeSingle();
+
+                if (pData) {
+                    if (pData.participant_group) {
+                        const radio = document.querySelector(`input[name="identity"][value="${pData.participant_group}"]`);
+                        if (radio) radio.checked = true;
+                    }
+                    if (pData.dominant_arm) {
+                        const radio = document.querySelector(`input[name="dominant_arm"][value="${pData.dominant_arm}"]`);
+                        if (radio) radio.checked = true;
+                    }
+                    checkAllFieldsFilled();
+                }
+            } catch (e) {
+                console.warn("Auto fill error:", e);
+            }
         };
         participantDropdown.appendChild(div);
     });
@@ -192,40 +249,54 @@ async function handleLogin(e) {
     isSubmittingLogin = true;
     errorEl.textContent = "";
 
-    const participantCode = participantInput.value;
+    const rawCode = participantInput.value.trim();
+    const participantCode = rawCode ? rawCode.toUpperCase() : "";
 
     // ---------- VALIDATION ----------
     if (!participantCode) {
-        errorEl.textContent = "Please select a participant.";
+        errorEl.textContent = "Please select or enter a participant ID.";
         isSubmittingLogin = false;
+        if (loginBtn) loginBtn.disabled = false;
         return;
     }
-    const identity = document.querySelector('input[name="identity"]:checked')?.value;
-    const dominantArm = document.querySelector('input[name="dominant_arm"]:checked')?.value;
+
+    let identity = document.querySelector('input[name="identity"]:checked')?.value;
+    let dominantArm = document.querySelector('input[name="dominant_arm"]:checked')?.value;
+
+    // Fetch DB info if participant exists
+    let { data: existingParticipant, error: pLookupErr } = await supabase
+        .from("participants")
+        .select("id, participant_code, participant_group, dominant_arm")
+        .eq("participant_code", participantCode)
+        .maybeSingle();
+
+    if (existingParticipant) {
+        if (!identity && existingParticipant.participant_group) {
+            identity = existingParticipant.participant_group;
+        }
+        if (!dominantArm && existingParticipant.dominant_arm) {
+            dominantArm = existingParticipant.dominant_arm;
+        }
+    }
 
     if (!identity) {
         errorEl.textContent = "Please select how you identify.";
         isSubmittingLogin = false;
+        if (loginBtn) loginBtn.disabled = false;
         return;
     }
 
     if (!dominantArm) {
         errorEl.textContent = "Please select your dominant arm.";
         isSubmittingLogin = false;
+        if (loginBtn) loginBtn.disabled = false;
         return;
     }
 
     if (loginBtn) loginBtn.disabled = true;
 
     try {
-        // ---------- GET OR CREATE PARTICIPANT ----------
-        let { data: participant, error } = await supabase
-            .from("participants")
-            .select("id, participant_group")
-            .eq("participant_code", participantCode)
-            .maybeSingle();
-
-        if (error) throw error;
+        let participant = existingParticipant;
 
         if (!participant) {
             const { data: newParticipant, error: insertError } = await supabase
@@ -239,14 +310,13 @@ async function handleLogin(e) {
                 .single();
 
             if (insertError) throw insertError;
-
             participant = newParticipant;
         }
 
         const participantUUID = participant.id;
 
-        // ---------- UPDATE GROUP IF NEEDED ----------
-        if (participant && !participant.participant_group) {
+        // ---------- UPDATE GROUP IF MISSING ----------
+        if (participant && (!participant.participant_group || !participant.dominant_arm)) {
             await supabase
                 .from("participants")
                 .update({
@@ -264,13 +334,12 @@ async function handleLogin(e) {
 
         if (sessionError) throw sessionError;
 
-        const sessionCount = sessions.length;
+        const sessionCount = sessions ? sessions.length : 0;
 
         console.log(
             `Participant ${participantCode} → ${sessionCount} sessions`
         );
 
-        // ---------- WARNING (optional) ----------
         if (sessionCount >= 2) {
             const confirmReuse = confirm(
                 `${participantCode} has already completed both sessions (2/2).\n\nDo you want to continue anyway?`
@@ -284,6 +353,9 @@ async function handleLogin(e) {
         const sessionType = (sessionCount === 0) ? "practice" : "main";
 
         // ---------- STORE CONTEXT ----------
+        // Wipe old sessionStorage first to prevent stale routing/completion flags
+        sessionStorage.clear();
+
         sessionStorage.setItem("participant_uuid", participantUUID);
         sessionStorage.setItem("participant_code", participantCode);
         sessionStorage.setItem("participant_group", identity);
@@ -295,7 +367,7 @@ async function handleLogin(e) {
         window.location.href = "./dashboard/dashboard.html";
 
     } catch (err) {
-        console.error(err);
+        console.error("Login error:", err);
         errorEl.textContent = err.message || "Something went wrong.";
         isSubmittingLogin = false;
         if (loginBtn) loginBtn.disabled = false;
@@ -311,6 +383,18 @@ if (loginBtn) {
         handleLogin(e);
         setTimeout(() => { handled = false; }, 300);
     };
+
+    window.addEventListener("pageshow", () => {
+        handled = false;
+        isSubmittingLogin = false;
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.classList.remove("button-pressed-animate");
+        }
+        removePointer();
+        updateFilledStatus();
+    });
+
     loginBtn.addEventListener("pointerup", triggerLogin);
     loginBtn.addEventListener("touchend", triggerLogin);
     loginBtn.addEventListener("click", triggerLogin);

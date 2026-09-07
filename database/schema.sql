@@ -16,6 +16,7 @@ create table if not exists sessions (
   completed boolean default false,
   drag_completed boolean default false,
   tap_completed boolean default false,
+  pinch_completed boolean default false,
   hold_completed boolean default false,
   completed_at timestamptz,
   device_info jsonb,

@@ -6,7 +6,7 @@ import { supabase } from "../client/supabaseClient.js";
  * initSession(options)
  * Lab version: uses participant_uuid instead of auth user
  */
-export async function initSession({ dashboardPath = "/dashboard/dashboard.html" } = {}) {
+export async function initSession({ dashboardPath = "../dashboard/dashboard.html" } = {}) {
 
     // -----------------------------
     // 1) get participant from sessionStorage
@@ -15,13 +15,14 @@ export async function initSession({ dashboardPath = "/dashboard/dashboard.html" 
 
     if (!participantId) {
         console.warn("No participant found → redirecting");
-        window.location.href = "/docs/index.html";
+        window.location.href = "../index.html";
         throw new Error("no-participant");
     }
 
-    const perUserKey = `session_${participantId}`;
+    const sessionType = sessionStorage.getItem("session_type") || "practice";
+    const perUserKey = `session_${participantId}_${sessionType}`;
     let candidateSessionId =
-        window.CURRENT_SESSION_ID || sessionStorage.getItem(perUserKey);
+        window.CURRENT_SESSION_ID || sessionStorage.getItem(perUserKey) || sessionStorage.getItem(`session_${participantId}`);
 
     // -----------------------------
     // 2) no session → redirect to dashboard
@@ -43,6 +44,7 @@ export async function initSession({ dashboardPath = "/dashboard/dashboard.html" 
             completed: false,
             drag_completed: false,
             tap_completed: false,
+            pinch_completed: false,
             hold_completed: false
         };
 
@@ -149,39 +151,47 @@ export async function initSession({ dashboardPath = "/dashboard/dashboard.html" 
  * - Updates any provided boolean flags on sessions table.
  * - Then checks whether all three task flags are true and marks completed + completed_at if so.
  */
-export async function updateSessionFlags(sessionId, { drag = null, tap = null, hold = null } = {}) {
+export async function updateSessionFlags(sessionId, { drag = null, tap = null, pinch = null, hold = null } = {}) {
     if (!sessionId) throw new Error("missing-sessionId");
 
     const updates = {};
     if (drag !== null) updates.drag_completed = !!drag;
     if (tap !== null) updates.tap_completed = !!tap;
+    if (pinch !== null) updates.pinch_completed = !!pinch;
     if (hold !== null) updates.hold_completed = !!hold;
 
     if (Object.keys(updates).length > 0) {
-        const { error: upErr } = await supabase
-            .from("sessions")
-            .update(updates)
-            .eq("id", sessionId);
+        try {
+            const { error: upErr } = await supabase
+                .from("sessions")
+                .update(updates)
+                .eq("id", sessionId);
 
-        if (upErr) {
-            console.error("Failed to update session flags:", upErr);
-            throw upErr;
+            if (upErr) {
+                console.error("Failed to update session flags:", upErr);
+            }
+        } catch (err) {
+            console.warn("Could not update session flags:", err);
         }
     }
 
     // fetch current flags (include completed_at)
     const { data: sessionRow, error: fetchErr } = await supabase
         .from("sessions")
-        .select("drag_completed, tap_completed, hold_completed, completed, completed_at")
+        .select("drag_completed, tap_completed, pinch_completed, hold_completed, completed, completed_at")
         .eq("id", sessionId)
         .maybeSingle();
 
     if (fetchErr || !sessionRow) {
         console.error("Failed to fetch session after update:", fetchErr);
-        throw fetchErr || new Error("session-missing-after-update");
+        return { allDone: false };
     }
 
-    const allDone = !!sessionRow.drag_completed && !!sessionRow.tap_completed && !!sessionRow.hold_completed;
+    const allDone = !!sessionRow.drag_completed && 
+                    !!sessionRow.tap_completed && 
+                    !!sessionRow.pinch_completed && 
+                    !!sessionRow.hold_completed;
+
     if (allDone && !sessionRow.completed) {
         const { error: completeErr } = await supabase
             .from("sessions")
@@ -190,7 +200,6 @@ export async function updateSessionFlags(sessionId, { drag = null, tap = null, h
 
         if (completeErr) {
             console.error("Failed to mark completed:", completeErr);
-            throw completeErr;
         }
     }
 
