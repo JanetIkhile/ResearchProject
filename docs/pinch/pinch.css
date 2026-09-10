@@ -254,7 +254,7 @@ textarea {
     padding: clamp(16px, 3vw, 24px) clamp(28px, 5vw, 48px);
     box-shadow: 0 4px 12px rgba(55, 151, 119, 0.3);
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.1s;
     width: 100%;
     box-sizing: border-box;
 }
@@ -264,7 +264,7 @@ textarea {
 }
 
 #nextTaskButton:active {
-    transform: none;
+    transform: scale(0.97);
 }
 
 .timer-line {
@@ -393,10 +393,7 @@ textarea {
 }
 
 .practice-options-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -423,12 +420,12 @@ textarea {
     padding: clamp(18px, 3vw, 26px) clamp(24px, 5vw, 36px);
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: background-color 0.2s, box-shadow 0.2s;
+    transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
     line-height: 1.35;
 }
 
 .practice-option-btn:active {
-    transform: none;
+    transform: scale(0.97);
 }
 
 .practice-option-primary {
@@ -496,7 +493,7 @@ textarea {
 
 /* GIF Modal Content */
 .gif-modal-content {
-    position: fixed;
+    position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -555,7 +552,7 @@ textarea {
     padding: clamp(14px, 2.2vw, 20px);
     cursor: pointer;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.1s;
     text-align: center;
 }
 
@@ -578,7 +575,7 @@ textarea {
 }
 
 .gif-btn:active {
-    transform: none;
+    transform: scale(0.97);
 }
 
 
@@ -645,11 +642,11 @@ textarea {
 
 @keyframes tapButtonSync {
     0%, 45%, 55%, 100% {
-        transform: none;
+        transform: scale(1);
         filter: brightness(1);
     }
     50% {
-        transform: none;
+        transform: scale(0.96);
         filter: brightness(0.85);
     }
 }
