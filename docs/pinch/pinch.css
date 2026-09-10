@@ -264,7 +264,7 @@ textarea {
 }
 
 #nextTaskButton:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .timer-line {
@@ -425,7 +425,7 @@ textarea {
 }
 
 .practice-option-btn:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .practice-option-primary {
@@ -575,7 +575,7 @@ textarea {
 }
 
 .gif-btn:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 

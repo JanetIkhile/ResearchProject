@@ -285,7 +285,7 @@ body.modal-open #tapInstruction {
 }
 
 #nextTaskButton:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .timer-line {
@@ -408,7 +408,7 @@ body.modal-open #tapInstruction {
 }
 
 .practice-option-btn:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .practice-option-primary {
@@ -548,7 +548,7 @@ body.modal-open #tapInstruction {
 }
 
 .gif-btn:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 

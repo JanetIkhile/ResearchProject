@@ -252,7 +252,7 @@ body.modal-open #holdInstruction {
 }
 
 #nextTaskButton:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .session-label {
@@ -574,7 +574,7 @@ body.modal-open #holdInstruction {
 }
 
 .gif-btn-yes:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .gif-btn-again {
@@ -595,7 +595,7 @@ body.modal-open #holdInstruction {
 }
 
 .gif-btn-again:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .dimmed {

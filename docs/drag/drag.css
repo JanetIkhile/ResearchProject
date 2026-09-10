@@ -248,7 +248,7 @@ canvas {
 }
 
 #nextTaskButton:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .modal {
@@ -448,7 +448,7 @@ canvas {
 }
 
 .practice-option-btn:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .practice-option-primary {
@@ -589,7 +589,7 @@ canvas {
 }
 
 .gif-btn:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 
