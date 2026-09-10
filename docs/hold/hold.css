@@ -19,11 +19,20 @@
     font-style: normal;
 }
 
+html,
+body {
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
 body {
     margin: 0;
     background-color: #A6A6A6;
     font-family: 'Selawik', Arial, Helvetica, sans-serif;
-    overflow: hidden;
 }
 
 button,
@@ -242,7 +251,7 @@ body.modal-open #holdInstruction {
     padding: clamp(16px, 3vw, 24px) clamp(28px, 5vw, 48px);
     box-shadow: 0 4px 12px rgba(55, 151, 119, 0.3);
     cursor: pointer;
-    transition: background-color 0.2s, transform 0.1s;
+    transition: background-color 0.2s;
     width: 100%;
     box-sizing: border-box;
 }
@@ -421,7 +430,10 @@ body.modal-open #holdInstruction {
 }
 
 .practice-options-container {
-    position: relative;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -448,12 +460,12 @@ body.modal-open #holdInstruction {
     padding: clamp(18px, 3vw, 26px) clamp(24px, 5vw, 36px);
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+    transition: background-color 0.2s, box-shadow 0.2s;
     line-height: 1.35;
 }
 
 .practice-option-btn:active {
-    transform: scale(0.97);
+    transform: none;
 }
 
 .practice-option-primary {
@@ -507,7 +519,7 @@ body.modal-open #holdInstruction {
 
 /* Modal GIF Styling */
 .gif-modal-content {
-    position: absolute;
+    position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
