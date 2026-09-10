@@ -1349,13 +1349,23 @@ async function savePinchTrial(startTime, endTime) {
         trajectory: trajectory
     };
 
-    try {
-        const { error } = await supabase.from("trial_results").insert(payload);
-        if (error) throw error;
-        console.log(`Pinch trial ${trialNumber} saved successfully to Supabase.`);
-    } catch (err) {
-        console.error("Error saving pinch trial:", err);
-        alert("Could not connect to database. Trial saved locally only.");
+    // Retry up to 3 times to handle socket disconnects after device sleep/idle
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const { error } = await supabase.from("trial_results").insert(payload);
+            if (error) throw error;
+            console.log(`Pinch trial ${trialNumber} saved successfully to Supabase.`);
+            return;
+        } catch (err) {
+            console.warn(`Attempt ${attempt}/${maxRetries} to save pinch trial failed:`, err);
+            if (attempt === maxRetries) {
+                console.error("Error saving pinch trial after max retries:", err);
+            } else {
+                // Wait 1 second before retrying to allow socket/connection to re-establish
+                await new Promise(res => setTimeout(res, 1000));
+            }
+        }
     }
 }
 

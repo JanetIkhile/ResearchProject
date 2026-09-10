@@ -821,14 +821,19 @@ async function handleTouchEnd(e) {
         trajectory: trajectoryLog
     };
     console.log("Saving trial data:", trialPayload);
-    const { error } = await supabase
-        .from("trial_results")
-        .insert(trialPayload);
-
-    if (error) {
-        console.error("Failed to save trial:", error);
-    } else {
-        console.log("Trial saved:", trialNumber);
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const { error } = await supabase.from("trial_results").insert(trialPayload);
+            if (error) throw error;
+            console.log("Trial saved successfully to Supabase:", trialNumber);
+            break;
+        } catch (err) {
+            console.warn(`Attempt ${attempt}/${maxRetries} to save drag trial failed:`, err);
+            if (attempt < maxRetries) {
+                await new Promise(res => setTimeout(res, 1000));
+            }
+        }
     }
     // Clear canvas for next trial after short delay
     ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';

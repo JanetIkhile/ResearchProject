@@ -1194,12 +1194,19 @@ async function endHoldTrialEarly(releaseTime) {
         hold_events: holdEvents
     };
 
-    try {
-        const { error } = await supabase.from("trial_results").insert(trialPayload);
-        if (error) console.error("Failed to save hold trial (early):", error);
-        else console.log("Saved hold trial (early):", trialNumber);
-    } catch (err) {
-        console.error("Unexpected error saving hold trial (early):", err);
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const { error } = await supabase.from("trial_results").insert(trialPayload);
+            if (error) throw error;
+            console.log("Saved hold trial (early):", trialNumber);
+            break;
+        } catch (err) {
+            console.warn(`Attempt ${attempt}/${maxRetries} to save hold trial (early) failed:`, err);
+            if (attempt < maxRetries) {
+                await new Promise(res => setTimeout(res, 1000));
+            }
+        }
     }
 
     // ---------- FEEDBACK ----------
@@ -1284,12 +1291,19 @@ async function endHold(touch) {
         hold_events: holdEvents
     };
 
-    try {
-        const { error } = await supabase.from("trial_results").insert(trialPayload);
-        if (error) console.error("Failed to save hold trial:", error);
-        else console.log("Saved hold trial:", trialNumber);
-    } catch (err) {
-        console.error("Unexpected error saving hold trial:", err);
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const { error } = await supabase.from("trial_results").insert(trialPayload);
+            if (error) throw error;
+            console.log("Saved hold trial:", trialNumber);
+            break;
+        } catch (err) {
+            console.warn(`Attempt ${attempt}/${maxRetries} to save hold trial failed:`, err);
+            if (attempt < maxRetries) {
+                await new Promise(res => setTimeout(res, 1000));
+            }
+        }
     }
 
     await maybeFinishSession();

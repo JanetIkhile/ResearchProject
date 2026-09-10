@@ -1146,15 +1146,19 @@ async function saveTapTrial(startTime, endTime) {
         trajectory: tapTrajectory
     };
 
-    try {
-        const { error } = await supabase.from("trial_results").insert(payload);
-        if (error) {
-            print("Failed to save tap trial to DB:", error);
-        } else {
-            console.log(`Tap trial saved: ${trialNumber} events:`, totalTaps);
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const { error } = await supabase.from("trial_results").insert(payload);
+            if (error) throw error;
+            console.log(`Tap trial ${trialNumber} saved successfully to Supabase.`);
+            break;
+        } catch (err) {
+            console.warn(`Attempt ${attempt}/${maxRetries} to save tap trial failed:`, err);
+            if (attempt < maxRetries) {
+                await new Promise(res => setTimeout(res, 1000));
+            }
         }
-    } catch (err) {
-        console.error("Unexpected error saving tap trial:", err);
     }
 }
 
