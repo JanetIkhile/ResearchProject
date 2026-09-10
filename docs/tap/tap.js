@@ -267,8 +267,8 @@ function isTouchInsideTarget(touch, targetEl) {
     const rect = targetEl.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const dx = touch.pageX - centerX;
-    const dy = touch.pageY - centerY;
+    const dx = touch.clientX - centerX;
+    const dy = touch.clientY - centerY;
     const radius = Math.min(rect.width, rect.height) / 2;
     return (dx * dx + dy * dy) <= (radius * radius);
 }
