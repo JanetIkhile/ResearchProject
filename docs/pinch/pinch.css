@@ -31,21 +31,12 @@ canvas,
     touch-action: none;
 }
 
-html,
-body {
-    overflow: hidden;
-    height: 100vh;
-    width: 100vw;
-    position: fixed;
-    top: 0;
-    left: 0;
-}
-
 body {
     margin: 0;
     background-color: #A6A6A6;
     /* Match the gray background of other tasks */
     font-family: 'Selawik', Arial, Helvetica, sans-serif;
+    overflow: hidden;
 }
 
 button,
@@ -263,7 +254,7 @@ textarea {
     padding: clamp(16px, 3vw, 24px) clamp(28px, 5vw, 48px);
     box-shadow: 0 4px 12px rgba(55, 151, 119, 0.3);
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.1s;
     width: 100%;
     box-sizing: border-box;
 }
@@ -402,10 +393,7 @@ textarea {
 }
 
 .practice-options-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -432,7 +420,7 @@ textarea {
     padding: clamp(18px, 3vw, 26px) clamp(24px, 5vw, 36px);
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: background-color 0.2s, box-shadow 0.2s;
+    transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
     line-height: 1.35;
 }
 
@@ -505,7 +493,7 @@ textarea {
 
 /* GIF Modal Content */
 .gif-modal-content {
-    position: fixed;
+    position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
