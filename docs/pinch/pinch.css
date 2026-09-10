@@ -254,7 +254,7 @@ textarea {
     padding: clamp(16px, 3vw, 24px) clamp(28px, 5vw, 48px);
     box-shadow: 0 4px 12px rgba(55, 151, 119, 0.3);
     cursor: pointer;
-    transition: background-color 0.2s, transform 0.1s;
+    transition: background-color 0.2s;
     width: 100%;
     box-sizing: border-box;
 }
@@ -393,7 +393,10 @@ textarea {
 }
 
 .practice-options-container {
-    position: relative;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -420,7 +423,7 @@ textarea {
     padding: clamp(18px, 3vw, 26px) clamp(24px, 5vw, 36px);
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+    transition: background-color 0.2s, box-shadow 0.2s;
     line-height: 1.35;
 }
 
@@ -493,7 +496,7 @@ textarea {
 
 /* GIF Modal Content */
 .gif-modal-content {
-    position: absolute;
+    position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -552,7 +555,7 @@ textarea {
     padding: clamp(14px, 2.2vw, 20px);
     cursor: pointer;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: background-color 0.2s, transform 0.1s;
+    transition: background-color 0.2s;
     text-align: center;
 }
 
