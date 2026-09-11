@@ -1,5 +1,8 @@
-id,participant_id,started_at,drag_completed,tap_completed,hold_completed,completed,completed_at,device_info,notes,session_type
-d72a1064-dea4-402f-ab7d-421dd5b33f2a,c34e4440-6a2d-4029-9baa-ab90fd5e6550,2026-09-02 17:18:27.072+00,True,True,True,True,2026-09-02 17:26:35.443+00,,,practice
-184837cd-82a2-4ff4-8f76-2d383df08eba,c34e4440-6a2d-4029-9baa-ab90fd5e6550,2026-09-02 17:27:04.038+00,True,True,True,True,2026-09-02 17:32:32.943+00,,,main
-95f258a3-bf9b-4f3e-a782-5b469e4ecb76,1410d533-4767-4d4c-846a-a656f08d7f2e,2026-09-03 18:04:20.277+00,True,True,True,True,2026-09-03 18:09:18.074+00,,,practice
-e456e983-2a29-41c0-958f-548ab7e65c85,1410d533-4767-4d4c-846a-a656f08d7f2e,2026-09-03 18:09:21.86+00,True,True,True,True,2026-09-03 18:12:24.194+00,,,main
+id,participant_id,started_at,drag_completed,tap_completed,hold_completed,completed,completed_at,device_info,notes,session_type,pinch_completed
+d72a1064-dea4-402f-ab7d-421dd5b33f2a,c34e4440-6a2d-4029-9baa-ab90fd5e6550,2026-09-02 17:18:27.072+00,True,True,True,True,2026-09-02 17:26:35.443+00,,,practice,
+184837cd-82a2-4ff4-8f76-2d383df08eba,c34e4440-6a2d-4029-9baa-ab90fd5e6550,2026-09-02 17:27:04.038+00,True,True,True,True,2026-09-02 17:32:32.943+00,,,main,
+95f258a3-bf9b-4f3e-a782-5b469e4ecb76,1410d533-4767-4d4c-846a-a656f08d7f2e,2026-09-03 18:04:20.277+00,True,True,True,True,2026-09-03 18:09:18.074+00,,,practice,
+e456e983-2a29-41c0-958f-548ab7e65c85,1410d533-4767-4d4c-846a-a656f08d7f2e,2026-09-03 18:09:21.86+00,True,True,True,True,2026-09-03 18:12:24.194+00,,,main,
+47e12de3-c301-4d8d-a5ce-aab24395b274,fd636dec-1806-4f14-844e-f6d1c39baea8,2026-09-10 16:51:25.12+00,True,True,True,True,2026-09-10 16:55:34.853+00,,,practice,True
+757da8f7-002e-4b04-8574-a8cbcfca6fa3,fd636dec-1806-4f14-844e-f6d1c39baea8,2026-09-10 16:55:43.866+00,True,False,False,False,,,excluded_incomplete_tap_scroll_issue,main,False
+fe7775e8-38bb-4dfc-8ef8-7ff40fa11093,fd636dec-1806-4f14-844e-f6d1c39baea8,2026-09-10 16:57:51.772+00,True,True,True,True,2026-09-10 17:00:43.729+00,,,main,True

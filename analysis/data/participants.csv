@@ -1,3 +1,4 @@
 id,participant_code,created_at,participant_group,dominant_arm
 1410d533-4767-4d4c-846a-a656f08d7f2e,P01,2026-09-03 18:04:19.643114+00,parkinsons,right
 c34e4440-6a2d-4029-9baa-ab90fd5e6550,P02,2026-09-02 17:18:26.762532+00,parkinsons,right
+fd636dec-1806-4f14-844e-f6d1c39baea8,P03,2026-09-10 16:51:24.64819+00,parkinsons,right
