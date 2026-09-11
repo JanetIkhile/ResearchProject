@@ -16,7 +16,7 @@ let lastTrialEndTime = pageLoadTime;
 let initiationDelay = null;
 
 // Practice error threshold
-const MAX_PRACTICE_ERRORS = 7;
+const MAX_PRACTICE_ERRORS = 5;
 let practiceErrorCount = 0;
 const instructionMain = document.getElementById("instructionMain");
 const instructionSub = document.getElementById("instructionSub");

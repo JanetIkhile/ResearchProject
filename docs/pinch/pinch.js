@@ -72,7 +72,7 @@ let openGifModalFn = null;
 let inwardErrorCount = 0;
 
 // Practice error threshold
-const MAX_PRACTICE_ERRORS = 7;
+const MAX_PRACTICE_ERRORS = 5;
 let practiceErrorCount = 0;
 
 function getInwardErrorMessage() {
