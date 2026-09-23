@@ -1,8 +1,12 @@
 id,participant_id,started_at,drag_completed,tap_completed,hold_completed,completed,completed_at,device_info,notes,session_type,pinch_completed
-d72a1064-dea4-402f-ab7d-421dd5b33f2a,c34e4440-6a2d-4029-9baa-ab90fd5e6550,2026-09-02 17:18:27.072+00,True,True,True,True,2026-09-02 17:26:35.443+00,,,practice,
-184837cd-82a2-4ff4-8f76-2d383df08eba,c34e4440-6a2d-4029-9baa-ab90fd5e6550,2026-09-02 17:27:04.038+00,True,True,True,True,2026-09-02 17:32:32.943+00,,,main,
-95f258a3-bf9b-4f3e-a782-5b469e4ecb76,1410d533-4767-4d4c-846a-a656f08d7f2e,2026-09-03 18:04:20.277+00,True,True,True,True,2026-09-03 18:09:18.074+00,,,practice,
-e456e983-2a29-41c0-958f-548ab7e65c85,1410d533-4767-4d4c-846a-a656f08d7f2e,2026-09-03 18:09:21.86+00,True,True,True,True,2026-09-03 18:12:24.194+00,,,main,
 47e12de3-c301-4d8d-a5ce-aab24395b274,fd636dec-1806-4f14-844e-f6d1c39baea8,2026-09-10 16:51:25.12+00,True,True,True,True,2026-09-10 16:55:34.853+00,,,practice,True
 757da8f7-002e-4b04-8574-a8cbcfca6fa3,fd636dec-1806-4f14-844e-f6d1c39baea8,2026-09-10 16:55:43.866+00,True,False,False,False,,,excluded_incomplete_tap_scroll_issue,main,False
 fe7775e8-38bb-4dfc-8ef8-7ff40fa11093,fd636dec-1806-4f14-844e-f6d1c39baea8,2026-09-10 16:57:51.772+00,True,True,True,True,2026-09-10 17:00:43.729+00,,,main,True
+7bb89f4d-d1ef-432a-8cc9-20b6f12bb707,56f58347-d268-4a2c-b40f-9e17a13e3f8e,2026-09-11 17:18:06.379+00,True,True,True,True,2026-09-11 17:20:40.532+00,,,practice,True
+84a45a5b-7db0-4be3-b107-23ea05fdae8e,aa70a350-f1f5-4b24-a014-1e33d3d179fe,2026-09-11 16:22:51.866+00,True,True,True,True,2026-09-11 16:26:47.703+00,,,main,True
+db9a5db6-3bb2-4f00-ade9-a11671b1b5f9,aa70a350-f1f5-4b24-a014-1e33d3d179fe,2026-09-11 16:18:00.465+00,True,False,True,True,,,,practice,True
+e06ddab5-bf1e-436d-a562-c723d72898a6,56f58347-d268-4a2c-b40f-9e17a13e3f8e,2026-09-11 17:20:49.443+00,True,True,True,True,2026-09-11 17:23:23.428+00,,,main,True
+1f6ba711-8743-48d8-9cb4-e201f6a6782f,b3c98017-dcdd-4d81-a04b-be1fcda32a63,2026-09-11 21:38:49.969+00,True,True,True,True,2026-09-11 21:42:15.715+00,,,practice,True
+878375fe-679f-4cc7-a8fa-6d7a97a963b3,b3c98017-dcdd-4d81-a04b-be1fcda32a63,2026-09-11 21:42:21.934+00,True,True,True,True,2026-09-11 21:45:30.041+00,,,main,True
+56a74a8b-ea39-490a-be69-2d0599fe6269,2a2c8bce-6f4f-4b6a-a96c-e90fa4af07e3,2026-09-23 18:38:23.704+00,True,True,True,True,2026-09-23 18:41:23.03+00,,,main,True
+bafa2410-b606-42d2-9d32-af69753b81d3,2a2c8bce-6f4f-4b6a-a96c-e90fa4af07e3,2026-09-23 18:35:50.63+00,True,True,True,True,2026-09-23 18:38:18.882+00,,,practice,True

@@ -17,11 +17,7 @@ REGISTRY = {
         {'col': 'pinch_mean_pinch_interval_ms', 'display_name': 'Mean Pinch Interval (ms)'},
         {'col': 'pinch_pinch_mean_opening_speed_mm_s', 'display_name': 'Pinch Mean Opening Speed (mm/s)'},
         {'col': 'pinch_pinch_median_opening_speed_mm_s', 'display_name': 'Pinch Median Opening Speed (mm/s)'},
-        {'col': 'pinch_pinch_max_opening_velocity_mm_s', 'display_name': 'Pinch Max Opening Velocity (mm/s)'},
-        {'col': 'tap_initiation_delay', 'display_name': 'Tap Initiation Delay (ms)'},
-        {'col': 'drag_initiation_delay', 'display_name': 'Drag Initiation Delay (ms)'},
-        {'col': 'pinch_initiation_delay', 'display_name': 'Pinch Initiation Delay (ms)'},
-        {'col': 'hold_initiation_delay', 'display_name': 'Hold Initiation Delay (ms)'}
+        {'col': 'pinch_pinch_max_opening_velocity_mm_s', 'display_name': 'Pinch Peak Opening Speed (mm/s)'}
     ],
     'hypokinesia': [
         {'col': 'drag_drag_terminal_undershoot_px', 'display_name': 'Drag Terminal Undershoot (px)'},
@@ -560,3 +556,150 @@ def generate_concept_report(trials_df, participants_df, clinical_scores, output_
         
     print("Markdown report written successfully to:", output_path)
     return results
+
+
+def plot_concept_highest_correlation_validation(concept_name, trials_df, participants_df, sessions_df, clinical_scores):
+    import numpy as np
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from scipy.stats import spearmanr
+
+    concept_scores = {
+        'bradykinesia': 'bradykinesia',
+        'hypokinesia': 'bradykinesia',
+        'sequence_effect': 'bradykinesia',
+        'hesitations_halts': 'bradykinesia',
+        'akinesia': 'bradykinesia',
+        'postural_tremor': 'tremor',
+        'kinetic_tremor': 'tremor'
+    }
+
+    concept_item_mapping = {
+        'bradykinesia': ('hand_movements', 'Hand Movements (Item 3.4)'),
+        'hypokinesia': ('hand_movements', 'Hand Movements (Item 3.4)'),
+        'sequence_effect': ('hand_movements', 'Hand Movements (Item 3.4)'),
+        'hesitations_halts': ('finger_tapping', 'Finger Tapping (Item 3.3)'),
+        'akinesia': ('hand_movements', 'Hand Movements (Item 3.4)'),
+        'postural_tremor': ('postural_tremor', 'Postural Tremor (Item 3.15)'),
+        'kinetic_tremor': ('kinetic_tremor', 'Kinetic Tremor (Item 3.16)')
+    }
+
+    concept_display_names = {
+        'bradykinesia': 'Bradykinesia',
+        'hypokinesia': 'Hypokinesia',
+        'sequence_effect': 'Sequence Effect',
+        'hesitations_halts': 'Hesitations & Halts',
+        'akinesia': 'Akinesia',
+        'postural_tremor': 'Postural Tremor',
+        'kinetic_tremor': 'Kinetic Tremor'
+    }
+
+    flat_subject_df, _ = evaluate_clinical_concepts(
+        trials_df=trials_df,
+        participants_df=participants_df,
+        clinical_scores=clinical_scores,
+        sessions_df=sessions_df
+    )
+
+    target_scores = ['MDS_UPDRS_total', 'bradykinesia', 'tremor', 'finger_tapping', 'hand_movements', 'postural_tremor', 'kinetic_tremor']
+    for score in target_scores:
+        flat_subject_df[score] = flat_subject_df['participant_code'].map(
+            lambda x: clinical_scores.get(x, {}).get(score, np.nan)
+        )
+
+    features = REGISTRY[concept_name]
+    primary_score = concept_scores[concept_name]
+    item_score, item_label = concept_item_mapping[concept_name]
+
+    corrs = []
+    for feat in features:
+        col = feat['col']
+        disp = feat['display_name']
+        if col in flat_subject_df.columns:
+            f_vals = pd.to_numeric(flat_subject_df[col], errors='coerce').values
+            s_vals = pd.to_numeric(flat_subject_df[primary_score], errors='coerce').values
+            mask = np.isfinite(f_vals) & np.isfinite(s_vals)
+            if mask.sum() >= 3:
+                rho, p = spearmanr(f_vals[mask], s_vals[mask])
+                corrs.append({
+                    'col': col,
+                    'display_name': disp,
+                    'rho': rho,
+                    'p': p,
+                    'abs_rho': abs(rho) if pd.notna(rho) else -1
+                })
+
+    if not corrs:
+        print(f'No valid candidate features found for concept {concept_name}')
+        return
+
+    corrs.sort(key=lambda x: x['abs_rho'], reverse=True)
+    top_feat = corrs[0]
+    col_name = top_feat['col']
+    disp_name = top_feat['display_name']
+    concept_title = concept_display_names[concept_name]
+
+    palette = {'P01': '#0D9488', 'P03': '#2563EB', 'P04': '#7C3AED', 'P05': '#D97706', 'P06': '#0284C7'}
+    label_offsets = {
+        'P01': (8, 6),
+        'P03': (8, 6),
+        'P04': (8, 6),
+        'P05': (8, 6),
+        'P06': (0, -16)
+    }
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5.2))
+
+    x_variables = [
+        ('MDS_UPDRS_total', 'Overall Motor Exam (MDS-UPDRS Part III Total)'),
+        (primary_score, f'Motor Domain ({primary_score.replace("_", " ").title()} Subscore)'),
+        (item_score, f'Task-Specific Item ({item_label})')
+    ]
+
+    for col_idx, (x_col, x_label) in enumerate(x_variables):
+        ax = axes[col_idx]
+        plot_df = flat_subject_df[['participant_code', col_name, x_col]].dropna()
+        plot_df[col_name] = pd.to_numeric(plot_df[col_name])
+        plot_df[x_col] = pd.to_numeric(plot_df[x_col])
+
+        if len(plot_df) >= 3:
+            rho, p = spearmanr(plot_df[x_col], plot_df[col_name])
+            sns.regplot(
+                data=plot_df,
+                x=x_col,
+                y=col_name,
+                ax=ax,
+                ci=None,
+                color='#1E293B',
+                scatter_kws={'s': 0},
+                line_kws={'color': '#64748B', 'linewidth': 2.0, 'linestyle': '--'}
+            )
+            for _, row in plot_df.iterrows():
+                p_code = row['participant_code']
+                color = palette.get(p_code, '#2563EB')
+                offset = label_offsets.get(p_code, (8, 6))
+                ax.scatter(row[x_col], row[col_name], color=color, s=140, edgecolors='black', linewidth=1.5, zorder=5)
+                ax.annotate(
+                    f"{p_code}",
+                    (row[x_col], row[col_name]),
+                    xytext=offset,
+                    textcoords='offset points',
+                    fontsize=11,
+                    fontweight='bold',
+                    color=color,
+                    ha='center' if p_code == 'P06' and x_col in ['MDS_UPDRS_total', primary_score] else 'left'
+                )
+
+            title_str = f"{concept_title} Top Feature: {disp_name}\nSpearman ρ = {rho:+.3f} (p = {p:.4f})"
+            ax.set_title(title_str, fontsize=11, fontweight='bold', pad=12, color='#0F172A')
+
+        ax.set_xlabel(x_label, fontsize=10, fontweight='semibold', labelpad=8)
+        ax.set_ylabel(disp_name, fontsize=10, fontweight='semibold', labelpad=8)
+        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+        ax.grid(True, linestyle='--', alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()

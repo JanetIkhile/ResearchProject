@@ -2723,3 +2723,246 @@ def plot_drag_variability_analysis(
     
     plt.tight_layout()
     plt.show()
+
+
+def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants_df, clinical_scores=None):
+    """
+    Plots:
+    1. Total Assessment Tool Completion Time (Practice + Main Phase) vs. MDS-UPDRS Scores.
+    2. Main Phase Completion Time vs. MDS-UPDRS Scores.
+    Formats statistical banners in subtitles above the plot area and places legends outside data areas.
+    """
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from scipy.stats import spearmanr, pearsonr
+
+    if sessions_df is None or sessions_df.empty or participants_df is None or participants_df.empty:
+        print("Error: Missing required sessions_df or participants_df.")
+        return
+
+    s_df = sessions_df.copy()
+    s_df['started_at'] = pd.to_datetime(s_df['started_at'])
+
+    def get_effective_end(row):
+        if pd.notna(row['completed_at']):
+            return pd.to_datetime(row['completed_at'])
+        sess_trials = trials_df[trials_df['session_id'] == row['id']]
+        if not sess_trials.empty:
+            return pd.to_datetime(sess_trials['timestamp']).max()
+        return pd.to_datetime(row['started_at'])
+
+    s_df['end_at'] = s_df.apply(get_effective_end, axis=1)
+    s_df['Duration (s)'] = (s_df['end_at'] - s_df['started_at']).dt.total_seconds()
+
+    s_df = s_df.sort_values(by=['participant_id', 'started_at'])
+    s_df['chrono'] = s_df.groupby('participant_id').cumcount()
+    s_df['chrono_type'] = s_df['chrono'].apply(lambda x: 'Practice Time (s)' if x == 0 else 'Main Phase Time (s)')
+    s_df['phase_type'] = s_df['chrono_type']
+
+    if 'session_type' in s_df.columns:
+        def sync_phase(row):
+            if pd.isna(row['session_type']) or row['session_type'] == '':
+                return row['chrono_type']
+            return 'Practice Time (s)' if row['session_type'] == 'practice' else 'Main Phase Time (s)'
+        s_df['phase_type'] = s_df.apply(sync_phase, axis=1)
+
+    time_pivot = s_df.groupby(['participant_id', 'phase_type'])['Duration (s)'].sum().unstack(fill_value=0).reset_index()
+
+    if 'Practice Time (s)' not in time_pivot.columns:
+        time_pivot['Practice Time (s)'] = 0.0
+    if 'Main Phase Time (s)' not in time_pivot.columns:
+        time_pivot['Main Phase Time (s)'] = 0.0
+
+    time_pivot['Total Runtime (s)'] = time_pivot['Practice Time (s)'] + time_pivot['Main Phase Time (s)']
+    time_pivot['Practice Time (min)'] = time_pivot['Practice Time (s)'] / 60.0
+    time_pivot['Main Phase Time (min)'] = time_pivot['Main Phase Time (s)'] / 60.0
+    time_pivot['Total Runtime (min)'] = time_pivot['Total Runtime (s)'] / 60.0
+
+    merged = time_pivot.merge(participants_df[['id', 'participant_code']], left_on='participant_id', right_on='id')
+
+    # Dynamically extract clinical scores from clinical_scores dict or participants_df
+    if clinical_scores is not None and isinstance(clinical_scores, dict):
+        merged['mdsupdrs_total'] = merged['participant_code'].apply(lambda x: clinical_scores.get(x, {}).get('MDS_UPDRS_total', np.nan))
+        merged['bradykinesia_subscore'] = merged['participant_code'].apply(lambda x: clinical_scores.get(x, {}).get('bradykinesia', np.nan))
+    else:
+        merged['mdsupdrs_total'] = merged['participant_code'].apply(lambda x: participants_df.loc[participants_df['participant_code'] == x, 'mdsupdrs_total'].values[0] if 'mdsupdrs_total' in participants_df.columns else np.nan)
+        merged['bradykinesia_subscore'] = merged['participant_code'].apply(lambda x: participants_df.loc[participants_df['participant_code'] == x, 'bradykinesia_subscore'].values[0] if 'bradykinesia_subscore' in participants_df.columns else np.nan)
+
+    merged = merged.sort_values(by='participant_code').reset_index(drop=True)
+
+    def format_min_sec(secs):
+        if pd.isna(secs) or secs <= 0:
+            return "0:00"
+        m = int(secs // 60)
+        s = int(round(secs % 60))
+        if s == 60:
+            m += 1
+            s = 0
+        return f"{m}:{s:02d}"
+
+    summary_tbl = merged.copy()
+    summary_tbl['Practice Time (min:sec)'] = summary_tbl['Practice Time (s)'].apply(format_min_sec)
+    summary_tbl['Main Phase Time (min:sec)'] = summary_tbl['Main Phase Time (s)'].apply(format_min_sec)
+    summary_tbl['Total Tool Time (min:sec)'] = summary_tbl['Total Runtime (s)'].apply(format_min_sec)
+
+    display_cols = ['participant_code', 'mdsupdrs_total', 'bradykinesia_subscore', 'Practice Time (min:sec)', 'Main Phase Time (min:sec)', 'Total Tool Time (min:sec)', 'Total Runtime (min)']
+    print("=== Total Assessment Tool & Main Phase Completion Time Summary ===")
+    from IPython.display import display
+    display(summary_tbl[display_cols].rename(columns={
+        'participant_code': 'Participant',
+        'mdsupdrs_total': 'MDS-UPDRS Total',
+        'bradykinesia_subscore': 'Bradykinesia Subscore',
+        'Total Runtime (min)': 'Total Time (min)'
+    }))
+
+    palette = {'P01': '#0D9488', 'P03': '#2563EB', 'P04': '#7C3AED', 'P05': '#D97706', 'P06': '#0284C7'}
+    label_offsets = {
+        'P01': (8, 6),
+        'P03': (8, 6),
+        'P04': (8, 6),
+        'P05': (8, 6),
+        'P06': (0, -16)  # Placed cleanly below P06 dot, well away from Y-axis and P03
+    }
+
+    # -----------------------------------------------------
+    # FIGURE 1: MOTORLENS TOTAL TIME VS MDS-UPDRS SCORES (1x2 Grid)
+    # -----------------------------------------------------
+    n_pts = len(merged)
+    if n_pts >= 3:
+        rho_tot, p_tot = spearmanr(merged['mdsupdrs_total'], merged['Total Runtime (min)'])
+        rho_brady, p_brady = spearmanr(merged['bradykinesia_subscore'], merged['Total Runtime (min)'])
+    else:
+        rho_tot, p_tot = np.nan, np.nan
+        rho_brady, p_brady = np.nan, np.nan
+
+    fig1, axes1 = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Panel 1A: MotorLens Total Time vs MDS-UPDRS Total
+    ax1 = axes1[0]
+    sns.regplot(
+        x='mdsupdrs_total',
+        y='Total Runtime (min)',
+        data=merged,
+        ax=ax1,
+        color='#1E293B',
+        scatter_kws={'s': 0},
+        line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#64748B'}
+    )
+    for _, row in merged.iterrows():
+        p_code = row['participant_code']
+        color = palette.get(p_code, '#2563EB')
+        offset = label_offsets.get(p_code, (8, 6))
+        ax1.scatter(row['mdsupdrs_total'], row['Total Runtime (min)'], color=color, s=140, edgecolors='black', linewidth=1.5, zorder=5)
+        ax1.annotate(f"{p_code}", (row['mdsupdrs_total'], row['Total Runtime (min)']), xytext=offset, textcoords='offset points', fontsize=11, fontweight='bold', color=color, ha='center' if p_code == 'P06' else 'left')
+
+    title_str1 = "MotorLens Total Time vs. MDS-UPDRS Total\n" + f"Spearman ρ = {rho_tot:+.3f} (p = {p_tot:.4f})"
+    ax1.set_title(title_str1, fontsize=11, fontweight='bold', pad=12, color='#0F172A')
+    ax1.set_xlabel("MDS-UPDRS Total Score", fontsize=11)
+    ax1.set_ylabel("MotorLens Total Time (minutes)", fontsize=11)
+    ax1.set_xlim(18.0, 46.5)
+    ax1.grid(True, linestyle='--', alpha=0.3)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+
+    # Panel 1B: MotorLens Total Time vs Bradykinesia Subscore
+    ax2 = axes1[1]
+    sns.regplot(
+        x='bradykinesia_subscore',
+        y='Total Runtime (min)',
+        data=merged,
+        ax=ax2,
+        color='#1E293B',
+        scatter_kws={'s': 0},
+        line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#64748B'}
+    )
+    for _, row in merged.iterrows():
+        p_code = row['participant_code']
+        color = palette.get(p_code, '#2563EB')
+        offset = label_offsets.get(p_code, (8, 6))
+        ax2.scatter(row['bradykinesia_subscore'], row['Total Runtime (min)'], color=color, s=140, edgecolors='black', linewidth=1.5, zorder=5)
+        ax2.annotate(f"{p_code}", (row['bradykinesia_subscore'], row['Total Runtime (min)']), xytext=offset, textcoords='offset points', fontsize=11, fontweight='bold', color=color, ha='center' if p_code == 'P06' else 'left')
+
+    title_str2 = "MotorLens Total Time vs. Bradykinesia Subscore\n" + f"Spearman ρ = {rho_brady:+.3f} (p = {p_brady:.4f})"
+    ax2.set_title(title_str2, fontsize=11, fontweight='bold', pad=12, color='#0F172A')
+    ax2.set_xlabel("MDS-UPDRS Bradykinesia Subscore", fontsize=11)
+    ax2.set_ylabel("MotorLens Total Time (minutes)", fontsize=11)
+    ax2.set_xlim(7.5, 15.8)
+    ax2.grid(True, linestyle='--', alpha=0.3)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
+
+    # -----------------------------------------------------
+    # FIGURE 2: MOTORLENS MAIN PHASE TIME VS MDS-UPDRS SCORES (1x2 Grid)
+    # -----------------------------------------------------
+    if n_pts >= 3:
+        rho_m_tot, p_m_tot = spearmanr(merged['mdsupdrs_total'], merged['Main Phase Time (min)'])
+        rho_m_brady, p_m_brady = spearmanr(merged['bradykinesia_subscore'], merged['Main Phase Time (min)'])
+    else:
+        rho_m_tot, p_m_tot = np.nan, np.nan
+        rho_m_brady, p_m_brady = np.nan, np.nan
+
+    fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Panel 2A: Main Phase Time vs MDS-UPDRS Total
+    ax2_1 = axes2[0]
+    sns.regplot(
+        x='mdsupdrs_total',
+        y='Main Phase Time (min)',
+        data=merged,
+        ax=ax2_1,
+        color='#0F766E',
+        scatter_kws={'s': 0},
+        line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#0D9488'}
+    )
+    for _, row in merged.iterrows():
+        p_code = row['participant_code']
+        color = palette.get(p_code, '#0D9488')
+        offset = label_offsets.get(p_code, (8, 6))
+        ax2_1.scatter(row['mdsupdrs_total'], row['Main Phase Time (min)'], color=color, s=140, edgecolors='black', linewidth=1.5, zorder=5)
+        ax2_1.annotate(f"{p_code}", (row['mdsupdrs_total'], row['Main Phase Time (min)']), xytext=offset, textcoords='offset points', fontsize=11, fontweight='bold', color=color, ha='center' if p_code == 'P06' else 'left')
+
+    title_m_str1 = "MotorLens Main Phase Time vs. MDS-UPDRS Total\n" + f"Spearman ρ = {rho_m_tot:+.3f} (p = {p_m_tot:.4f})"
+    ax2_1.set_title(title_m_str1, fontsize=11, fontweight='bold', pad=12, color='#0F172A')
+    ax2_1.set_xlabel("MDS-UPDRS Total Score", fontsize=11)
+    ax2_1.set_ylabel("MotorLens Main Phase Time (minutes)", fontsize=11)
+    ax2_1.set_xlim(18.0, 46.5)
+    ax2_1.grid(True, linestyle='--', alpha=0.3)
+    ax2_1.spines['top'].set_visible(False)
+    ax2_1.spines['right'].set_visible(False)
+
+    # Panel 2B: Main Phase Time vs Bradykinesia Subscore
+    ax2_2 = axes2[1]
+    sns.regplot(
+        x='bradykinesia_subscore',
+        y='Main Phase Time (min)',
+        data=merged,
+        ax=ax2_2,
+        color='#0F766E',
+        scatter_kws={'s': 0},
+        line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#0D9488'}
+    )
+    for _, row in merged.iterrows():
+        p_code = row['participant_code']
+        color = palette.get(p_code, '#0D9488')
+        offset = label_offsets.get(p_code, (8, 6))
+        ax2_2.scatter(row['bradykinesia_subscore'], row['Main Phase Time (min)'], color=color, s=140, edgecolors='black', linewidth=1.5, zorder=5)
+        ax2_2.annotate(f"{p_code}", (row['bradykinesia_subscore'], row['Main Phase Time (min)']), xytext=offset, textcoords='offset points', fontsize=11, fontweight='bold', color=color, ha='center' if p_code == 'P06' else 'left')
+
+    title_m_str2 = "MotorLens Main Phase Time vs. Bradykinesia Subscore\n" + f"Spearman ρ = {rho_m_brady:+.3f} (p = {p_m_brady:.4f})"
+    ax2_2.set_title(title_m_str2, fontsize=11, fontweight='bold', pad=12, color='#0F172A')
+    ax2_2.set_xlabel("MDS-UPDRS Bradykinesia Subscore", fontsize=11)
+    ax2_2.set_ylabel("MotorLens Main Phase Time (minutes)", fontsize=11)
+    ax2_2.set_xlim(7.5, 15.8)
+    ax2_2.grid(True, linestyle='--', alpha=0.3)
+    ax2_2.spines['top'].set_visible(False)
+    ax2_2.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
+
+

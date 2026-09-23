@@ -1,4 +1,6 @@
 id,participant_code,created_at,participant_group,dominant_arm
-1410d533-4767-4d4c-846a-a656f08d7f2e,P01,2026-09-03 18:04:19.643114+00,parkinsons,right
-c34e4440-6a2d-4029-9baa-ab90fd5e6550,P02,2026-09-02 17:18:26.762532+00,parkinsons,right
 fd636dec-1806-4f14-844e-f6d1c39baea8,P03,2026-09-10 16:51:24.64819+00,parkinsons,right
+56f58347-d268-4a2c-b40f-9e17a13e3f8e,P05,2026-09-11 17:18:05.891584+00,parkinsons,right
+aa70a350-f1f5-4b24-a014-1e33d3d179fe,P04,2026-09-11 16:17:59.790749+00,parkinsons,left
+b3c98017-dcdd-4d81-a04b-be1fcda32a63,P06,2026-09-11 21:38:49.601221+00,parkinsons,left
+2a2c8bce-6f4f-4b6a-a96c-e90fa4af07e3,P01,2026-09-23 18:35:50.14681+00,parkinsons,right
