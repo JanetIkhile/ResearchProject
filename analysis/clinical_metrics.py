@@ -744,7 +744,7 @@ def extract_features_from_trial(row):
             'pause_count': pause_count,
             'longest_hesitation_halt_duration': longest_pause_duration,
             'setup_time': float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else np.nan,
-            'initiation_delay': float(valid_pts[start_idx]['t']) if len(valid_pts) > start_idx else 0.0,
+            'initiation_delay': float(valid_pts[start_idx]['t'] - valid_pts[0]['t']) if len(valid_pts) > start_idx else (float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else 0.0),
             'movement_time_ms': row.get('movement_time_ms'),
             'fitts_law_id': fitts_law_id,
             'fitts_law_throughput': fitts_law_throughput,

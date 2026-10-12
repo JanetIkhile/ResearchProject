@@ -2,7 +2,8 @@ import os
 import json
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr, pearsonr, kruskal
+from scipy.stats import spearmanr, pearsonr, kruskal, mannwhitneyu
+from statsmodels.stats.multitest import multipletests
 
 # Pre-defined mapping registry of candidate digital features per clinical concept.
 REGISTRY = {
@@ -77,60 +78,162 @@ REGISTRY = {
     ]
 }
 
-def calculate_icc_3_1(df, subject_col, trial_col, value_col):
+
+
+
+
+def calculate_icc_absolute(df, subject_col, trial_col, value_col, expected_k=None):
     """
-    Computes ICC(3,1) - Two-way mixed consistency model for single measurements.
+    Computes ICC(A,1) [single trial] and ICC(A,k) [average of repeated trials]
+    under the two-way mixed-effects / random-effects absolute agreement model.
     """
-    sub_df = df[[subject_col, trial_col, value_col]].dropna()
+    sub_df = df[[subject_col, trial_col, value_col]].dropna().copy()
+    sub_df[value_col] = pd.to_numeric(sub_df[value_col], errors='coerce')
+    sub_df = sub_df.dropna()
+    
+    # Explicit check for duplicate observations before pivot
+    dup_mask = sub_df.duplicated(subset=[subject_col, trial_col], keep=False)
+    if dup_mask.any():
+        sub_df = sub_df.drop_duplicates(subset=[subject_col, trial_col], keep='last')
+
     try:
         pivot_df = sub_df.pivot(index=subject_col, columns=trial_col, values=value_col).dropna()
     except Exception:
-        return np.nan
+        return np.nan, np.nan
 
-    data = pivot_df.values
+    # Validate that pivot dataframe contains the exact expected trial numbers 1..expected_k
+    if expected_k is not None:
+        expected_trials = set(range(1, expected_k + 1))
+        actual_trials = set(pivot_df.columns)
+        if actual_trials != expected_trials:
+            return np.nan, np.nan
+
+    try:
+        data = pivot_df.values.astype(float)
+    except Exception:
+        return np.nan, np.nan
     n, k = data.shape
     if n < 2 or k < 2:
-        return np.nan
+        return np.nan, np.nan
 
     grand_mean = np.mean(data)
-    
-    # Between-subjects Mean Square (MSB)
-    SST = np.sum((np.mean(data, axis=1) - grand_mean)**2) * k
-    MSB = SST / (n - 1)
-    
-    # Within-subjects Sum of Squares (SSW)
-    SSW = np.sum((data - np.mean(data, axis=1)[:, np.newaxis])**2)
-    
-    # Between-trials Mean Square (MSJ)
-    SSJ = np.sum((np.mean(data, axis=0) - grand_mean)**2) * n
-    
-    # Error Mean Square (MSE)
-    SSE = SSW - SSJ
-    MSE = SSE / ((n - 1) * (k - 1))
-    
-    denom = MSB + (k - 1) * MSE
-    if denom == 0:
-        return 0.0
-        
-    icc = (MSB - MSE) / denom
-    return max(-1.0, min(1.0, icc))
+    msb = np.sum((np.mean(data, axis=1) - grand_mean)**2) * k / (n - 1)
+    msr = np.sum((np.mean(data, axis=0) - grand_mean)**2) * n / (k - 1)
+    ssw = np.sum((data - np.mean(data, axis=1)[:, np.newaxis])**2)
+    sse = ssw - (k - 1) * msr
+    mse = sse / ((n - 1) * (k - 1))
 
-def calculate_cohens_d(g1, g2, global_std=None):
-    """Calculates Cohen's d between two groups of values, falling back to global standard deviation if group sizes are 1."""
-    n1, n2 = len(g1), len(g2)
-    if n1 < 1 or n2 < 1:
-        return np.nan
-    m1, m2 = np.mean(g1), np.mean(g2)
+    denom_a1 = msb + (k - 1) * mse + (k / n) * (msr - mse)
+    icc_a1 = (msb - mse) / denom_a1 if (denom_a1 != 0 and not pd.isna(denom_a1)) else np.nan
+
+    denom_ak = msb + (msr - mse) / n
+    icc_ak = (msb - mse) / denom_ak if (denom_ak != 0 and not pd.isna(denom_ak)) else np.nan
+
+    # Return raw unclipped estimates (no hard [-1.0, 1.0] clipping)
+    return icc_a1, icc_ak
+
+def evaluate_feature_reliability(trials_df, participants_df, sessions_df=None):
+    """
+    Computes trial-to-trial repeatability for single trial ICC(A,1) and mean of repeated trials ICC(A,k) 
+    (ICC(A,10) for Drag, ICC(A,3) for Tap/Pinch/Hold) under two-way absolute agreement model.
+    """
+    from clinical_metrics import extract_features_from_trial
+
+    if sessions_df is not None and not sessions_df.empty:
+        main_mask = (sessions_df['session_type'] == 'main') if 'session_type' in sessions_df.columns else pd.Series(True, index=sessions_df.index)
+        if 'completed' in sessions_df.columns:
+            main_mask = main_mask & (sessions_df['completed'] == True)
+        main_session_ids = sessions_df[main_mask]['id']
+        trials_df = trials_df[trials_df['session_id'].isin(main_session_ids)]
+
+    feature_df = trials_df.apply(extract_features_from_trial, axis=1)
+    feature_df['participant_id'] = trials_df['participant_id']
+    feature_df['task_type'] = trials_df['task_type']
+    feature_df['trial_number'] = trials_df['trial_number']
+
+    p_code_map = dict(zip(participants_df['id'], participants_df['participant_code'])) if 'participant_code' in participants_df.columns else {}
+    p_group_map = dict(zip(participants_df['id'], participants_df['participant_group'])) if 'participant_group' in participants_df.columns else {}
+
+    feature_df['participant_code'] = feature_df['participant_id'].map(p_code_map).fillna(feature_df['participant_id'])
+    feature_df['participant_group'] = feature_df['participant_id'].map(p_group_map).fillna('unknown')
+
+    # Partition into PD and Normative cohorts using participant_group ('parkinsons' vs 'caregiver'/'other')
+    pd_mask = feature_df['participant_group'].astype(str).str.lower().isin(['parkinsons', 'pd'])
+    pd_feature_df = feature_df[pd_mask].copy()
+    ctrl_feature_df = feature_df[~pd_mask].copy()
+
+    pd_dict = {}
+    ctrl_dict = {}
+    raw_feature_cols = [c for c in feature_df.columns if c not in ['participant_id', 'participant_code', 'task_type', 'trial_number', 'id']]
     
-    if n1 > 1 and n2 > 1:
-        v1, v2 = np.var(g1, ddof=1), np.var(g2, ddof=1)
-        pooled_std = np.sqrt(((n1 - 1) * v1 + (n2 - 1) * v2) / (n1 + n2 - 2))
-    else:
-        pooled_std = global_std if global_std is not None else np.std(np.concatenate([g1, g2]), ddof=0)
+    for task in ['tap', 'drag', 'pinch', 'hold']:
+        pd_task_df = pd_feature_df[pd_feature_df['task_type'] == task]
+        ctrl_task_df = ctrl_feature_df[ctrl_feature_df['task_type'] == task]
+        expected_k_val = 10 if task == 'drag' else 3
         
-    if pooled_std == 0 or pd.isna(pooled_std):
-        return 0.0
-    return (m1 - m2) / pooled_std
+        for col in raw_feature_cols:
+            if col in pd_feature_df.columns and pd_feature_df[col].notna().sum() > 0:
+                prefixed_name = f"{task}_{col}"
+                pd_a1, pd_ak = calculate_icc_absolute(pd_task_df, 'participant_code', 'trial_number', col, expected_k=expected_k_val) if not pd_task_df.empty else (np.nan, np.nan)
+                ctrl_a1, ctrl_ak = calculate_icc_absolute(ctrl_task_df, 'participant_code', 'trial_number', col, expected_k=expected_k_val) if not ctrl_task_df.empty else (np.nan, np.nan)
+                pd_dict[prefixed_name] = {'icc_a1': pd_a1, 'icc_ak': pd_ak}
+                ctrl_dict[prefixed_name] = {'icc_a1': ctrl_a1, 'icc_ak': ctrl_ak}
+
+    def get_grade(icc_val):
+        if pd.isna(icc_val):
+            return 'N/A'
+        elif icc_val > 0.90:
+            return 'Excellent (> 0.90)'
+        elif icc_val >= 0.75:
+            return 'Good (0.75–0.90)'
+        elif icc_val >= 0.50:
+            return 'Moderate (0.50–0.75)'
+        else:
+            return 'Poor (< 0.50)'
+
+    rows = []
+    for concept, features in REGISTRY.items():
+        concept_domain = 'Tremor-Related' if concept in ['postural_tremor', 'kinetic_tremor'] else 'Bradykinesia-Related'
+        motor_char = concept.replace('_', ' ').title()
+        if motor_char == 'Hesitations Halts':
+            motor_char = 'Hesitations & Halts'
+
+        for feat in features:
+            col_name = feat['col']
+            disp_name = feat['display_name']
+            
+            pd_info = pd_dict.get(col_name, {'icc_a1': np.nan, 'icc_ak': np.nan})
+            ctrl_info = ctrl_dict.get(col_name, {'icc_a1': np.nan, 'icc_ak': np.nan})
+            
+            task_short = col_name.split('_')[0].capitalize()
+            k_val = 10 if task_short.lower() == 'drag' else 3
+
+            rows.append({
+                'Clinical Concept': concept_domain,
+                'Motor Characteristic': motor_char,
+                'Feature': disp_name,
+                'Task': task_short,
+                'PD ICC (A,1)': round(pd_info['icc_a1'], 3) if pd.notna(pd_info['icc_a1']) else np.nan,
+                'PD Grade (A,1)': get_grade(pd_info['icc_a1']),
+                f'PD ICC (A,{k_val})': round(pd_info['icc_ak'], 3) if pd.notna(pd_info['icc_ak']) else np.nan,
+                f'PD Grade (A,{k_val})': get_grade(pd_info['icc_ak']),
+                'Normative ICC (A,1)': round(ctrl_info['icc_a1'], 3) if pd.notna(ctrl_info['icc_a1']) else np.nan,
+                'Normative Grade (A,1)': get_grade(ctrl_info['icc_a1']),
+                f'Normative ICC (A,{k_val})': round(ctrl_info['icc_ak'], 3) if pd.notna(ctrl_info['icc_ak']) else np.nan,
+                f'Normative Grade (A,{k_val})': get_grade(ctrl_info['icc_ak'])
+            })
+
+    res_df = pd.DataFrame(rows).sort_values(by=['PD ICC (A,1)'], ascending=False, na_position='last').reset_index(drop=True)
+    return res_df
+
+def analyze_feature_reliability(trials_df, participants_df, sessions_df=None):
+    """
+    Displays and returns the trial-to-trial repeatability (ICC A,1 and ICC A,k) reliability evaluation matrix.
+    """
+    from IPython.display import display
+    rel_df = evaluate_feature_reliability(trials_df, participants_df, sessions_df=sessions_df)
+    display(rel_df)
+    return rel_df
 
 def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sessions_df=None):
     """
@@ -143,8 +246,11 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
 
     # Filter trials for main session type if sessions_df is provided and not empty
     if sessions_df is not None and not sessions_df.empty:
-        print("Filtering trials for 'main' session type to isolate analysis session trials...")
-        main_session_ids = sessions_df[sessions_df['session_type'] == 'main']['id'] if 'session_type' in sessions_df.columns else sessions_df['id']
+        print("Filtering trials for completed 'main' sessions to isolate analysis session trials...")
+        main_mask = (sessions_df['session_type'] == 'main') if 'session_type' in sessions_df.columns else pd.Series(True, index=sessions_df.index)
+        if 'completed' in sessions_df.columns:
+            main_mask = main_mask & (sessions_df['completed'] == True)
+        main_session_ids = sessions_df[main_mask]['id']
         trials_df = trials_df[trials_df['session_id'].isin(main_session_ids)]
 
     print("Extracting features from all trials...")
@@ -156,20 +262,8 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
     # Map participant codes
     merged = feature_df.merge(participants_df[['id', 'participant_code']], left_on='participant_id', right_on='id')
 
-    # 1. Calculate trial-level repeatability (ICC 3,1) for each feature.
-    reliability_dict = {}
-    raw_feature_cols = [c for c in feature_df.columns if c not in ['participant_id', 'task_type', 'trial_number', 'id']]
-    
-    for task in ['tap', 'drag', 'pinch', 'hold']:
-        task_df = merged[merged['task_type'] == task]
-        if task_df.empty:
-            continue
-        for col in raw_feature_cols:
-            if col in task_df.columns and task_df[col].notna().sum() > 0:
-                prefixed_name = f"{task}_{col}"
-                reliability_dict[prefixed_name] = calculate_icc_3_1(task_df, 'participant_code', 'trial_number', col)
-
     # 2. Pivot task features to a single flat row per participant (taking the median across trials)
+    raw_feature_cols = [c for c in feature_df.columns if c not in ['participant_id', 'task_type', 'trial_number', 'id']]
     subject_avg = merged.groupby(['participant_code', 'task_type']).median(numeric_only=True).reset_index()
     
     # Pivot tasks into columns
@@ -328,56 +422,14 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
         drag_across_df = pd.DataFrame(drag_across_metrics)
         flat_subject_df = flat_subject_df.merge(drag_across_df, on='participant_code', how='left')
 
-    # Add clinical scores
+    # Add participant_group and clinical scores
+    if 'participant_group' in participants_df.columns:
+        group_map = dict(zip(participants_df['participant_code'], participants_df['participant_group']))
+        flat_subject_df['participant_group'] = flat_subject_df['participant_code'].map(group_map)
+
     flat_subject_df['MDS_UPDRS_total'] = flat_subject_df['participant_code'].map(lambda x: clinical_scores.get(x, {}).get('MDS_UPDRS_total', np.nan))
     flat_subject_df['bradykinesia'] = flat_subject_df['participant_code'].map(lambda x: clinical_scores.get(x, {}).get('bradykinesia', np.nan))
     flat_subject_df['tremor'] = flat_subject_df['participant_code'].map(lambda x: clinical_scores.get(x, {}).get('tremor', np.nan))
-
-    # Determine severity groups (Mild, Moderate, Severe) based on clinical scores
-    def split_groups(df, score_col):
-        valid_df = df[df[score_col].notna()].sort_values(by=score_col)
-        if len(valid_df) == 0:
-            return {}, None
-            
-        unique_vals = sorted(valid_df[score_col].unique())
-        if len(unique_vals) == 2:
-            return {
-                'Mild': valid_df[valid_df[score_col] == unique_vals[0]],
-                'Moderate': pd.DataFrame(),
-                'Severe': valid_df[valid_df[score_col] == unique_vals[1]]
-            }, 'binary'
-        elif len(unique_vals) == 1:
-            return {
-                'Mild': valid_df,
-                'Moderate': pd.DataFrame(),
-                'Severe': pd.DataFrame()
-            }, 'single'
-        else:
-            q13 = np.percentile(valid_df[score_col], 33.3)
-            q23 = np.percentile(valid_df[score_col], 66.7)
-            return {
-                'Mild': valid_df[valid_df[score_col] <= q13],
-                'Moderate': valid_df[(valid_df[score_col] > q13) & (valid_df[score_col] <= q23)],
-                'Severe': valid_df[valid_df[score_col] > q23]
-            }, 'tercile'
-
-    # Define subtype classification (TD vs. AR)
-    subtypes = {}
-    for p_code, scores in clinical_scores.items():
-        t_val = scores.get('tremor')
-        b_val = scores.get('bradykinesia')
-        if pd.notna(t_val) and pd.notna(b_val) and b_val > 0:
-            ratio = t_val / b_val
-            if ratio >= 1.5:
-                subtypes[p_code] = 'TD'
-            elif ratio <= 1.0:
-                subtypes[p_code] = 'AR'
-            else:
-                subtypes[p_code] = 'Indeterminate'
-        else:
-            subtypes[p_code] = 'Unknown'
-            
-    flat_subject_df['subtype'] = flat_subject_df['participant_code'].map(subtypes)
 
     # 3. Perform Concept evaluation (no composite scores)
     results_by_concept = {}
@@ -388,8 +440,6 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
         
         if flat_subject_df[clinical_col].isna().all():
             clinical_col = 'MDS_UPDRS_total'
-
-        groups, split_type = split_groups(flat_subject_df, clinical_col)
 
         concept_rows = []
         for feat in features:
@@ -408,50 +458,12 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
             c_valid = clinical_vals[mask]
 
             # Correlation
-            if len(f_valid) >= 2:
-                sp_rho, _ = spearmanr(f_valid, c_valid)
-                pe_r, _ = pearsonr(f_valid, c_valid)
+            if len(f_valid) >= 3:
+                sp_rho, sp_p = spearmanr(f_valid, c_valid)
+                pe_r, pe_p = pearsonr(f_valid, c_valid)
             else:
-                sp_rho, _ = np.nan, np.nan
-                pe_r, _ = np.nan, np.nan
-
-            # Reliability (ICC)
-            icc_val = reliability_dict.get(col_name, np.nan)
-
-            # Global Standard Deviation fallback for Cohen's d
-            g_std = np.std(flat_subject_df[col_name].dropna(), ddof=0) if col_name in flat_subject_df.columns else None
-
-            # Pairwise Cohen's d Effect Sizes
-            d_mild_mod = np.nan
-            d_mod_sev = np.nan
-            d_mild_sev = np.nan
-            kw_stat = np.nan
-
-            if split_type == 'tercile':
-                g_mild = groups['Mild'][col_name].dropna().values
-                g_mod = groups['Moderate'][col_name].dropna().values
-                g_sev = groups['Severe'][col_name].dropna().values
-                
-                d_mild_mod = calculate_cohens_d(g_mild, g_mod, g_std)
-                d_mod_sev = calculate_cohens_d(g_mod, g_sev, g_std)
-                d_mild_sev = calculate_cohens_d(g_mild, g_sev, g_std)
-                
-                if len(g_mild) >= 2 and len(g_mod) >= 2 and len(g_sev) >= 2:
-                    try:
-                        kw_stat, _ = kruskal(g_mild, g_mod, g_sev)
-                    except ValueError:
-                        pass
-            elif split_type == 'binary':
-                g_mild = groups['Mild'][col_name].dropna().values
-                g_sev = groups['Severe'][col_name].dropna().values
-                d_mild_sev = calculate_cohens_d(g_mild, g_sev, g_std)
-
-            # Subtype Group Means
-            td_vals = flat_subject_df[flat_subject_df['subtype'] == 'TD'][col_name].dropna().values
-            ar_vals = flat_subject_df[flat_subject_df['subtype'] == 'AR'][col_name].dropna().values
-            
-            mean_td = np.mean(td_vals) if len(td_vals) > 0 else np.nan
-            mean_ar = np.mean(ar_vals) if len(ar_vals) > 0 else np.nan
+                sp_rho, sp_p = np.nan, np.nan
+                pe_r, pe_p = np.nan, np.nan
 
             # Sort by absolute Spearman correlation to help clinicians find top patterns
             sort_metric = abs(sp_rho) if pd.notna(sp_rho) else -1.0
@@ -461,14 +473,9 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
                 'Display Name': disp_name,
                 'Task': col_name.split('_')[0].capitalize(),
                 'Spearman rho': sp_rho,
+                'Spearman p (raw)': sp_p,
                 'Pearson r': pe_r,
-                'ICC (3,1)': icc_val,
-                'd (Mild-Mod)': d_mild_mod,
-                'd (Mod-Sev)': d_mod_sev,
-                'd (Mild-Sev)': d_mild_sev,
-                'K-W H-stat': kw_stat,
-                'Mean (AR)': mean_ar,
-                'Mean (TD)': mean_td,
+                'Pearson p (raw)': pe_p,
                 '_sort_key': sort_metric
             })
             
@@ -476,6 +483,14 @@ def evaluate_clinical_concepts(trials_df, participants_df, clinical_scores, sess
             # Sort by sorting key (absolute correlation strength)
             concept_df = pd.DataFrame(concept_rows).sort_values(by='_sort_key', ascending=False).reset_index(drop=True)
             concept_df.drop(columns=['_sort_key'], inplace=True)
+            
+            # Apply Benjamini-Hochberg FDR correction across candidate features per concept
+            valid_p_mask = concept_df['Spearman p (raw)'].notna()
+            concept_df['Spearman p (FDR)'] = np.nan
+            if valid_p_mask.sum() > 0:
+                _, p_adj, _, _ = multipletests(concept_df.loc[valid_p_mask, 'Spearman p (raw)'], method='fdr_bh')
+                concept_df.loc[valid_p_mask, 'Spearman p (FDR)'] = p_adj
+                
             results_by_concept[concept] = concept_df
 
     return flat_subject_df, results_by_concept
@@ -491,11 +506,11 @@ def generate_concept_report(trials_df, participants_df, clinical_scores, output_
     md_content.append("\nThis report aggregates digital motor features across the **Tapping, Drag, Pinch, and Hold** tasks, grouping them by clinical concepts to select the strongest candidate measures based on clinical scores.")
     
     md_content.append("\n## Clinical Cohort Profile")
-    subtypes = flat_subject_df[['participant_code', 'MDS_UPDRS_total', 'bradykinesia', 'tremor', 'subtype']].dropna(subset=['MDS_UPDRS_total'])
-    md_content.append("\n| Participant | MDS-UPDRS Total | Bradykinesia Subscore | Tremor Subscore | Clinical Subtype |")
-    md_content.append("| :--- | :---: | :---: | :---: | :--- |")
+    subtypes = flat_subject_df[['participant_code', 'MDS_UPDRS_total', 'bradykinesia', 'tremor']].dropna(subset=['MDS_UPDRS_total'])
+    md_content.append("\n| Participant | MDS-UPDRS Total | Bradykinesia Subscore | Tremor Subscore |")
+    md_content.append("| :--- | :---: | :---: | :---: |")
     for _, r in subtypes.iterrows():
-        md_content.append(f"| **{r['participant_code']}** | {int(r['MDS_UPDRS_total'])} | {int(r['bradykinesia'])} | {int(r['tremor'])} | {r['subtype']} |")
+        md_content.append(f"| **{r['participant_code']}** | {int(r['MDS_UPDRS_total'])} | {int(r['bradykinesia'])} | {int(r['tremor'])} |")
 
     md_content.append("\n---")
     
@@ -537,19 +552,15 @@ def generate_concept_report(trials_df, participants_df, clinical_scores, output_
             md_content.append("\nNo computed digital features available for this concept.")
             continue
 
-        md_content.append("\n| Feature | Task | Spearman $\\rho$ | Pearson $r$ | ICC (3,1) | Cohen's $d$ (Mild-Sev) | Kruskal H-stat | Mean (AR) | Mean (TD) |")
-        md_content.append("| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |")
+        md_content.append("\n| Feature | Task | Spearman $\\rho$ | Pearson $r$ | Spearman $p$ (FDR) |")
+        md_content.append("| :--- | :--- | :---: | :---: | :---: |")
         
         for _, row in concept_df.iterrows():
             rho_str = f"{row['Spearman rho']:.2f}" if pd.notna(row['Spearman rho']) else "N/A"
             r_str = f"{row['Pearson r']:.2f}" if pd.notna(row['Pearson r']) else "N/A"
-            icc_str = f"{row['ICC (3,1)']:.2f}" if pd.notna(row['ICC (3,1)']) else "N/A"
-            d_str = f"{row['d (Mild-Sev)']:.2f}" if pd.notna(row['d (Mild-Sev)']) else "N/A"
-            kw_str = f"{row['K-W H-stat']:.2f}" if pd.notna(row['K-W H-stat']) else "N/A"
-            ar_str = f"{row['Mean (AR)']:.2f}" if pd.notna(row['Mean (AR)']) else "N/A"
-            td_str = f"{row['Mean (TD)']:.2f}" if pd.notna(row['Mean (TD)']) else "N/A"
+            fdr_str = f"{row['Spearman p (FDR)']:.3f}" if pd.notna(row['Spearman p (FDR)']) else "N/A"
             
-            md_content.append(f"| {row['Display Name']} | {row['Task']} | {rho_str} | {r_str} | {icc_str} | {d_str} | {kw_str} | {ar_str} | {td_str} |")
+            md_content.append(f"| {row['Display Name']} | {row['Task']} | {rho_str} | {r_str} | {fdr_str} |")
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write("\n".join(md_content))
@@ -640,9 +651,10 @@ def plot_concept_highest_correlation_validation(concept_name, trials_df, partici
     disp_name = top_feat['display_name']
     concept_title = concept_display_names[concept_name]
 
-    palette = {'P01': '#0D9488', 'P03': '#2563EB', 'P04': '#7C3AED', 'P05': '#D97706', 'P06': '#0284C7'}
+    palette = {'P01': '#0D9488', 'P02': '#C026D3', 'P03': '#2563EB', 'P04': '#7C3AED', 'P05': '#D97706', 'P06': '#0284C7'}
     label_offsets = {
         'P01': (8, 6),
+        'P02': (8, 6),
         'P03': (8, 6),
         'P04': (8, 6),
         'P05': (8, 6),
@@ -703,3 +715,106 @@ def plot_concept_highest_correlation_validation(concept_name, trials_df, partici
 
     plt.tight_layout()
     plt.show()
+
+def evaluate_known_groups_validity(flat_subject_df):
+    """
+    Evaluates Known-Groups Validity (Parkinson's Disease vs. Healthy Controls).
+    Answers: Can digital motor features statistically differentiate PD participants vs. Controls?
+    
+    Uses:
+      - Non-parametric Mann-Whitney U test
+      - Rank-biserial correlation effect size (r)
+      - Benjamini-Hochberg FDR p-value correction across candidate features
+    
+    Returns:
+      pd.DataFrame: Standalone summary matrix for Known-Groups Validity
+    """
+    if flat_subject_df is None or flat_subject_df.empty:
+        return pd.DataFrame()
+
+    # Determine PD vs Control assignment using participant_group ('parkinsons' vs 'other'/'caregiver')
+    if 'participant_group' in flat_subject_df.columns and flat_subject_df['participant_group'].notna().any():
+        pd_mask = flat_subject_df['participant_group'].astype(str).str.lower().str.contains('parkinson|pd', na=False)
+        ctrl_mask = flat_subject_df['participant_group'].astype(str).str.lower().str.contains('control|caregiver|healthy|hc|other|normative', na=False)
+    else:
+        pd_mask = flat_subject_df['participant_code'].astype(str).str.startswith('P')
+        ctrl_mask = flat_subject_df['participant_code'].astype(str).str.startswith('C')
+
+    pd_sub = flat_subject_df[pd_mask]
+    ctrl_sub = flat_subject_df[ctrl_mask]
+
+    n_pd = len(pd_sub)
+    n_ctrl = len(ctrl_sub)
+    print(f"Known-Groups Cohort Size: {n_pd} PD participant(s), {n_ctrl} Control participant(s).")
+
+    results = []
+
+    for concept, features in REGISTRY.items():
+        for feat in features:
+            col_name = feat['col']
+            disp_name = feat['display_name']
+
+            if col_name not in flat_subject_df.columns:
+                continue
+
+            pd_vals = pd.to_numeric(pd_sub[col_name], errors='coerce').dropna().values
+            ctrl_vals = pd.to_numeric(ctrl_sub[col_name], errors='coerce').dropna().values
+
+            if len(pd_vals) == 0 and len(ctrl_vals) == 0:
+                continue
+
+            med_pd = np.median(pd_vals) if len(pd_vals) > 0 else np.nan
+            iqr_pd = np.percentile(pd_vals, 75) - np.percentile(pd_vals, 25) if len(pd_vals) >= 2 else (0.0 if len(pd_vals) == 1 else np.nan)
+
+            med_ctrl = np.median(ctrl_vals) if len(ctrl_vals) > 0 else np.nan
+            iqr_ctrl = np.percentile(ctrl_vals, 75) - np.percentile(ctrl_vals, 25) if len(ctrl_vals) >= 2 else (0.0 if len(ctrl_vals) == 1 else np.nan)
+
+            if len(pd_vals) >= 1 and len(ctrl_vals) >= 1:
+                try:
+                    mwu_res = mannwhitneyu(pd_vals, ctrl_vals, alternative='two-sided')
+                    u_stat = mwu_res.statistic
+                    p_val = mwu_res.pvalue
+                    n1, n2 = len(pd_vals), len(ctrl_vals)
+                    r_effect = 1.0 - (2.0 * u_stat / (n1 * n2)) if (n1 * n2) > 0 else np.nan
+                except Exception:
+                    u_stat, p_val, r_effect = np.nan, np.nan, np.nan
+            else:
+                u_stat, p_val, r_effect = np.nan, np.nan, np.nan
+
+            pd_str = f"{med_pd:.2f} ({iqr_pd:.2f})" if pd.notna(med_pd) else "N/A"
+            ctrl_str = f"{med_ctrl:.2f} ({iqr_ctrl:.2f})" if pd.notna(med_ctrl) else "N/A"
+
+            concept_domain = 'Tremor-Related' if concept in ['postural_tremor', 'kinetic_tremor'] else 'Bradykinesia-Related'
+            motor_char = concept.replace('_', ' ').title()
+            if motor_char == 'Hesitations Halts':
+                motor_char = 'Hesitations & Halts'
+
+            results.append({
+                'Clinical Concept': concept_domain,
+                'Motor Characteristic': motor_char,
+                'Feature': disp_name,
+                'Task': col_name.split('_')[0].capitalize(),
+                'PD Median (IQR)': pd_str,
+                'Normative Median (IQR)': ctrl_str,
+                'Mann-Whitney U': u_stat,
+                'Rank-Biserial r': r_effect,
+                'p-value (raw)': p_val
+            })
+
+    if not results:
+        return pd.DataFrame()
+
+    res_df = pd.DataFrame(results)
+
+    valid_p_mask = res_df['p-value (raw)'].notna()
+    res_df['p-value (FDR)'] = np.nan
+    if valid_p_mask.sum() > 0:
+        _, p_adj, _, _ = multipletests(res_df.loc[valid_p_mask, 'p-value (raw)'], method='fdr_bh')
+        res_df.loc[valid_p_mask, 'p-value (FDR)'] = p_adj
+
+    res_df = res_df.sort_values(by=['p-value (raw)', 'Rank-Biserial r'], ascending=[True, False], na_position='last').reset_index(drop=True)
+    return res_df
+
+
+
+

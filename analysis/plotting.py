@@ -2790,7 +2790,7 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
         merged['mdsupdrs_total'] = merged['participant_code'].apply(lambda x: participants_df.loc[participants_df['participant_code'] == x, 'mdsupdrs_total'].values[0] if 'mdsupdrs_total' in participants_df.columns else np.nan)
         merged['bradykinesia_subscore'] = merged['participant_code'].apply(lambda x: participants_df.loc[participants_df['participant_code'] == x, 'bradykinesia_subscore'].values[0] if 'bradykinesia_subscore' in participants_df.columns else np.nan)
 
-    merged = merged.sort_values(by='participant_code').reset_index(drop=True)
+    merged = merged[merged['mdsupdrs_total'].notna()].sort_values(by='participant_code').reset_index(drop=True)
 
     def format_min_sec(secs):
         if pd.isna(secs) or secs <= 0:
@@ -2817,9 +2817,10 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
         'Total Runtime (min)': 'Total Time (min)'
     }))
 
-    palette = {'P01': '#0D9488', 'P03': '#2563EB', 'P04': '#7C3AED', 'P05': '#D97706', 'P06': '#0284C7'}
+    palette = {'P01': '#0D9488', 'P02': '#C026D3', 'P03': '#2563EB', 'P04': '#7C3AED', 'P05': '#D97706', 'P06': '#0284C7'}
     label_offsets = {
         'P01': (8, 6),
+        'P02': (8, 6),
         'P03': (8, 6),
         'P04': (8, 6),
         'P05': (8, 6),
@@ -2829,10 +2830,11 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
     # -----------------------------------------------------
     # FIGURE 1: MOTORLENS TOTAL TIME VS MDS-UPDRS SCORES (1x2 Grid)
     # -----------------------------------------------------
-    n_pts = len(merged)
+    pd_merged = merged[merged['mdsupdrs_total'].notna()].copy()
+    n_pts = len(pd_merged)
     if n_pts >= 3:
-        rho_tot, p_tot = spearmanr(merged['mdsupdrs_total'], merged['Total Runtime (min)'])
-        rho_brady, p_brady = spearmanr(merged['bradykinesia_subscore'], merged['Total Runtime (min)'])
+        rho_tot, p_tot = spearmanr(pd_merged['mdsupdrs_total'], pd_merged['Total Runtime (min)'])
+        rho_brady, p_brady = spearmanr(pd_merged['bradykinesia_subscore'], pd_merged['Total Runtime (min)'])
     else:
         rho_tot, p_tot = np.nan, np.nan
         rho_brady, p_brady = np.nan, np.nan
@@ -2844,13 +2846,13 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
     sns.regplot(
         x='mdsupdrs_total',
         y='Total Runtime (min)',
-        data=merged,
+        data=pd_merged,
         ax=ax1,
         color='#1E293B',
         scatter_kws={'s': 0},
         line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#64748B'}
     )
-    for _, row in merged.iterrows():
+    for _, row in pd_merged.iterrows():
         p_code = row['participant_code']
         color = palette.get(p_code, '#2563EB')
         offset = label_offsets.get(p_code, (8, 6))
@@ -2871,13 +2873,13 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
     sns.regplot(
         x='bradykinesia_subscore',
         y='Total Runtime (min)',
-        data=merged,
+        data=pd_merged,
         ax=ax2,
         color='#1E293B',
         scatter_kws={'s': 0},
         line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#64748B'}
     )
-    for _, row in merged.iterrows():
+    for _, row in pd_merged.iterrows():
         p_code = row['participant_code']
         color = palette.get(p_code, '#2563EB')
         offset = label_offsets.get(p_code, (8, 6))
@@ -2900,8 +2902,8 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
     # FIGURE 2: MOTORLENS MAIN PHASE TIME VS MDS-UPDRS SCORES (1x2 Grid)
     # -----------------------------------------------------
     if n_pts >= 3:
-        rho_m_tot, p_m_tot = spearmanr(merged['mdsupdrs_total'], merged['Main Phase Time (min)'])
-        rho_m_brady, p_m_brady = spearmanr(merged['bradykinesia_subscore'], merged['Main Phase Time (min)'])
+        rho_m_tot, p_m_tot = spearmanr(pd_merged['mdsupdrs_total'], pd_merged['Main Phase Time (min)'])
+        rho_m_brady, p_m_brady = spearmanr(pd_merged['bradykinesia_subscore'], pd_merged['Main Phase Time (min)'])
     else:
         rho_m_tot, p_m_tot = np.nan, np.nan
         rho_m_brady, p_m_brady = np.nan, np.nan
@@ -2913,13 +2915,13 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
     sns.regplot(
         x='mdsupdrs_total',
         y='Main Phase Time (min)',
-        data=merged,
+        data=pd_merged,
         ax=ax2_1,
         color='#0F766E',
         scatter_kws={'s': 0},
         line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#0D9488'}
     )
-    for _, row in merged.iterrows():
+    for _, row in pd_merged.iterrows():
         p_code = row['participant_code']
         color = palette.get(p_code, '#0D9488')
         offset = label_offsets.get(p_code, (8, 6))
@@ -2940,13 +2942,13 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
     sns.regplot(
         x='bradykinesia_subscore',
         y='Main Phase Time (min)',
-        data=merged,
+        data=pd_merged,
         ax=ax2_2,
         color='#0F766E',
         scatter_kws={'s': 0},
         line_kws={'linewidth': 2, 'linestyle': '--', 'color': '#0D9488'}
     )
-    for _, row in merged.iterrows():
+    for _, row in pd_merged.iterrows():
         p_code = row['participant_code']
         color = palette.get(p_code, '#0D9488')
         offset = label_offsets.get(p_code, (8, 6))

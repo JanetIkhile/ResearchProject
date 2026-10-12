@@ -1,0 +1,5 @@
+id,participant_id,started_at,drag_completed,tap_completed,hold_completed,completed,completed_at,device_info,notes,session_type,pinch_completed
+48ed747e-6292-401f-ad97-a0573558dcd0,23dfbdf5-ef33-4550-9b9c-7e46d090448d,2026-10-12 19:10:48.635+00,true,true,true,true,2026-10-12 19:13:19.939+00,,,practice,true
+9b076697-d7cc-4bf3-8139-c4b4438c0e21,79e21202-3ddd-4723-aea1-10b92be9ad7c,2026-10-08 21:25:04.813+00,true,true,true,true,2026-10-08 21:27:35.896+00,,,practice,true
+d9b3f7f9-f392-422e-84f3-77bc4285990d,23dfbdf5-ef33-4550-9b9c-7e46d090448d,2026-10-12 19:13:24.368+00,true,true,true,true,2026-10-12 19:16:29.508+00,,,main,true
+f97f3b30-7010-445e-a716-a24039773118,79e21202-3ddd-4723-aea1-10b92be9ad7c,2026-10-08 21:27:51.222+00,true,true,true,true,2026-10-08 21:31:05.221+00,,,main,true
