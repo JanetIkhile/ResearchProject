@@ -2048,31 +2048,41 @@ def plot_clinical_metrics_dashboard(master_df, trials_df=None, participants_df=N
         if pd.notna(val):
             ax2.text(i + width/2, val + 0.02, f"{val:.1f}s", ha='center', va='bottom', fontweight='bold', color='#EC4899')
 
-    # Subplot 5: Kinetic Tremor Amplitude & Clinical Grade
+    # Subplot 5: Kinetic Tremor Peak Amplitude
     ax = axes[2, 0]
-    trem_amp = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_tremor_amplitude_peak_cm_median'].values[0] for p in participant_codes]
-    trem_grade = [master_df[master_df['participant_code'] == p]['drag_Overall_drag_tremor_clinical_grade_median'].values[0] for p in participant_codes]
+    amp_col = 'drag_Overall_drag_tremor_amplitude_peak_cm_median' if 'drag_Overall_drag_tremor_amplitude_peak_cm_median' in master_df.columns else ('drag_Overall_drag_tremor_amplitude_peak_px_median' if 'drag_Overall_drag_tremor_amplitude_peak_px_median' in master_df.columns else None)
+    unit_label = "cm" if amp_col and "_cm_" in amp_col else "px"
+    trem_amp = [master_df[master_df['participant_code'] == p][amp_col].values[0] if amp_col and amp_col in master_df.columns else np.nan for p in participant_codes]
     
-    ax.bar(x - width/2, trem_amp, width, label='Amp (cm)', color='#8B5CF6')
-    ax2 = ax.twinx()
-    ax2.bar(x + width/2, trem_grade, width, label='Estimated Clinical Severity', color='#EC4899')
-    
-    ax.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.16 Kinetic Tremor)", fontsize=11, fontweight='bold')
-    ax.set_ylabel("Peak-to-Peak Amplitude (cm)", color='#8B5CF6', fontsize=11)
-    ax2.set_ylabel("Estimated Severity Grade (0-4)", color='#EC4899', fontsize=11)
-    ax2.set_ylim(0, 4.2)
+    grade_col = 'drag_Overall_drag_tremor_clinical_grade_median'
+    if grade_col in master_df.columns:
+        trem_grade = [master_df[master_df['participant_code'] == p][grade_col].values[0] for p in participant_codes]
+        ax.bar(x - width/2, trem_amp, width, label=f'Amp ({unit_label})', color='#8B5CF6')
+        ax2 = ax.twinx()
+        ax2.bar(x + width/2, trem_grade, width, label='Estimated Clinical Severity', color='#EC4899')
+        ax.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.16 Kinetic Tremor)", fontsize=11, fontweight='bold')
+        ax.set_ylabel(f"Peak-to-Peak Amplitude ({unit_label})", color='#8B5CF6', fontsize=11)
+        ax2.set_ylabel("Estimated Severity Grade (0-4)", color='#EC4899', fontsize=11)
+        ax2.set_ylim(0, 4.2)
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax.legend(lines + lines2, labels + labels2, loc='upper left')
+        for i, val in enumerate(trem_amp):
+            if pd.notna(val):
+                ax.text(i - width/2, val + 0.02, f"{val:.2f} {unit_label}", ha='center', va='bottom', fontweight='bold', color='#8B5CF6')
+        for i, val in enumerate(trem_grade):
+            if pd.notna(val):
+                ax2.text(i + width/2, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold', color='#EC4899')
+    else:
+        ax.bar(x, trem_amp, width, label=f'Amp ({unit_label})', color='#8B5CF6')
+        ax.set_title("Kinetic Tremor Peak Amplitude", fontsize=11, fontweight='bold')
+        ax.set_ylabel(f"Peak Amplitude ({unit_label})", color='#8B5CF6', fontsize=11)
+        for i, val in enumerate(trem_amp):
+            if pd.notna(val):
+                ax.text(i, val + 0.02, f"{val:.2f} {unit_label}", ha='center', va='bottom', fontweight='bold', color='#8B5CF6')
     ax.set_xticks(x)
     ax.set_xticklabels(participant_codes)
     ax.yaxis.grid(True, linestyle='--', alpha=0.3)
-    lines, labels = ax.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax.legend(lines + lines2, labels + labels2, loc='upper left')
-    for i, val in enumerate(trem_amp):
-        if pd.notna(val):
-            ax.text(i - width/2, val + 0.02, f"{val:.2f} cm", ha='center', va='bottom', fontweight='bold', color='#8B5CF6')
-    for i, val in enumerate(trem_grade):
-        if pd.notna(val):
-            ax2.text(i + width/2, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold', color='#EC4899')
 
     # Subplot 6: Kinetic Tremor Frequency
     ax = axes[2, 1]
@@ -2166,19 +2176,35 @@ def plot_clinical_metrics_dashboard(master_df, trials_df=None, participants_df=N
         if pd.notna(val):
             ax.text(i, val + 0.2, f"{val:.2f} Hz", ha='center', va='bottom', fontweight='bold')
 
-    # Subplot 3: MDS-UPDRS Item 3.15 Postural Tremor Grade
+    # Subplot 3: Postural Tremor Spectral Power / Severity
     ax = axes[2]
-    hold_grade = [master_df[master_df['participant_code'] == p]['hold_Overall_hold_tremor_clinical_grade_median'].values[0] for p in participant_codes]
-    ax.bar(x, hold_grade, width, color='#EC4899')
-    ax.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.15 Postural Tremor)", fontsize=11, fontweight='bold')
-    ax.set_ylabel("Estimated Severity Grade (0-4)", fontsize=11)
-    ax.set_ylim(0, 4.2)
-    ax.set_xticks(x)
-    ax.set_xticklabels(participant_codes)
-    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
-    for i, val in enumerate(hold_grade):
-        if pd.notna(val):
-            ax.text(i, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold')
+    if 'hold_Overall_hold_tremor_power_median' in master_df.columns:
+        hold_pwr = [master_df[master_df['participant_code'] == p]['hold_Overall_hold_tremor_power_median'].values[0] for p in participant_codes]
+        ax.bar(x, hold_pwr, width, color='#EC4899')
+        ax.set_title("Postural Tremor Power", fontsize=11, fontweight='bold')
+        ax.set_ylabel("Power (px²/Hz)", fontsize=11)
+        ax.set_xticks(x)
+        ax.set_xticklabels(participant_codes)
+        ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+        for i, val in enumerate(hold_pwr):
+            if pd.notna(val):
+                ax.text(i, val + 0.005, f"{val:.3f}", ha='center', va='bottom', fontweight='bold')
+    elif 'hold_Overall_hold_tremor_clinical_grade_median' in master_df.columns:
+        hold_grade = [master_df[master_df['participant_code'] == p]['hold_Overall_hold_tremor_clinical_grade_median'].values[0] for p in participant_codes]
+        ax.bar(x, hold_grade, width, color='#EC4899')
+        ax.set_title("Estimated Clinical Severity\n(MDS-UPDRS Item 3.15 Postural Tremor)", fontsize=11, fontweight='bold')
+        ax.set_ylabel("Estimated Severity Grade (0-4)", fontsize=11)
+        ax.set_ylim(0, 4.2)
+        ax.set_xticks(x)
+        ax.set_xticklabels(participant_codes)
+        ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+        for i, val in enumerate(hold_grade):
+            if pd.notna(val):
+                ax.text(i, val + 0.1, f"Grade {val:.1f}", ha='center', va='bottom', fontweight='bold')
+    else:
+        ax.set_title("Postural Tremor", fontsize=11, fontweight='bold')
+        ax.set_xticks(x)
+        ax.set_xticklabels(participant_codes)
             
     plt.tight_layout()
     if save_dir is not None:
@@ -2817,14 +2843,25 @@ def plot_completion_time_vs_clinical_scores(sessions_df, trials_df, participants
         'Total Runtime (min)': 'Total Time (min)'
     }))
 
-    palette = {'P01': '#0D9488', 'P02': '#C026D3', 'P03': '#2563EB', 'P04': '#7C3AED', 'P05': '#D97706', 'P06': '#0284C7'}
+    palette = {
+        'P01': '#0D9488',
+        'P02': '#C026D3',
+        'P03': '#2563EB',
+        'P04': '#7C3AED',
+        'P05': '#D97706',
+        'P06': '#0284C7',
+        'P07': '#E11D48',
+        'P08': '#059669'
+    }
     label_offsets = {
         'P01': (8, 6),
         'P02': (8, 6),
         'P03': (8, 6),
         'P04': (8, 6),
         'P05': (8, 6),
-        'P06': (0, -16)  # Placed cleanly below P06 dot, well away from Y-axis and P03
+        'P06': (0, -16),  # Placed cleanly below P06 dot, well away from Y-axis and P03
+        'P07': (8, 6),
+        'P08': (8, 6)
     }
 
     # -----------------------------------------------------

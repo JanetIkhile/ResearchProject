@@ -46,18 +46,20 @@ def calculate_derivatives(times, coords):
 def extract_tremor(times, coords):
     """
     Interpolates touch coordinates into a uniform timestamp geometry and applies Welch's PSD 
-    to robustly calculate physiological tremor characteristics inside a 3-8 Hz target band.
-    Also extracts peak-to-peak amplitude (px, cm) and maps to MDS-UPDRS clinical grades.
+    separately on horizontal (X) and vertical (Y) coordinates, combining their spectral power:
+    P_total(f) = P_x(f) + P_y(f) to avoid frequency doubling from distance magnitudes.
+    Robustly calculates physiological tremor characteristics inside a 3-8 Hz target band,
+    and extracts RMS amplitude and peak-to-peak amplitude (px, cm).
     """
     # Clean input data (remove NaNs, infs, None)
     if times is None or coords is None or len(times) == 0 or len(coords) == 0:
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     times = np.asarray(times)
     coords = np.asarray(coords)
     
     if len(coords.shape) != 2 or coords.shape[0] != len(times):
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     valid_mask = np.isfinite(times) & np.all(np.isfinite(coords), axis=1)
     times = times[valid_mask]
@@ -70,7 +72,7 @@ def extract_tremor(times, coords):
 
     # Use 2-3 seconds as minimum duration threshold (2000 ms)
     if len(times) < 10 or (times[-1] - times[0]) < 2000:
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     # Target uniform grid: 100 Hz (10ms steps). 
     # We hardcode 100 Hz because it satisfies the Nyquist theorem for frequencies up to 50 Hz, 
@@ -86,30 +88,25 @@ def extract_tremor(times, coords):
     
     # Check that interpolated coordinates contain no NaNs/infs
     if not np.all(np.isfinite(uniform_x)) or not np.all(np.isfinite(uniform_y)):
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     uniform_x_zero = uniform_x - np.mean(uniform_x)
     uniform_y_zero = uniform_y - np.mean(uniform_y)
     
-    # Calculate euclidean magnitude from center immediately (legacy compatibility)
-    centroid = np.mean(coords, axis=0)
-    deviations = np.linalg.norm(coords - centroid, axis=1)
-    
-    # Interpolate non-uniform touch events onto stable baseline 
-    f_interp = interp1d(times, deviations, kind='linear', fill_value='extrapolate')
-    uniform_deviations = f_interp(uniform_times)
-    
-    # Remove DC offset (zero mean)
-    uniform_deviations -= np.mean(uniform_deviations)
-    
-    # Calculate PSD using Welch's method
-    f, Pxx = welch(uniform_deviations, fs=target_fs, nperseg=min(len(uniform_deviations), int(target_fs * 1.5)))
+    # Analyze horizontal (X) and vertical (Y) coordinates separately using Welch's method
+    # and combine spectral powers: P_total(f) = P_x(f) + P_y(f).
+    # This preserves oscillations along both axes without the frequency distortion/doubling
+    # caused by taking the Euclidean distance magnitude before spectral analysis.
+    nperseg = min(len(uniform_x_zero), int(target_fs * 1.5))
+    f, Pxx_x = welch(uniform_x_zero, fs=target_fs, nperseg=nperseg)
+    _, Pxx_y = welch(uniform_y_zero, fs=target_fs, nperseg=nperseg)
+    Pxx = Pxx_x + Pxx_y
     
     # Isolate clinical Tremor Band (Postural + Resting Action typically 3-8 Hz)
     band_mask = (f >= 3.0) & (f <= 8.0)
     
     if not np.any(band_mask):
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     f_band = f[band_mask]
     Pxx_band = Pxx[band_mask]
@@ -153,57 +150,31 @@ def extract_tremor(times, coords):
     except Exception:
         tremor_amp_peak_px = tremor_amp_rms * 2.828
         
-    # Convert pixels to centimeters using standard CSS layout definition: 96 px = 2.54 cm
-    # We apply a calibration factor of 10 to represent hand-in-the-air visual equivalent
-    tremor_amp_peak_cm = tremor_amp_peak_px * (2.54 / 96.0) * 10.0 if pd.notna(tremor_amp_peak_px) else np.nan
-    
-    # MDS-UPDRS Postural Tremor clinical grade mapping
-    if pd.isna(tremor_amp_peak_cm):
-        tremor_clinical_grade = np.nan
-    elif tremor_amp_peak_cm == 0 or tremor_amp_peak_px < 1.0: # threshold for no tremor
-        tremor_clinical_grade = 0.0
-    elif tremor_amp_peak_cm < 1.0:
-        tremor_clinical_grade = 1.0  # slight (< 1 cm equivalent)
-    elif tremor_amp_peak_cm < 3.0:
-        tremor_clinical_grade = 2.0  # mild (1-3 cm equivalent)
-    elif tremor_amp_peak_cm < 10.0:
-        tremor_clinical_grade = 3.0  # moderate (3-10 cm equivalent)
-    else:
-        tremor_clinical_grade = 4.0  # severe (>= 10 cm equivalent)
-        
-    # Incorporate slow postural drift distance
-    drift_distance = np.sum(np.linalg.norm(np.diff(coords, axis=0), axis=1)) if len(coords) > 1 else 0.0
-    drift_cm = drift_distance * (2.54 / 96.0)
-    if pd.notna(drift_cm):
-        if drift_cm < 0.5: # < 5 mm
-            drift_grade = 0.0
-        elif drift_cm < 1.0: # 5-10 mm
-            drift_grade = 1.0
-        elif drift_cm < 2.0: # 10-20 mm
-            drift_grade = 2.0
-        elif drift_cm < 4.0: # 20-40 mm
-            drift_grade = 3.0
-        else:
-            drift_grade = 4.0
-        tremor_clinical_grade = max(tremor_clinical_grade, drift_grade)
-    
-    return tremor_freq, tremor_power, tremor_amp_rms, tremor_amp_peak_px, tremor_amp_peak_cm, tremor_clinical_grade
+    # Convert pixels to physical distance (mm and cm).
+    # Telemetry records viewport 820x1048 at DPR=2, uniquely matching 10.9" iPad (264 physical ppi / 2 = 132 CSS px/inch).
+    # Verified iPad calibration: 25.4 mm / 132 px = 0.192424 mm/px (0.0192424 cm/px).
+    # The arbitrary 10x multiplier previously used as a 'hand-in-the-air' equivalent is removed
+    # so that the primary physical measurement reflects true on-screen touch displacement.
+    IPAD_PX_TO_MM = 25.4 / 132.0 # ~0.192424 mm/px
+    tremor_amp_peak_mm = tremor_amp_peak_px * IPAD_PX_TO_MM if pd.notna(tremor_amp_peak_px) else np.nan
+    tremor_amp_peak_cm = tremor_amp_peak_mm / 10.0 if pd.notna(tremor_amp_peak_mm) else np.nan
+    return tremor_freq, tremor_power, tremor_amp_rms, tremor_amp_peak_px, tremor_amp_peak_cm
 
 def extract_kinetic_tremor(times, deviations):
     """
     Interpolates orthogonal deviations into a uniform timestamp geometry and applies Welch's PSD 
     to robustly calculate physiological kinetic tremor characteristics inside a 3-8 Hz target band.
-    Also extracts peak-to-peak amplitude (px, cm) and maps to MDS-UPDRS clinical severity grades.
+    Also extracts peak-to-peak amplitude (px, cm).
     """
     # Clean input data (remove NaNs, infs, None)
     if times is None or deviations is None or len(times) == 0 or len(deviations) == 0:
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     times = np.asarray(times)
     deviations = np.asarray(deviations)
     
     if len(deviations) != len(times):
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     valid_mask = np.isfinite(times) & np.isfinite(deviations)
     times = times[valid_mask]
@@ -216,7 +187,7 @@ def extract_kinetic_tremor(times, deviations):
 
     # Use 300 ms as minimum duration threshold for drag movements
     if len(times) < 6 or (times[-1] - times[0]) < 300:
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     target_fs = 100.0
     uniform_times = np.arange(times[0], times[-1], 10.0)
@@ -227,7 +198,7 @@ def extract_kinetic_tremor(times, deviations):
     
     # Check that interpolated deviations contain no NaNs/infs
     if not np.all(np.isfinite(uniform_deviations)):
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     # Remove DC offset (zero mean)
     uniform_deviations_zero = uniform_deviations - np.mean(uniform_deviations)
@@ -239,7 +210,7 @@ def extract_kinetic_tremor(times, deviations):
     band_mask = (f >= 3.0) & (f <= 8.0)
     
     if not np.any(band_mask):
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, np.nan
         
     f_band = f[band_mask]
     Pxx_band = Pxx[band_mask]
@@ -280,147 +251,18 @@ def extract_kinetic_tremor(times, deviations):
     except Exception:
         tremor_amp_peak_px = tremor_amp_rms * 2.828
         
-    # Convert pixels to centimeters using standard CSS layout definition: 96 px = 2.54 cm
-    # We apply a calibration factor of 10 to represent hand-in-the-air visual equivalent
-    tremor_amp_peak_cm = tremor_amp_peak_px * (2.54 / 96.0) * 10.0 if pd.notna(tremor_amp_peak_px) else np.nan
+    # Convert pixels to physical distance (mm and cm).
+    # Telemetry records viewport 820x1048 at DPR=2, uniquely matching 10.9" iPad (264 physical ppi / 2 = 132 CSS px/inch).
+    # Verified iPad calibration: 25.4 mm / 132 px = 0.192424 mm/px (0.0192424 cm/px).
+    # The arbitrary 10x multiplier previously used as a 'hand-in-the-air' equivalent is removed
+    # so that the primary physical measurement reflects true on-screen touch displacement.
+    IPAD_PX_TO_MM = 25.4 / 132.0 # ~0.192424 mm/px
+    tremor_amp_peak_mm = tremor_amp_peak_px * IPAD_PX_TO_MM if pd.notna(tremor_amp_peak_px) else np.nan
+    tremor_amp_peak_cm = tremor_amp_peak_mm / 10.0 if pd.notna(tremor_amp_peak_mm) else np.nan
     
-    # MDS-UPDRS Kinetic Tremor clinical grade mapping
-    if pd.isna(tremor_amp_peak_cm):
-        tremor_clinical_grade = np.nan
-    elif tremor_amp_peak_cm == 0 or tremor_amp_peak_px < 1.0: # threshold for no tremor
-        tremor_clinical_grade = 0.0
-    elif tremor_amp_peak_cm < 1.0:
-        tremor_clinical_grade = 1.0  # slight (< 1 cm equivalent)
-    elif tremor_amp_peak_cm < 3.0:
-        tremor_clinical_grade = 2.0  # mild (1-3 cm equivalent)
-    elif tremor_amp_peak_cm < 10.0:
-        tremor_clinical_grade = 3.0  # moderate (3-10 cm equivalent)
-    else:
-        tremor_clinical_grade = 4.0  # severe (>= 10 cm equivalent)
-        
-    return tremor_freq, tremor_power, tremor_amp_rms, tremor_amp_peak_px, tremor_amp_peak_cm, tremor_clinical_grade
+    return tremor_freq, tremor_power, tremor_amp_rms, tremor_amp_peak_px, tremor_amp_peak_cm
 
-def calculate_tapping_impairment_grade(freq, ratio, halts_count, double_taps_count, hesitations_count, mean_amp_mm, is_pinch=False):
-    """
-    Translates quantitative tapping/pinching metrics into an estimated MDS-UPDRS Item 3.4
-    clinical impairment grade (0 to 4) based on slowing, interruptions/halts, and amplitude decrement.
-    """
-    if pd.isna(freq):
-        return np.nan
-        
-    # 1. Speed (Slowing) Grade
-    if freq >= 4.5:
-        grade_slowing = 0.0
-    elif freq >= 3.5:
-        grade_slowing = 1.0  # Slight slowing
-    elif freq >= 2.5:
-        grade_slowing = 2.0  # Mild slowing
-    elif freq >= 1.5:
-        grade_slowing = 3.0  # Moderate slowing
-    else:
-        grade_slowing = 4.0  # Severe slowing
-        
-    # 2. Rhythm (Interruptions / Freezes) Grade
-    total_halts = halts_count if pd.notna(halts_count) else 0
-    total_doubles = double_taps_count if pd.notna(double_taps_count) else 0
-    total_interruptions = total_halts + total_doubles
-    total_hesitations = hesitations_count if pd.notna(hesitations_count) else 0
-    
-    if total_interruptions == 0 and total_hesitations == 0:
-        grade_rhythm = 0.0
-    elif (1 <= (total_interruptions + total_hesitations) <= 2):
-        grade_rhythm = 1.0  # Slight: 1-2 hesitations or interruptions
-    elif 3 <= total_interruptions <= 5:
-        grade_rhythm = 2.0  # Mild: 3-5 interruptions
-    elif total_interruptions > 5 or total_halts >= 1:
-        grade_rhythm = 3.0  # Moderate: > 5 interruptions or at least one freeze
-    else:
-        grade_rhythm = 0.0
-        
-    # 3. Amplitude Decrement Grade
-    if pd.isna(ratio):
-        grade_decrement = 0.0
-    elif ratio >= 0.85:
-        grade_decrement = 0.0
-    elif ratio >= 0.70:
-        grade_decrement = 1.0  # Slight: decrements near the end
-    elif ratio >= 0.50:
-        grade_decrement = 2.0  # Mild: decrements midway
-    elif ratio >= 0.30:
-        grade_decrement = 3.0  # Moderate: decrements early
-    else:
-        grade_decrement = 4.0  # Severe: extreme reduction
-        
-    # Overall MDS-UPDRS Grade is the maximum of any criteria met (the "Any of the following" rule)
-    overall_grade = max(grade_slowing, grade_rhythm, grade_decrement)
-    
-    # 4. Severe Override (barely able to perform task)
-    if freq < 1.0 or total_halts >= 3:
-        overall_grade = 4.0
-    elif is_pinch and (pd.notna(mean_amp_mm) and mean_amp_mm < 8.0):
-        overall_grade = 4.0
-        
-    return overall_grade
 
-def calculate_drag_impairment_grade(mean_speed, ratio, halts_count, hesitations_count, movement_time_ms):
-    """
-    Translates quantitative drag metrics into an estimated MDS-UPDRS Item 3.5
-    clinical impairment grade (0 to 4) based on slowing, interruptions/halts, and amplitude decrement.
-    """
-    if pd.isna(mean_speed):
-        return np.nan
-        
-    mean_speed_mm = mean_speed * (25.4 / 96.0)
-    
-    # 1. Speed (Slowing) Grade
-    if mean_speed_mm >= 250.0:
-        grade_slowing = 0.0
-    elif mean_speed_mm >= 200.0:
-        grade_slowing = 1.0  # Slight slowing
-    elif mean_speed_mm >= 150.0:
-        grade_slowing = 2.0  # Mild slowing
-    elif mean_speed_mm >= 100.0:
-        grade_slowing = 3.0  # Moderate slowing
-    else:
-        grade_slowing = 4.0  # Severe slowing
-        
-    # 2. Rhythm (Interruptions / Freezes) Grade
-    total_halts = halts_count if pd.notna(halts_count) else 0
-    total_hesitations = hesitations_count if pd.notna(hesitations_count) else 0
-    total_interruptions = total_halts + total_hesitations
-    
-    if total_interruptions == 0:
-        grade_rhythm = 0.0
-    elif 1 <= total_interruptions <= 2:
-        grade_rhythm = 1.0  # Slight: 1-2 hesitations or interruptions
-    elif 3 <= total_interruptions <= 5:
-        grade_rhythm = 2.0  # Mild: 3-5 interruptions
-    elif total_interruptions > 5 or total_halts >= 1:
-        grade_rhythm = 3.0  # Moderate: > 5 interruptions or at least one freeze
-    else:
-        grade_rhythm = 0.0
-        
-    # 3. Amplitude Decrement Grade
-    if pd.isna(ratio):
-        grade_decrement = 0.0
-    elif ratio >= 0.85:
-        grade_decrement = 0.0
-    elif ratio >= 0.70:
-        grade_decrement = 1.0  # Slight decrement
-    elif ratio >= 0.50:
-        grade_decrement = 2.0  # Mild decrement
-    elif ratio >= 0.30:
-        grade_decrement = 3.0  # Moderate decrement
-    else:
-        grade_decrement = 4.0  # Severe decrement
-        
-    overall_grade = max(grade_slowing, grade_rhythm, grade_decrement)
-    
-    # 4. Severe Override
-    if mean_speed_mm < 50.0 or (pd.notna(movement_time_ms) and movement_time_ms > 10000.0) or total_halts >= 3:
-        overall_grade = 4.0
-        
-    return overall_grade
 
 def extract_features_from_trial(row):
     """
@@ -526,7 +368,7 @@ def extract_features_from_trial(row):
                 
                 # Extract kinetic tremor from signed orthogonal deviations
                 signed_dists = signed_cross / task_axis_dist
-                k_freq, k_power, k_amp, k_amp_peak_px, k_amp_peak_cm, k_clinical_grade = extract_kinetic_tremor(times, signed_dists)
+                k_freq, k_power, k_amp, k_amp_peak_px, k_amp_peak_cm = extract_kinetic_tremor(times, signed_dists)
                 
                 # Deviation Decrement of deviations along the task path (using median)
                 abs_dists = np.abs(signed_dists)
@@ -576,7 +418,6 @@ def extract_features_from_trial(row):
                 k_amp = np.nan
                 k_amp_peak_px = np.nan
                 k_amp_peak_cm = np.nan
-                k_clinical_grade = np.nan
                 drag_deviation_slope = np.nan
                 drag_deviation_decrement_ratio = np.nan
                 drag_speed_slope = np.nan
@@ -591,7 +432,6 @@ def extract_features_from_trial(row):
             k_amp = np.nan
             k_amp_peak_px = np.nan
             k_amp_peak_cm = np.nan
-            k_clinical_grade = np.nan
             fitts_law_id = np.nan
             fitts_law_throughput = np.nan
             drag_deviation_slope = np.nan
@@ -606,59 +446,45 @@ def extract_features_from_trial(row):
         median_speed = np.median(vel) if len(vel) > 0 else np.nan
         peak_speed = np.max(vel) if len(vel) > 0 else np.nan
         
-        # Halts (movement stops: velocity drops below 5% of median speed for >= 250ms)
+        # Pauses / Interruptions (Drag Pause: Speed stays below 5% of peak movement speed for >= 100 ms strictly between movement initiation and termination)
+        # Movement initiation: first moment speed reaches >= 5% of peak movement speed.
+        # Movement termination: last moment speed was >= 5% of peak movement speed.
+        drag_pause_count = 0
+        drag_pause_durations = []
+        if len(vel) > 0 and pd.notna(peak_speed) and peak_speed > 0:
+            pause_threshold = 0.05 * peak_speed
+            active_indices = np.where(vel >= pause_threshold)[0]
+            if len(active_indices) >= 2:
+                i_init = active_indices[0]
+                i_term = active_indices[-1]
+                
+                curr_pause_start = None
+                for i in range(i_init + 1, i_term):
+                    if vel[i] < pause_threshold:
+                        if curr_pause_start is None:
+                            curr_pause_start = i
+                    else:
+                        if curr_pause_start is not None:
+                            dur = times[i] - times[curr_pause_start]
+                            if dur >= 100.0:
+                                drag_pause_count += 1
+                                drag_pause_durations.append(dur)
+                            curr_pause_start = None
+                if curr_pause_start is not None:
+                    dur = times[i_term] - times[curr_pause_start]
+                    if dur >= 100.0:
+                        drag_pause_count += 1
+                        drag_pause_durations.append(dur)
+                        
+        drag_longest_pause_duration = max(drag_pause_durations) if drag_pause_durations else 0.0
+        drag_pause_total_duration = sum(drag_pause_durations) if drag_pause_durations else 0.0
+
         halts_count = 0
         halts_duration = 0.0
-        halt_intervals = []
-        halt_durations = []
-        if len(vel) > 0 and pd.notna(median_speed) and median_speed > 0:
-            halt_threshold = 0.05 * median_speed
-            halt_mask = vel < halt_threshold
-            padded_halt = np.concatenate(([False], halt_mask, [False]))
-            diffs_halt = np.diff(padded_halt.astype(int))
-            starts_halt = np.where(diffs_halt == 1)[0]
-            ends_halt = np.where(diffs_halt == -1)[0]
-            for s, e in zip(starts_halt, ends_halt):
-                duration = times[e] - times[s]
-                if duration >= 250:
-                    halts_count += 1
-                    halts_duration += duration
-                    halt_intervals.append((s, e))
-                    halt_durations.append(duration)
-
-        # Hesitations (velocity drops below 30% of median speed for >= 100ms)
-        # Excludes any hesitation interval that overlaps with a halt interval (halts take precedence)
-        hesitations_count = 0
-        hesitations_duration = 0.0
-        hesitation_durations = []
-        if len(vel) > 0 and pd.notna(median_speed) and median_speed > 0:
-            hes_threshold = 0.3 * median_speed
-            hes_mask = vel < hes_threshold
-            padded_hes = np.concatenate(([False], hes_mask, [False]))
-            diffs_hes = np.diff(padded_hes.astype(int))
-            starts_hes = np.where(diffs_hes == 1)[0]
-            ends_hes = np.where(diffs_hes == -1)[0]
-            for s, e in zip(starts_hes, ends_hes):
-                duration = times[e] - times[s]
-                if duration >= 100:
-                    # Check overlap with any halt interval
-                    overlaps_with_halt = False
-                    for halt_s, halt_e in halt_intervals:
-                        if max(s, halt_s) < min(e, halt_e):
-                            overlaps_with_halt = True
-                            break
-                    if not overlaps_with_halt:
-                        hesitations_count += 1
-                        hesitations_duration += duration
-                        hesitation_durations.append(duration)
-
-        pause_threshold = 10.0 # arbitrary px/s threshold for halt
-        pauses = vel < pause_threshold
-        pause_count = np.sum(np.diff(pauses.astype(int)) == 1)
-        
-        # Calculate longest relative hesitation/halt duration
-        all_durations = halt_durations + hesitation_durations
-        longest_pause_duration = max(all_durations) if all_durations else 0.0
+        hesitations_count = drag_pause_count
+        hesitations_duration = drag_pause_total_duration
+        pause_count = drag_pause_count
+        longest_pause_duration = drag_longest_pause_duration
 
         mean_accel = np.mean(acc) if len(acc) > 0 else np.nan
         mean_abs_jerk = np.mean(np.abs(jerk)) if len(jerk) > 0 else np.nan
@@ -704,18 +530,12 @@ def extract_features_from_trial(row):
             'task_axis_crossings_count': task_axis_crossings_count,
             'kinetic_tremor_frequency_hz': k_freq,
             'kinetic_tremor_power': k_power,
-            'kinetic_tremor_amplitude': k_amp * (2.54 / 96.0) * 10.0 if pd.notna(k_amp) else np.nan,
+            'kinetic_tremor_amplitude': k_amp if pd.notna(k_amp) else np.nan,
+            'kinetic_tremor_amplitude_px': k_amp if pd.notna(k_amp) else np.nan,
+            'kinetic_tremor_amplitude_mm': k_amp * (25.4 / 132.0) if pd.notna(k_amp) else np.nan,
             'drag_tremor_amplitude_peak_px': k_amp_peak_px,
+            'drag_tremor_amplitude_peak_mm': k_amp_peak_px * (25.4 / 132.0) if pd.notna(k_amp_peak_px) else np.nan,
             'drag_tremor_amplitude_peak_cm': k_amp_peak_cm,
-            'drag_tremor_clinical_grade': max(
-                k_clinical_grade if pd.notna(k_clinical_grade) else 0.0,
-                0.0 if not pd.notna(path_eff) else (
-                    0.0 if path_eff >= 0.98 else
-                    1.0 if path_eff >= 0.95 else
-                    2.0 if path_eff >= 0.90 else
-                    3.0 if path_eff >= 0.80 else 4.0
-                )
-            ),
             'drag_deviation_slope': drag_deviation_slope,
             'drag_deviation_decrement_ratio': drag_deviation_decrement_ratio,
             'drag_speed_slope': drag_speed_slope,
@@ -742,13 +562,15 @@ def extract_features_from_trial(row):
             'mean_abs_jerk': mean_abs_jerk,
             'peak_jerk': peak_jerk,
             'pause_count': pause_count,
-            'longest_hesitation_halt_duration': longest_pause_duration,
+            'drag_pause_count': pause_count,
+            'longest_pause_duration_ms': float(longest_pause_duration),
+            'drag_longest_pause_duration_ms': float(longest_pause_duration),
+            'longest_hesitation_halt_duration': float(longest_pause_duration),
             'setup_time': float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else np.nan,
             'initiation_delay': float(valid_pts[start_idx]['t'] - valid_pts[0]['t']) if len(valid_pts) > start_idx else (float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else 0.0),
             'movement_time_ms': row.get('movement_time_ms'),
             'fitts_law_id': fitts_law_id,
-            'fitts_law_throughput': fitts_law_throughput,
-            'drag_clinical_impairment_grade': calculate_drag_impairment_grade(mean_speed, drag_deviation_decrement_ratio, halts_count, hesitations_count, row.get('movement_time_ms'))
+            'fitts_law_throughput': fitts_law_throughput
         })
         
     elif task == 'tap':
@@ -860,19 +682,25 @@ def extract_features_from_trial(row):
         else:
             tap_interval_decrement_ratio = np.nan
 
-        # 3. Hesitations & Halts
-        hesitations = 0
-        hesitations_duration = 0.0
-        halts = 0
-        halts_duration = 0.0
-        # 3. Hesitations & Halts (Dynamic rhythm-based, relative to subject's own median)
+        # 3. Pauses, Hesitations & Halts (Dynamic rhythm-based, relative to subject's own median)
+        # Pause count: Intertap interval greater than 1.5x median
+        # Longest Duration: Largest excess interval (iti - med_intertap)
         med_intertap = np.median(intertap) if len(intertap) > 0 else np.nan
         max_intertap = np.max(intertap) if len(intertap) > 0 else np.nan
         tap_halt_ratio = med_intertap / max_intertap if (pd.notna(med_intertap) and max_intertap > 0) else np.nan
         
+        tap_pause_count = 0
+        tap_excess_durations = []
+        halts = 0
+        halts_duration = 0.0
+        hesitations = 0
+        hesitations_duration = 0.0
         disruption_durations = []
         if len(intertap) > 0 and pd.notna(med_intertap) and med_intertap > 0:
             for iti in intertap:
+                if iti > 1.5 * med_intertap:
+                    tap_pause_count += 1
+                    tap_excess_durations.append(iti - med_intertap)
                 if iti > 2.0 * med_intertap:
                     halts += 1
                     halts_duration += iti
@@ -882,7 +710,10 @@ def extract_features_from_trial(row):
                     hesitations_duration += iti
                     disruption_durations.append(iti)
                     
+        tap_longest_pause_duration_ms = max(tap_excess_durations) if tap_excess_durations else 0.0
         longest_hesitation_halt_duration_ms = max(disruption_durations) if disruption_durations else 0.0
+        num_intertap = len(intertap)
+        tap_pause_ratio = (tap_pause_count / num_intertap) if num_intertap > 0 else 0.0
 
         # 4. Double Taps (Sequence violations)
         double_taps = 0
@@ -908,14 +739,13 @@ def extract_features_from_trial(row):
         k_amp = np.nan
         k_amp_peak_px = np.nan
         k_amp_peak_cm = np.nan
-        k_clinical_grade = np.nan
         
         traj = row.get('trajectory', [])
         if isinstance(traj, list) and len(traj) >= 10:
             traj_times = np.array([pt['t'] for pt in traj if 't' in pt])
             traj_coords = np.array([[pt['x'], pt['y']] for pt in traj if 'x' in pt and 'y' in pt])
             if len(traj_times) >= 10 and (traj_times[-1] - traj_times[0]) >= 2000:
-                k_freq, k_power, k_amp, k_amp_peak_px, k_amp_peak_cm, k_clinical_grade = extract_tremor(traj_times, traj_coords)
+                k_freq, k_power, k_amp, k_amp_peak_px, k_amp_peak_cm = extract_tremor(traj_times, traj_coords)
             
         raw_init = row.get('initiation_delay')
         trial_num = row.get('trial_number', 1)
@@ -952,9 +782,16 @@ def extract_features_from_trial(row):
             'hesitations_duration_ms': hesitations_duration,
             'halts_count': halts,
             'halts_duration_ms': halts_duration,
-            'hesitations_halts_count': hesitations + halts,
+            'hesitations_halts_count': tap_pause_count,
             'hesitations_halts_duration_ms': hesitations_duration + halts_duration,
-            'longest_hesitation_halt_duration_ms': float(longest_hesitation_halt_duration_ms),
+            'longest_hesitation_halt_duration_ms': float(tap_longest_pause_duration_ms),
+            'pause_count': tap_pause_count,
+            'tap_pause_count': tap_pause_count,
+            'pause_ratio': tap_pause_ratio,
+            'tap_pause_ratio': tap_pause_ratio,
+            'num_intertap_intervals': num_intertap,
+            'longest_pause_duration_ms': float(tap_longest_pause_duration_ms),
+            'tap_longest_pause_duration_ms': float(tap_longest_pause_duration_ms),
             'tap_halt_ratio': tap_halt_ratio,
             'double_taps_count': double_taps,
             'interruptions_count': interruptions,
@@ -962,9 +799,7 @@ def extract_features_from_trial(row):
             'tap_tremor_power': k_power,
             'tap_tremor_amplitude': k_amp,
             'tap_tremor_amplitude_peak_px': k_amp_peak_px,
-            'tap_tremor_amplitude_peak_mm': k_amp_peak_px * (25.4 / 96.0) if pd.notna(k_amp_peak_px) else np.nan,
-            'tap_tremor_clinical_grade': k_clinical_grade,
-            'tap_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, amplitude_decrement_ratio, halts, double_taps, hesitations, median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan)
+            'tap_tremor_amplitude_peak_mm': k_amp_peak_px * (25.4 / 132.0) if pd.notna(k_amp_peak_px) else np.nan
         })
     elif task == 'hold':
         events = row.get('hold_events', [])
@@ -987,7 +822,7 @@ def extract_features_from_trial(row):
         spatial_sd = np.std(np.linalg.norm(coords - centroid, axis=1))
         
         # Spectral Extraction
-        tremor_freq, tremor_power, tremor_amp, tremor_amp_peak_px, tremor_amp_peak_cm, tremor_clinical_grade = extract_tremor(times, coords)
+        tremor_freq, tremor_power, tremor_amp, tremor_amp_peak_px, tremor_amp_peak_cm = extract_tremor(times, coords)
         
         # Pressure (Force) Extraction
         forces = [pt.get('force') for pt in events if 'force' in pt and pt.get('force') is not None]
@@ -1014,10 +849,12 @@ def extract_features_from_trial(row):
             'hold_mean_abs_jerk': np.mean(np.abs(jerk)) if len(jerk) > 0 else np.nan,
             'hold_tremor_frequency_hz': tremor_freq,
             'hold_tremor_power': tremor_power,
-            'hold_tremor_amplitude': tremor_amp * (2.54 / 96.0) * 10.0 if pd.notna(tremor_amp) else np.nan,
+            'hold_tremor_amplitude': tremor_amp if pd.notna(tremor_amp) else np.nan,
+            'hold_tremor_amplitude_px': tremor_amp if pd.notna(tremor_amp) else np.nan,
+            'hold_tremor_amplitude_mm': tremor_amp * (25.4 / 132.0) if pd.notna(tremor_amp) else np.nan,
             'hold_tremor_amplitude_peak_px': tremor_amp_peak_px,
+            'hold_tremor_amplitude_peak_mm': tremor_amp_peak_px * (25.4 / 132.0) if pd.notna(tremor_amp_peak_px) else np.nan,
             'hold_tremor_amplitude_peak_cm': tremor_amp_peak_cm,
-            'hold_tremor_clinical_grade': tremor_clinical_grade,
             'hold_mean_force': np.mean(forces) if force_valid else np.nan,
             'hold_max_force': np.max(forces) if force_valid else np.nan,
             'hold_force_variability': np.std(forces) if force_valid else np.nan,
@@ -1129,8 +966,22 @@ def extract_features_from_trial(row):
         # Peak opening distances (amplitude of fingers being apart)
         peak_distances_px = [distances_smooth[p] for p in peaks] if len(peaks) > 0 else []
         peak_distances_mm = [d * (25.4 / 96.0) for d in peak_distances_px]
+        pinch_max_opening_distance_px = np.max(peak_distances_px) if len(peak_distances_px) > 0 else np.nan
+        pinch_median_opening_distance_px = np.median(peak_distances_px) if len(peak_distances_px) > 0 else np.nan
+        pinch_mean_opening_distance_px = np.mean(peak_distances_px) if len(peak_distances_px) > 0 else np.nan
         pinch_max_opening_distance_mm = np.max(peak_distances_mm) if len(peak_distances_mm) > 0 else np.nan
         pinch_median_opening_distance_mm = np.median(peak_distances_mm) if len(peak_distances_mm) > 0 else np.nan
+        pinch_mean_opening_distance_mm = np.mean(peak_distances_mm) if len(peak_distances_mm) > 0 else np.nan
+        
+        # Pinch Amplitude Disruption Count (Exploratory Hesitation/Halt Measure)
+        # Flagged if the opening amplitude is > 20% smaller than the average of the immediately preceding and following openings.
+        pinch_amplitude_disruption_count = 0
+        if len(peak_distances_px) >= 3:
+            for i in range(1, len(peak_distances_px) - 1):
+                neighbor_avg = (peak_distances_px[i - 1] + peak_distances_px[i + 1]) / 2.0
+                if neighbor_avg > 0:
+                    if (neighbor_avg - peak_distances_px[i]) / neighbor_avg > 0.20:
+                        pinch_amplitude_disruption_count += 1
         
         # Decrement (using peak opening distances in mm)
         if len(peak_distances_mm) > 1:
@@ -1175,25 +1026,87 @@ def extract_features_from_trial(row):
         else:
             pinch_speed_decrement_ratio = np.nan
             
-        # Hesitations & Halts (Dynamic rhythm-based, relative to subject's own median)
-        med_cycle = np.median(cycle_intervals) if len(cycle_intervals) > 0 else np.nan
-        hesitations = 0
-        hesitations_duration = 0.0
+        # Velocity-based Pause Detection (Analogous to Drag Task)
+        # Evaluated continuously from the finger opening/closing distance trajectory.
+        # Speed stays below 5% of peak movement speed for >= 100 ms between movement initiation and termination.
+        clean_pts = []
+        last_t = -1
+        for pt in sorted(valid_points, key=lambda x: x['t']):
+            if pt['t'] > last_t:
+                clean_pts.append(pt)
+                last_t = pt['t']
+
+        pinch_pause_count = 0
+        pinch_pause_durations = []
+        if len(clean_pts) >= 5:
+            c_times = np.array([pt['t'] for pt in clean_pts], dtype=float)
+            c_dists = np.array([pt['distance'] for pt in clean_pts], dtype=float)
+            
+            if c_times[-1] - c_times[0] >= 100.0:
+                t_uniform = np.arange(c_times[0], c_times[-1], 20.0)
+                if len(t_uniform) >= 5:
+                    f_d = interp1d(c_times, c_dists, kind='linear', fill_value='extrapolate')(t_uniform)
+                    d_smooth_u = savgol_filter(f_d, 7, 2)
+                    pinch_vel = np.abs(np.diff(d_smooth_u)) / 0.020  # px/s
+                    t_mid = t_uniform[:-1]
+
+                    # Define peak speed using the 95th percentile of continuous 2-touch speed
+                    # to protect against single-frame touch drops, swaps, or glitch spikes.
+                    two_touch_times = [
+                        p['t'] for p in traj 
+                        if (p.get('state') == '2_touches_active' or p.get('num_touches') == 2) 
+                        and 't' in p and p['t'] is not None
+                    ]
+                    if len(two_touch_times) > 0:
+                        is_2touch = np.zeros(len(t_mid), dtype=bool)
+                        for t2 in two_touch_times:
+                            is_2touch |= (np.abs(t_mid - t2) <= 25.0)
+                        vel_2touch = pinch_vel[is_2touch]
+                    else:
+                        vel_2touch = np.array([])
+
+                    if len(vel_2touch) >= 5:
+                        pinch_peak_speed = float(np.percentile(vel_2touch, 95))
+                    elif len(pinch_vel) >= 5:
+                        pinch_peak_speed = float(np.percentile(pinch_vel, 95))
+                    elif len(pinch_vel) > 0:
+                        pinch_peak_speed = float(np.max(pinch_vel))
+                    else:
+                        pinch_peak_speed = np.nan
+                    
+                    if pd.notna(pinch_peak_speed) and pinch_peak_speed > 0:
+                        pause_threshold = 0.05 * pinch_peak_speed
+                        active_indices = np.where((pinch_vel >= pause_threshold) & is_2touch)[0]
+                        if len(active_indices) >= 2:
+                            i_init = active_indices[0]
+                            i_term = active_indices[-1]
+                            
+                            curr_pause_start = None
+                            for i in range(i_init + 1, i_term):
+                                if pinch_vel[i] < pause_threshold and is_2touch[i]:
+                                    if curr_pause_start is None:
+                                        curr_pause_start = i
+                                else:
+                                    if curr_pause_start is not None:
+                                        dur = t_mid[i] - t_mid[curr_pause_start]
+                                        if dur >= 100.0:
+                                            pinch_pause_count += 1
+                                            pinch_pause_durations.append(dur)
+                                        curr_pause_start = None
+                            if curr_pause_start is not None:
+                                dur = t_mid[i_term] - t_mid[curr_pause_start]
+                                if dur >= 100.0:
+                                    pinch_pause_count += 1
+                                    pinch_pause_durations.append(dur)
+
+        pinch_longest_pause_duration_ms = max(pinch_pause_durations) if pinch_pause_durations else 0.0
+        pinch_pause_total_duration_ms = sum(pinch_pause_durations) if pinch_pause_durations else 0.0
+        num_cycles = len(cycle_intervals)
+        pinch_pause_ratio = (pinch_pause_count / num_cycles) if num_cycles > 0 else 0.0
+        hesitations = pinch_pause_count
+        hesitations_duration = pinch_pause_total_duration_ms
         halts = 0
         halts_duration = 0.0
-        disruption_durations = []
-        if len(cycle_intervals) > 0 and pd.notna(med_cycle) and med_cycle > 0:
-            for iti in cycle_intervals:
-                if iti > 2.0 * med_cycle:
-                    halts += 1
-                    halts_duration += iti
-                    disruption_durations.append(iti)
-                elif iti > 1.5 * med_cycle:
-                    hesitations += 1
-                    hesitations_duration += iti
-                    disruption_durations.append(iti)
-                    
-        pinch_longest_hesitation_halt_duration_ms = max(disruption_durations) if disruption_durations else 0.0
 
         # Pinch Lift-Offs (touch interruptions)
         pinch_lifts_count = 0
@@ -1252,8 +1165,12 @@ def extract_features_from_trial(row):
             'cv_pinch_interval': cv_interval,
             'median_pinch_amplitude_px': median_amplitude,
             'median_pinch_amplitude_mm': median_amplitude * (25.4 / 96.0) if pd.notna(median_amplitude) else np.nan,
+            'pinch_max_opening_distance_px': pinch_max_opening_distance_px,
+            'pinch_median_opening_distance_px': pinch_median_opening_distance_px,
+            'pinch_mean_opening_distance_px': pinch_mean_opening_distance_px,
             'pinch_max_opening_distance_mm': pinch_max_opening_distance_mm,
             'pinch_median_opening_distance_mm': pinch_median_opening_distance_mm,
+            'pinch_mean_opening_distance_mm': pinch_mean_opening_distance_mm,
             'pinch_opening_distance_slope_mm': opening_distance_slope,
             'pinch_opening_distance_decrement_ratio': opening_distance_decrement_ratio,
             'pinch_speed_slope': pinch_speed_slope,
@@ -1264,9 +1181,17 @@ def extract_features_from_trial(row):
             'pinch_hesitations_duration_ms': hesitations_duration,
             'pinch_halts_count': halts,
             'pinch_halts_duration_ms': halts_duration,
-            'pinch_hesitations_halts_count': hesitations + halts,
+            'pinch_hesitations_halts_count': pinch_pause_count,
             'pinch_hesitations_halts_duration_ms': hesitations_duration + halts_duration,
-            'pinch_longest_hesitation_halt_duration_ms': float(pinch_longest_hesitation_halt_duration_ms),
+            'pinch_longest_hesitation_halt_duration_ms': float(pinch_longest_pause_duration_ms),
+            'pause_count': pinch_pause_count,
+            'pinch_pause_count': pinch_pause_count,
+            'pause_ratio': pinch_pause_ratio,
+            'pinch_pause_ratio': pinch_pause_ratio,
+            'num_cycle_intervals': num_cycles,
+            'longest_pause_duration_ms': float(pinch_longest_pause_duration_ms),
+            'pinch_longest_pause_duration_ms': float(pinch_longest_pause_duration_ms),
+            'pinch_amplitude_disruption_count': pinch_amplitude_disruption_count,
             'pinch_lifts_count': pinch_lifts_count,
             'pinch_lifts_duration_ms': pinch_lifts_duration_ms,
             'pinch_mean_lift_duration_ms': pinch_mean_lift_duration_ms,
@@ -1276,8 +1201,7 @@ def extract_features_from_trial(row):
             'pinch_median_opening_speed_mm_s': median_opening_speed_mm,
             'pinch_max_opening_velocity_mm_s': max_opening_velocity_mm,
             'setup_time': float(row.get('initiation_delay')) if row.get('initiation_delay') is not None else np.nan,
-            'initiation_delay': initiation_delay,
-            'pinch_clinical_impairment_grade': calculate_tapping_impairment_grade(freq, opening_distance_decrement_ratio, halts, 0, hesitations, pinch_median_opening_distance_mm, is_pinch=True)
+            'initiation_delay': initiation_delay
         })
         
     return pd.Series(dtype=float)

@@ -31,36 +31,70 @@ def deduplicate_trials(trials_df):
         
     return trials_df
 
+def get_trial_counts(trials_df, participants_df=None, sessions_df=None):
+    """
+    Returns an unstacked DataFrame of distinct trial numbers per participant and task type.
+    Useful for quick preprocessing verification.
+    """
+    df = trials_df.copy()
+    if sessions_df is not None and not sessions_df.empty:
+        main_mask = (sessions_df['session_type'] == 'main') if 'session_type' in sessions_df.columns else pd.Series(True, index=sessions_df.index)
+        if 'completed' in sessions_df.columns:
+            main_mask = main_mask & (sessions_df['completed'] == True)
+        df = df[df['session_id'].isin(sessions_df[main_mask]['id'])]
+        
+    if participants_df is not None and 'participant_code' in participants_df.columns:
+        p_map = dict(zip(participants_df['id'], participants_df['participant_code']))
+        df['participant_code'] = df['participant_id'].map(p_map).fillna(df['participant_id'])
+        subj_col = 'participant_code'
+    else:
+        subj_col = 'participant_id'
+        
+    return df.groupby([subj_col, 'task_type'])['trial_number'].nunique().unstack(fill_value=0)
+
 def remap_control_participants(participants_df):
     """
-    Automatically remaps control/caregiver group participants to C01, C02, etc.,
-    ordered by creation timestamp, even if selected as P07, P08 in app dropdown.
+    Remaps participant codes and cohorts based on diagnosis and code order (NOT timestamps):
+    - Control cohort: Participants with diagnosis in ['control', 'caregiver', 'other', etc.]
+      are mapped to C01, C02, etc. in numerical order of their original app codes (P07 -> C01, P08 -> C02, etc.).
+    - Parkinson's cohort: Participants with diagnosis 'parkinsons' retain their P-codes (P01-P06),
+      and additional PD participants are mapped sequentially in code order (P21 -> P07, etc.).
     """
     if participants_df.empty or 'participant_group' not in participants_df.columns:
         return participants_df
         
     df_out = participants_df.copy()
     
-    # Check if there are any control/caregiver participants to remap
-    control_mask = df_out['participant_group'].astype(str).str.lower().isin(['control', 'caregiver', 'healthy', 'hc', 'other', 'normative'])
-    if not control_mask.any():
-        return df_out
-        
-    # Sort control participants by created_at timestamp
-    if 'created_at' in df_out.columns:
-        df_out['created_dt'] = pd.to_datetime(df_out['created_at'], format='mixed')
-        df_out = df_out.sort_values(by='created_dt').reset_index(drop=True)
-        
-    control_counter = 1
-    for idx, row in df_out.iterrows():
-        group = str(row.get('participant_group', '')).lower()
-        if group in ['control', 'caregiver', 'healthy', 'hc', 'other', 'normative']:
-            df_out.at[idx, 'participant_code'] = f"C{control_counter:02d}"
-            control_counter += 1
+    def extract_code_num(c):
+        digits = ''.join(filter(str.isdigit, str(c)))
+        return int(digits) if digits else 999
+
+    # 1. Remap controls based on diagnosis and code order (e.g. P07 -> C01, P08 -> C02 ... P20 -> C14)
+    control_mask = df_out['participant_group'].astype(str).str.lower().isin(
+        ['control', 'caregiver', 'healthy', 'hc', 'other', 'normative']
+    )
+    if control_mask.any():
+        control_indices = sorted(
+            df_out[control_mask].index,
+            key=lambda idx: extract_code_num(df_out.at[idx, 'participant_code'])
+        )
+        for counter, idx in enumerate(control_indices, 1):
+            df_out.at[idx, 'participant_code'] = f"C{counter:02d}"
             
-    if 'created_dt' in df_out.columns:
-        df_out = df_out.drop(columns=['created_dt'])
-        
+    # 2. Parkinson's cohort: determined by diagnosis ('parkinsons' / 'pd') and code order
+    pd_mask = df_out['participant_group'].astype(str).str.lower().isin(['parkinsons', 'pd'])
+    if pd_mask.any():
+        existing_pd = {'P01', 'P02', 'P03', 'P04', 'P05', 'P06'}
+        extra_pd_indices = [
+            idx for idx in df_out[pd_mask].index 
+            if str(df_out.at[idx, 'participant_code']).strip() not in existing_pd
+        ]
+        # Map additional PD participants by app code offset (e.g. P21 -> P07, P24 -> P10, P25 -> P11)
+        for idx in extra_pd_indices:
+            num = extract_code_num(df_out.at[idx, 'participant_code'])
+            mapped_num = (num - 14) if num >= 21 else num
+            df_out.at[idx, 'participant_code'] = f"P{mapped_num:02d}"
+                
     return df_out
 
 def load_from_csv(data_dir="data", remap_controls=True):
